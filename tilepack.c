@@ -1,0 +1,424 @@
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <curses.h>
+#include "tilepack.h"
+#include "generated/rogue_tile_mapping.h"
+
+#define ROGUE_TILEPACK_MAX_TEXT 262144
+#define ROGUE_TILEPACK_MAX_ENTRIES 128
+
+static ROGUE_TILEPACK_ENTRY entries[ROGUE_TILEPACK_MAX_ENTRIES];
+static int entry_count = 0;
+static char atlas_path[512] = "assets/rltiles/rltiles-2d.png";
+static int atlas_columns = 30;
+static int source_width = 32;
+static int source_height = 32;
+static char status_text[256] = "built-in generated tile mapping";
+static bool loaded = FALSE;
+
+static char *
+read_text_file(const char *path)
+{
+    FILE *file;
+    long size;
+    char *text;
+
+    file = fopen(path, "rb");
+    if (file == NULL)
+	return NULL;
+
+    fseek(file, 0, SEEK_END);
+    size = ftell(file);
+    if (size < 0 || size > ROGUE_TILEPACK_MAX_TEXT)
+    {
+	fclose(file);
+	return NULL;
+    }
+
+    fseek(file, 0, SEEK_SET);
+    text = (char *) calloc((size_t) size + 1, 1);
+    if (text == NULL)
+    {
+	fclose(file);
+	return NULL;
+    }
+
+    fread(text, 1, (size_t) size, file);
+    fclose(file);
+    return text;
+}
+
+static const char *
+skip_ws(const char *p)
+{
+    while (*p != '\0' && isspace((unsigned char) *p))
+	p++;
+    return p;
+}
+
+static const char *
+parse_json_string(const char *p, char *out, size_t out_size)
+{
+    char *w;
+
+    p = skip_ws(p);
+    if (*p != '"')
+	return NULL;
+
+    p++;
+    w = out;
+    while (*p != '\0' && *p != '"')
+    {
+	if (*p == '\\' && p[1] != '\0')
+	    p++;
+	if ((size_t) (w - out) + 1 < out_size)
+	    *w++ = *p;
+	p++;
+    }
+
+    if (*p != '"')
+	return NULL;
+
+    *w = '\0';
+    return p + 1;
+}
+
+static bool
+json_string_field(const char *json, const char *key, char *out, size_t out_size)
+{
+    char pattern[96];
+    const char *p;
+
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    p = strstr(json, pattern);
+    if (p == NULL)
+	return FALSE;
+
+    p = strchr(p + strlen(pattern), ':');
+    if (p == NULL)
+	return FALSE;
+
+    return parse_json_string(p + 1, out, out_size) != NULL;
+}
+
+static bool
+json_int_field(const char *json, const char *key, int *out)
+{
+    char pattern[96];
+    const char *p;
+
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    p = strstr(json, pattern);
+    if (p == NULL)
+	return FALSE;
+
+    p = strchr(p + strlen(pattern), ':');
+    if (p == NULL)
+	return FALSE;
+
+    p = skip_ws(p + 1);
+    if (*p == '\0')
+	return FALSE;
+
+    *out = atoi(p);
+    return TRUE;
+}
+
+static const char *
+object_end(const char *p)
+{
+    int depth;
+    bool in_string;
+    bool escaped;
+
+    depth = 0;
+    in_string = FALSE;
+    escaped = FALSE;
+
+    while (*p != '\0')
+    {
+	if (in_string)
+	{
+	    if (escaped)
+		escaped = FALSE;
+	    else if (*p == '\\')
+		escaped = TRUE;
+	    else if (*p == '"')
+		in_string = FALSE;
+	}
+	else
+	{
+	    if (*p == '"')
+		in_string = TRUE;
+	    else if (*p == '{')
+		depth++;
+	    else if (*p == '}')
+	    {
+		depth--;
+		if (depth == 0)
+		    return p + 1;
+	    }
+	}
+	p++;
+    }
+
+    return NULL;
+}
+
+static void
+dirname_of(const char *path, char *out, size_t out_size)
+{
+    char *slash;
+
+    strncpy(out, path, out_size - 1);
+    out[out_size - 1] = '\0';
+
+    slash = strrchr(out, '/');
+    if (slash == NULL)
+	slash = strrchr(out, '\\');
+
+    if (slash == NULL)
+    {
+	strncpy(out, ".", out_size - 1);
+	out[out_size - 1] = '\0';
+	return;
+    }
+
+    *slash = '\0';
+}
+
+static void
+join_path(const char *dir, const char *name, char *out, size_t out_size)
+{
+    snprintf(out, out_size, "%s/%s", dir, name);
+}
+
+static void
+reset_to_generated(void)
+{
+    entry_count = 0;
+    strncpy(atlas_path, rogue_tile_atlas_path(), sizeof(atlas_path) - 1);
+    atlas_path[sizeof(atlas_path) - 1] = '\0';
+    atlas_columns = rogue_tile_atlas_columns();
+    source_width = rogue_tile_atlas_source_width();
+    source_height = rogue_tile_atlas_source_height();
+}
+
+static bool
+add_entry(const char *role, int index, const char *name)
+{
+    ROGUE_TILEPACK_ENTRY *entry;
+
+    if (entry_count >= ROGUE_TILEPACK_MAX_ENTRIES)
+	return FALSE;
+
+    entry = &entries[entry_count++];
+    strncpy(entry->role, role, sizeof(entry->role) - 1);
+    entry->role[sizeof(entry->role) - 1] = '\0';
+    strncpy(entry->name, name, sizeof(entry->name) - 1);
+    entry->name[sizeof(entry->name) - 1] = '\0';
+    entry->index = index;
+    return TRUE;
+}
+
+static void
+parse_mapping_roles(const char *json)
+{
+    const char *roles;
+    const char *p;
+    const char *end;
+    char role[64];
+    char name[128];
+    int index;
+    char object_text[1024];
+    const char *object_stop;
+    size_t object_len;
+
+    roles = strstr(json, "\"roles\"");
+    if (roles == NULL)
+	return;
+
+    p = strchr(roles, '{');
+    if (p == NULL)
+	return;
+    end = object_end(p);
+    if (end == NULL)
+	return;
+    p++;
+
+    while (p < end && *p != '\0')
+    {
+	p = skip_ws(p);
+	if (*p == ',')
+	{
+	    p++;
+	    continue;
+	}
+	if (*p == '}')
+	    break;
+
+	p = parse_json_string(p, role, sizeof(role));
+	if (p == NULL)
+	    break;
+	p = skip_ws(p);
+	if (*p != ':')
+	    break;
+	p = skip_ws(p + 1);
+	if (*p != '{')
+	    break;
+
+	object_stop = object_end(p);
+	if (object_stop == NULL)
+	    break;
+	object_len = (size_t) (object_stop - p);
+	if (object_len == 0 || object_len >= sizeof(object_text))
+	    break;
+	memcpy(object_text, p, object_len);
+	object_text[object_len] = '\0';
+	p += object_len;
+
+	if (!json_int_field(object_text, "index", &index))
+	    continue;
+	if (!json_string_field(object_text, "name", name, sizeof(name)))
+	{
+	    strncpy(name, role, sizeof(name) - 1);
+	    name[sizeof(name) - 1] = '\0';
+	}
+
+	add_entry(role, index, name);
+    }
+}
+
+static bool
+load_tilepack_file(const char *tilepack_path)
+{
+    char *tilepack_json;
+    char *mapping_json;
+    char dir[512];
+    char image_name[256];
+    char mapping_name[256];
+    char mapping_path[512];
+
+    tilepack_json = read_text_file(tilepack_path);
+    if (tilepack_json == NULL)
+	return FALSE;
+
+    if (!json_string_field(tilepack_json, "image", image_name, sizeof(image_name))
+	|| !json_string_field(tilepack_json, "mapping", mapping_name,
+			      sizeof(mapping_name))
+	|| !json_int_field(tilepack_json, "tileWidth", &source_width)
+	|| !json_int_field(tilepack_json, "tileHeight", &source_height)
+	|| !json_int_field(tilepack_json, "columns", &atlas_columns)
+	|| source_width <= 0 || source_height <= 0 || atlas_columns <= 0)
+    {
+	free(tilepack_json);
+	return FALSE;
+    }
+
+    dirname_of(tilepack_path, dir, sizeof(dir));
+    join_path(dir, image_name, atlas_path, sizeof(atlas_path));
+    join_path(dir, mapping_name, mapping_path, sizeof(mapping_path));
+
+    mapping_json = read_text_file(mapping_path);
+    if (mapping_json == NULL)
+    {
+	free(tilepack_json);
+	return FALSE;
+    }
+
+    entry_count = 0;
+    parse_mapping_roles(mapping_json);
+    snprintf(status_text, sizeof(status_text), "loaded %s with %d role mappings",
+	     tilepack_path, entry_count);
+    free(mapping_json);
+    free(tilepack_json);
+    return entry_count > 0;
+}
+
+bool
+rogue_tilepack_load(void)
+{
+    if (loaded)
+	return TRUE;
+
+    loaded = TRUE;
+    reset_to_generated();
+
+    if (load_tilepack_file("tilepacks/active/tilepack.json"))
+	return TRUE;
+    if (load_tilepack_file("tilepacks/default/tilepack.json"))
+	return TRUE;
+
+    snprintf(status_text, sizeof(status_text),
+	     "using generated fallback tile mapping");
+    return FALSE;
+}
+
+const char *
+rogue_tilepack_atlas_path(void)
+{
+    rogue_tilepack_load();
+    return atlas_path;
+}
+
+int
+rogue_tilepack_columns(void)
+{
+    rogue_tilepack_load();
+    return atlas_columns;
+}
+
+int
+rogue_tilepack_source_width(void)
+{
+    rogue_tilepack_load();
+    return source_width;
+}
+
+int
+rogue_tilepack_source_height(void)
+{
+    rogue_tilepack_load();
+    return source_height;
+}
+
+int
+rogue_tilepack_lookup_index(const char *role, int fallback_index)
+{
+    int i;
+
+    rogue_tilepack_load();
+    if (role == NULL)
+	return fallback_index;
+
+    for (i = 0; i < entry_count; i++)
+	if (strcmp(entries[i].role, role) == 0 && entries[i].index >= 0)
+	    return entries[i].index;
+
+    return fallback_index;
+}
+
+const char *
+rogue_tilepack_lookup_name(const char *role, const char *fallback_name)
+{
+    int i;
+
+    rogue_tilepack_load();
+    if (role == NULL)
+	return fallback_name;
+
+    for (i = 0; i < entry_count; i++)
+	if (strcmp(entries[i].role, role) == 0)
+	    return entries[i].name;
+
+    return fallback_name;
+}
+
+const char *
+rogue_tilepack_status(void)
+{
+    rogue_tilepack_load();
+    return status_text;
+}
