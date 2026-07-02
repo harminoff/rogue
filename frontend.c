@@ -36,10 +36,64 @@ bool rogue_allegro_notice(const char *title, const char *message);
 void rogue_allegro_shutdown(void);
 #endif
 
+static int
+ascii_lower(int ch)
+{
+    if (ch >= 'A' && ch <= 'Z')
+	return ch + ('a' - 'A');
+    return ch;
+}
+
+static bool
+ascii_equal_case_insensitive(const char *left, const char *right)
+{
+    while (*left != '\0' && *right != '\0')
+    {
+	if (ascii_lower((unsigned char) *left)
+	    != ascii_lower((unsigned char) *right))
+	    return FALSE;
+	left++;
+	right++;
+    }
+
+    return (bool)(*left == '\0' && *right == '\0');
+}
+
+static const char *
+path_basename(const char *path)
+{
+    const char *base;
+    const char *p;
+
+    if (path == NULL)
+	return "";
+
+    base = path;
+    for (p = path; *p != '\0'; p++)
+	if (*p == '/' || *p == '\\')
+	    base = p + 1;
+
+    return base;
+}
+
+bool
+rogue_frontend_default_tiles_for_executable(const char *path)
+{
+    const char *base;
+
+    base = path_basename(path);
+    return (bool)(ascii_equal_case_insensitive(base, "RogueTiles.exe")
+		  || ascii_equal_case_insensitive(base, "RogueTiles"));
+}
+
 bool
 rogue_frontend_init(int *argc, char **argv)
 {
     int read_idx, write_idx;
+
+    if (argv != NULL && argv[0] != NULL
+	&& rogue_frontend_default_tiles_for_executable(argv[0]))
+	tiles_requested = TRUE;
 
     write_idx = 1;
     for (read_idx = 1; read_idx < *argc; read_idx++)

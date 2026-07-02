@@ -14,15 +14,19 @@ if (-not $SkipBuild) {
     powershell -ExecutionPolicy Bypass -File (Join-Path $repoRoot "scripts\build-windows-native.ps1") -MsysRoot $MsysRoot -Tiles
 }
 
+New-Item -ItemType Directory -Force $packageDir | Out-Null
+
 if (Test-Path $packageDir) {
     $resolvedRepo = (Resolve-Path $repoRoot).Path
     $resolvedPackage = (Resolve-Path $packageDir).Path
     if (-not $resolvedPackage.StartsWith($resolvedRepo)) {
-        throw "Refusing to remove package directory outside repo: $resolvedPackage"
+        throw "Refusing to update package directory outside repo: $resolvedPackage"
     }
-    Remove-Item -LiteralPath $resolvedPackage -Recurse -Force
+
+    foreach ($child in Get-ChildItem -LiteralPath $packageDir -Force) {
+        Remove-Item -LiteralPath $child.FullName -Recurse -Force
+    }
 }
-New-Item -ItemType Directory -Force $packageDir | Out-Null
 
 Copy-Item -LiteralPath (Join-Path $nativeDir "rogue54.exe") -Destination (Join-Path $packageDir "RogueTiles.exe") -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE.TXT") -Destination $packageDir -Force

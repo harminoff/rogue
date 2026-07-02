@@ -32,5 +32,6 @@ bool rogue_frontend_notice(const char *title, const char *message);
 void rogue_frontend_shutdown(void);
 bool rogue_frontend_is_tiles(void);
 bool rogue_frontend_smoke_requested(void);
+bool rogue_frontend_default_tiles_for_executable(const char *path);
 
 #endif

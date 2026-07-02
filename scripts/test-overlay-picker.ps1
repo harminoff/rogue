@@ -29,3 +29,19 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
     throw "overlay picker tests failed"
 }
+
+$frontendExe = Join-Path $buildDir "frontend_selection_test.exe"
+& $gcc -std=gnu89 -Wall -Wextra -I$repoRoot `
+    -I(Join-Path $MsysRoot "mingw64\include\ncursesw") `
+    (Join-Path $repoRoot "tests\frontend_selection_test.c") `
+    (Join-Path $repoRoot "frontend.c") `
+    (Join-Path $MsysRoot "mingw64\lib\libncursesw.dll.a") `
+    -o $frontendExe
+if ($LASTEXITCODE -ne 0) {
+    throw "frontend selection test build failed"
+}
+
+& $frontendExe
+if ($LASTEXITCODE -ne 0) {
+    throw "frontend selection tests failed"
+}

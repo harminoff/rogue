@@ -29,6 +29,8 @@ class BadRequest(ValueError):
 
 
 def repo_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
     return Path(__file__).resolve().parents[1]
 
 
@@ -197,11 +199,13 @@ def delete_profile(root: Path, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def status(root: Path) -> dict[str, Any]:
+    packaged = root / "RogueTiles.exe"
+    dev = root / "native-build" / "rogue54.exe"
     return {
         "ok": True,
         "repoRoot": root.as_posix(),
         "buildScript": (root / "scripts" / "build-windows-native.ps1").exists(),
-        "exe": (root / "native-build" / "rogue54.exe").exists(),
+        "exe": packaged.exists() or dev.exists(),
         "generated": (root / "generated" / "rogue_tile_mapping.c").exists(),
         "activeSource": read_json(root / ACTIVE_SOURCE) if (root / ACTIVE_SOURCE).exists() else {"mode": "rltiles"},
     }
@@ -303,10 +307,11 @@ def run_server(root: Path, host: str, port: int, open_browser: bool = False) -> 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
+    default_open = bool(getattr(sys, "frozen", False))
     parser.add_argument("--root", type=Path, default=repo_root())
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8788)
-    parser.add_argument("--open", action="store_true")
+    parser.add_argument("--open", action="store_true", default=default_open)
     return parser.parse_args()
 
 
