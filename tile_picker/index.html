@@ -1,0 +1,549 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RogueTiles Picker</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080a0d;
+      --panel: #121720;
+      --panel2: #19212c;
+      --line: #2b3442;
+      --text: #eef2f8;
+      --muted: #9ba6b8;
+      --accent: #7bdff2;
+      --good: #9be58c;
+      --warn: #ffd36a;
+      font-family: "Segoe UI", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+    header {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 10px 14px;
+      background: #0d1118;
+      border-bottom: 1px solid var(--line);
+    }
+    h1 { margin: 0; font-size: 18px; line-height: 1.1; }
+    button, input, select, textarea, label.file {
+      background: var(--panel2);
+      color: var(--text);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font: inherit;
+    }
+    button, label.file { padding: 7px 10px; cursor: pointer; }
+    button:hover, label.file:hover { border-color: var(--accent); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    input, select { padding: 7px 9px; min-width: 0; }
+    textarea { width: 100%; min-height: 70px; padding: 8px; resize: vertical; }
+    .toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+    .status { color: var(--muted); min-width: 150px; text-align: right; }
+    .hidden { display: none; }
+    .app {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 360px 1fr 310px;
+    }
+    aside, main, .detail {
+      min-height: 0;
+      background: var(--panel);
+      border-right: 1px solid var(--line);
+      overflow: hidden;
+    }
+    .detail { border-right: 0; }
+    .pane-head {
+      height: 58px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      background: #10151d;
+    }
+    .list, .grid, .detail-body {
+      height: calc(100% - 58px);
+      overflow: auto;
+      padding: 10px;
+    }
+    .role-row {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 10px;
+      padding: 8px;
+      margin-bottom: 6px;
+      border: 1px solid transparent;
+      background: #10151d;
+      text-align: left;
+    }
+    .role-row.active { border-color: var(--accent); background: #172334; }
+    .role-row.changed .role-name { color: var(--good); }
+    .glyph { color: var(--muted); font-weight: 700; text-align: center; }
+    .role-name { font-weight: 650; }
+    .meta { margin-top: 3px; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tabs, .pager {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      background: #10151d;
+    }
+    .pager { border-top: 1px solid var(--line); border-bottom: 0; justify-content: flex-end; }
+    .grid {
+      height: calc(100% - 116px);
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+      gap: 8px;
+      align-content: start;
+    }
+    .tile-card {
+      min-width: 0;
+      padding: 8px;
+      background: #10151d;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      text-align: center;
+    }
+    .tile-card.active { border-color: var(--accent); background: #172334; }
+    canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
+    .tile-label { margin-top: 5px; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .source-settings {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .source-settings label { color: var(--muted); font-size: 12px; }
+    .source-settings input { width: 100%; margin-top: 4px; }
+    .preview-row { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: start; margin: 12px 0; }
+    .preview-box {
+      width: 96px;
+      height: 96px;
+      display: grid;
+      place-items: center;
+      background: #080a0d;
+      border: 1px solid var(--line);
+    }
+    .detail h2 { margin: 0 0 6px; font-size: 17px; }
+    .detail p { margin: 0 0 10px; color: var(--muted); }
+    .section-title { margin: 16px 0 8px; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>RogueTiles Picker</h1>
+    <div class="toolbar">
+      <button id="applyRlBtn" type="button">Apply RLTiles</button>
+      <button id="applyCustomBtn" type="button" disabled>Apply Custom</button>
+      <button id="runBtn" type="button">Run Game</button>
+      <button id="applyRunBtn" type="button">Save + Run</button>
+      <input id="profileName" type="text" placeholder="profile name" style="width: 130px">
+      <button id="saveProfileBtn" type="button">Save</button>
+      <select id="profileSelect"><option value="">Saved profiles</option></select>
+      <button id="loadProfileBtn" type="button">Load</button>
+      <span class="status" id="status">Static mode</span>
+    </div>
+  </header>
+
+  <div class="app">
+    <aside>
+      <div class="pane-head">
+        <input id="roleSearch" type="search" placeholder="Filter Rogue roles">
+        <select id="groupFilter">
+          <option value="all">All</option>
+          <option value="terrain">Terrain</option>
+          <option value="objects">Objects</option>
+          <option value="actors">Actors</option>
+          <option value="monsters">Monsters</option>
+          <option value="changed">Changed</option>
+        </select>
+      </div>
+      <div class="list" id="roleList"></div>
+    </aside>
+
+    <main>
+      <div class="tabs">
+        <select id="sourceMode">
+          <option value="rltiles">RLTiles</option>
+          <option value="custom">Custom upload</option>
+        </select>
+        <input id="tileSearch" type="search" placeholder="Search tiles" style="flex: 1">
+        <label class="file" for="tileUpload">Upload PNG</label>
+        <input class="hidden" id="tileUpload" type="file" accept="image/png,image/*">
+      </div>
+      <div class="grid" id="tileGrid"></div>
+      <div class="pager">
+        <button id="prevPage" type="button">Prev</button>
+        <span id="pageLabel">Page 1 / 1</span>
+        <button id="nextPage" type="button">Next</button>
+      </div>
+    </main>
+
+    <section class="detail">
+      <div class="pane-head">
+        <strong>Selection</strong>
+        <button id="resetBtn" type="button">Reset</button>
+      </div>
+      <div class="detail-body">
+        <h2 id="detailTitle">Choose a role</h2>
+        <p id="detailMeta"></p>
+        <div class="preview-row">
+          <div class="preview-box"><canvas id="selectedPreview" width="64" height="64"></canvas></div>
+          <div>
+            <p id="selectedText">No tile selected.</p>
+            <p id="changedText"></p>
+          </div>
+        </div>
+        <div class="section-title">Custom Tilemap</div>
+        <div class="source-settings">
+          <label>Tile W <input id="customTileW" type="number" min="1" value="32"></label>
+          <label>Tile H <input id="customTileH" type="number" min="1" value="32"></label>
+          <label>Columns <input id="customCols" type="number" min="1" value="1"></label>
+        </div>
+        <textarea id="customNames" placeholder="Optional names, one per tile"></textarea>
+      </div>
+    </section>
+  </div>
+
+  <script src="data/picker_data.js"></script>
+  <script>
+    const data = window.ROGUE_TILE_PICKER_DATA;
+    const PAGE_SIZE = 180;
+    const rlImage = new Image();
+    rlImage.src = "assets/rltiles-2d.png";
+    const customImage = new Image();
+
+    const roles = data.rogue.roles;
+    const original = Object.fromEntries(roles.map(role => [role.role, role.currentRltilesName || ""]));
+    const rlSelections = {...original};
+    const customSelections = {};
+    const rlByName = new Map(data.rltiles.tiles.map(tile => [tile.name, tile]));
+    let sourceMode = "rltiles";
+    let activeRole = roles.find(role => role.role === "actor.player") || roles[0];
+    let page = 0;
+    let serverReady = false;
+    let customSource = null;
+
+    const roleList = document.getElementById("roleList");
+    const tileGrid = document.getElementById("tileGrid");
+    const statusEl = document.getElementById("status");
+    const sourceModeEl = document.getElementById("sourceMode");
+
+    function activeSelections() {
+      return sourceMode === "custom" ? customSelections : rlSelections;
+    }
+
+    function activeCatalog() {
+      if (sourceMode === "custom") {
+        return customSource || {tiles: [], image: customImage, atlas: {columns: 1, tileWidth: 32, tileHeight: 32}};
+      }
+      return {tiles: data.rltiles.tiles, image: rlImage, atlas: data.rltiles.atlas};
+    }
+
+    function selectedTile(role) {
+      const selected = activeSelections()[role.role];
+      if (sourceMode === "custom") {
+        return selected || null;
+      }
+      return selected ? rlByName.get(selected) : null;
+    }
+
+    function isChanged(role) {
+      if (sourceMode === "custom") return Boolean(customSelections[role.role]);
+      return (rlSelections[role.role] || "") !== (original[role.role] || "");
+    }
+
+    function drawTile(canvas, catalog, tile, size = 48) {
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!tile || !catalog.image.complete || !catalog.image.naturalWidth) return;
+      const atlas = catalog.atlas;
+      const sx = (tile.index % atlas.columns) * atlas.tileWidth;
+      const sy = Math.floor(tile.index / atlas.columns) * atlas.tileHeight;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(catalog.image, sx, sy, atlas.tileWidth, atlas.tileHeight, 0, 0, size, size);
+    }
+
+    function renderRoles() {
+      const query = document.getElementById("roleSearch").value.toLowerCase();
+      const group = document.getElementById("groupFilter").value;
+      roleList.replaceChildren();
+      for (const role of roles) {
+        if (group !== "all" && group !== "changed" && role.group !== group) continue;
+        if (group === "changed" && !isChanged(role)) continue;
+        if (query && !`${role.role} ${role.label} ${role.name}`.toLowerCase().includes(query)) continue;
+        const selected = selectedTile(role);
+        const button = document.createElement("button");
+        button.className = "role-row";
+        if (activeRole && activeRole.role === role.role) button.classList.add("active");
+        if (isChanged(role)) button.classList.add("changed");
+        button.innerHTML = `
+          <div class="glyph">${role.glyph || role.key}</div>
+          <div>
+            <div class="role-name">${role.label}</div>
+            <div class="meta">${selected ? (selected.name || selected.index) : "unmapped"}</div>
+          </div>`;
+        button.addEventListener("click", () => {
+          activeRole = role;
+          renderAll();
+        });
+        roleList.append(button);
+      }
+    }
+
+    function filteredTiles() {
+      const catalog = activeCatalog();
+      const query = document.getElementById("tileSearch").value.toLowerCase();
+      if (!query) return catalog.tiles;
+      return catalog.tiles.filter(tile => `${tile.name || ""} ${tile.index}`.toLowerCase().includes(query));
+    }
+
+    function renderGrid() {
+      const catalog = activeCatalog();
+      const tiles = filteredTiles();
+      const pageCount = Math.max(1, Math.ceil(tiles.length / PAGE_SIZE));
+      if (page >= pageCount) page = pageCount - 1;
+      const shown = tiles.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+      tileGrid.replaceChildren();
+      for (const tile of shown) {
+        const card = document.createElement("button");
+        card.className = "tile-card";
+        const selected = selectedTile(activeRole);
+        if (selected && selected.index === tile.index && selected.name === tile.name) card.classList.add("active");
+        const canvas = document.createElement("canvas");
+        canvas.width = 48;
+        canvas.height = 48;
+        const label = document.createElement("div");
+        label.className = "tile-label";
+        label.textContent = `${tile.name || "tile"} #${tile.index}`;
+        card.append(canvas, label);
+        card.addEventListener("click", () => {
+          if (sourceMode === "custom") {
+            customSelections[activeRole.role] = {index: tile.index, name: tile.name || `tile_${tile.index}`};
+          } else {
+            rlSelections[activeRole.role] = tile.name;
+          }
+          renderAll();
+        });
+        tileGrid.append(card);
+        drawTile(canvas, catalog, tile);
+      }
+      document.getElementById("pageLabel").textContent = `Page ${page + 1} / ${pageCount}`;
+      document.getElementById("prevPage").disabled = page <= 0;
+      document.getElementById("nextPage").disabled = page >= pageCount - 1;
+    }
+
+    function renderDetail() {
+      const tile = selectedTile(activeRole);
+      const catalog = activeCatalog();
+      document.getElementById("detailTitle").textContent = activeRole ? activeRole.label : "Choose a role";
+      document.getElementById("detailMeta").textContent = activeRole ? activeRole.role : "";
+      document.getElementById("selectedText").textContent = tile ? `${tile.name || "tile"} #${tile.index}` : "No tile selected.";
+      document.getElementById("changedText").textContent = isChanged(activeRole) ? "Changed from baseline." : "Baseline selection.";
+      drawTile(document.getElementById("selectedPreview"), catalog, tile, 64);
+      document.getElementById("applyCustomBtn").disabled = !serverReady || !customSource;
+    }
+
+    function renderAll() {
+      renderRoles();
+      renderGrid();
+      renderDetail();
+    }
+
+    function rlPayload() {
+      return {
+        tiles: {...rlSelections},
+      };
+    }
+
+    function customPayload() {
+      if (!customSource) return null;
+      return {
+        source: {
+          type: "embedded_png",
+          fileName: customSource.fileName,
+          dataUrl: customSource.dataUrl,
+          path: "assets/generated/custom-tiles.png",
+          tileWidth: customSource.atlas.tileWidth,
+          tileHeight: customSource.atlas.tileHeight,
+          columns: customSource.atlas.columns,
+        },
+        tiles: {...customSelections},
+      };
+    }
+
+    function pickerConfig() {
+      return {sourceMode, rlSelections, customSelections, customSource};
+    }
+
+    function loadPickerConfig(config) {
+      sourceMode = config.sourceMode || "rltiles";
+      Object.assign(rlSelections, config.rlSelections || {});
+      Object.assign(customSelections, config.customSelections || {});
+      customSource = config.customSource || customSource;
+      sourceModeEl.value = sourceMode;
+      if (customSource?.dataUrl) customImage.src = customSource.dataUrl;
+      renderAll();
+    }
+
+    async function postApi(endpoint, payload, busy, success) {
+      if (!serverReady) {
+        alert("Start the picker server first.");
+        return null;
+      }
+      statusEl.textContent = busy;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload || {}),
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) {
+        statusEl.textContent = "Failed";
+        alert(result.error || result.output || "Operation failed.");
+        return null;
+      }
+      statusEl.textContent = success;
+      if (result.output) console.log(result.output);
+      return result;
+    }
+
+    async function applyActive() {
+      if (sourceMode === "custom") return postApi("/api/apply-custom-profile", customPayload(), "Applying custom...", "Custom applied");
+      return postApi("/api/apply-rltiles-mapping", rlPayload(), "Applying RLTiles...", "RLTiles applied");
+    }
+
+    async function runGame() {
+      return postApi("/api/run-game", {}, "Launching...", "Launched");
+    }
+
+    async function applyAndRun() {
+      const applied = await applyActive();
+      if (!applied) return;
+      await runGame();
+    }
+
+    async function refreshProfiles() {
+      if (!serverReady) return;
+      const response = await fetch("/api/list-picker-configs", {cache: "no-store"});
+      const result = await response.json();
+      const select = document.getElementById("profileSelect");
+      select.replaceChildren(new Option("Saved profiles", ""));
+      for (const profile of result.profiles || []) select.append(new Option(profile.name, profile.name));
+    }
+
+    async function checkServer() {
+      if (!location.protocol.startsWith("http")) {
+        statusEl.textContent = "Run server to save";
+        return;
+      }
+      try {
+        const response = await fetch("/api/status", {cache: "no-store"});
+        const result = await response.json();
+        serverReady = Boolean(result.ok);
+        statusEl.textContent = serverReady ? "Server ready" : "Server offline";
+        await refreshProfiles();
+      } catch {
+        serverReady = false;
+        statusEl.textContent = "Server offline";
+      }
+    }
+
+    document.getElementById("applyRlBtn").addEventListener("click", () => postApi("/api/apply-rltiles-mapping", rlPayload(), "Applying RLTiles...", "RLTiles applied"));
+    document.getElementById("applyCustomBtn").addEventListener("click", () => postApi("/api/apply-custom-profile", customPayload(), "Applying custom...", "Custom applied"));
+    document.getElementById("runBtn").addEventListener("click", runGame);
+    document.getElementById("applyRunBtn").addEventListener("click", applyAndRun);
+    document.getElementById("saveProfileBtn").addEventListener("click", async () => {
+      const name = document.getElementById("profileName").value || "RogueTiles profile";
+      await postApi("/api/save-picker-config", {name, profile: pickerConfig()}, "Saving profile...", "Profile saved");
+      await refreshProfiles();
+    });
+    document.getElementById("loadProfileBtn").addEventListener("click", async () => {
+      const name = document.getElementById("profileSelect").value;
+      if (!name) return;
+      const response = await fetch(`/api/load-picker-config?name=${encodeURIComponent(name)}`, {cache: "no-store"});
+      const result = await response.json();
+      if (!response.ok || !result.ok) return alert(result.error || "Load failed.");
+      loadPickerConfig(result.profile);
+    });
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      if (!activeRole) return;
+      if (sourceMode === "custom") delete customSelections[activeRole.role];
+      else rlSelections[activeRole.role] = original[activeRole.role] || "";
+      renderAll();
+    });
+    document.getElementById("prevPage").addEventListener("click", () => { page--; renderGrid(); });
+    document.getElementById("nextPage").addEventListener("click", () => { page++; renderGrid(); });
+    document.getElementById("roleSearch").addEventListener("input", renderRoles);
+    document.getElementById("groupFilter").addEventListener("change", renderRoles);
+    document.getElementById("tileSearch").addEventListener("input", () => { page = 0; renderGrid(); });
+    sourceModeEl.addEventListener("change", () => { sourceMode = sourceModeEl.value; page = 0; renderAll(); });
+    for (const id of ["customTileW", "customTileH", "customCols"]) {
+      document.getElementById(id).addEventListener("change", rebuildCustomCatalog);
+    }
+    document.getElementById("customNames").addEventListener("change", rebuildCustomCatalog);
+    document.getElementById("tileUpload").addEventListener("change", event => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        customSource = {
+          fileName: file.name,
+          dataUrl: reader.result,
+          atlas: {
+            columns: Number(document.getElementById("customCols").value) || 1,
+            tileWidth: Number(document.getElementById("customTileW").value) || 32,
+            tileHeight: Number(document.getElementById("customTileH").value) || 32,
+          },
+          tiles: [],
+        };
+        customImage.onload = rebuildCustomCatalog;
+        customImage.src = customSource.dataUrl;
+        sourceMode = "custom";
+        sourceModeEl.value = "custom";
+        statusEl.textContent = "Custom tilemap loaded";
+        renderAll();
+      };
+      reader.readAsDataURL(file);
+    });
+
+    function rebuildCustomCatalog() {
+      if (!customSource || !customImage.naturalWidth) return;
+      const columns = Number(document.getElementById("customCols").value) || 1;
+      const tileWidth = Number(document.getElementById("customTileW").value) || 32;
+      const tileHeight = Number(document.getElementById("customTileH").value) || tileWidth;
+      const names = document.getElementById("customNames").value.split(/\r?\n/).map(line => line.trim());
+      const rows = Math.floor(customImage.naturalHeight / tileHeight);
+      const count = Math.max(0, rows * columns);
+      customSource.atlas = {columns, tileWidth, tileHeight};
+      customSource.tiles = Array.from({length: count}, (_, index) => ({
+        index,
+        name: names[index] || `tile_${String(index).padStart(4, "0")}`,
+      }));
+      page = 0;
+      renderAll();
+    }
+
+    rlImage.onload = renderAll;
+    customImage.onload = rebuildCustomCatalog;
+    renderAll();
+    checkServer();
+  </script>
+</body>
+</html>
