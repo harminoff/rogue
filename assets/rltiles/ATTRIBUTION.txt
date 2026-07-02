@@ -1,0 +1,20 @@
+RL Tiles vendored assets
+========================
+
+Files:
+- rltiles-2d.png
+- rltiles-2d.json
+
+Source:
+https://github.com/statico/rltiles
+
+The statico/rltiles README identifies this as a GitHub clone of RL Tiles with
+JSON metadata, transparent background, deduplication, and ordering for
+roguelike games.
+
+License note from upstream:
+Part of (or All) the graphic tiles used in this program is the public domain
+roguelike tileset "RLTiles".
+
+Original RL Tiles site:
+http://rltiles.sf.net

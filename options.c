@@ -13,10 +13,12 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <curses.h>
 #include <ctype.h>
 #include <string.h>
 #include "rogue.h"
+#include "frontend.h"
 
 #define	EQSTR(a, b, c)	(strncmp(a, b, c) == 0)
 
@@ -38,6 +40,9 @@ struct optstruct {
 typedef struct optstruct	OPTION;
 
 void	pr_optname(OPTION *op);
+static void	tile_option(void);
+static void	tile_option_line(char key, OPTION *op, char *line, int line_size);
+static void	tile_change_option(OPTION *op);
 
 OPTION	optlist[] = {
     {"terse",	 "Terse output",
@@ -72,6 +77,13 @@ option()
 {
     OPTION	*op;
     int		retval;
+
+    if (rogue_frontend_is_tiles())
+    {
+	tile_option();
+	after = FALSE;
+	return;
+    }
 
     wclear(hw);
     /*
@@ -117,6 +129,96 @@ option()
     clearok(curscr, TRUE);
     touchwin(stdscr);
     after = FALSE;
+}
+
+static void
+tile_option(void)
+{
+    OPTION *op;
+    char line[2 * MAXSTR];
+    char ch;
+    int index;
+    bool done;
+
+    done = FALSE;
+    while (!done)
+    {
+	rogue_frontend_text_overlay_begin("Options");
+	index = 0;
+	for (op = optlist; op <= &optlist[NUM_OPTS-1]; op++)
+	{
+	    tile_option_line((char)('a' + index), op, line, sizeof(line));
+	    rogue_frontend_text_overlay_add(line);
+	    index++;
+	}
+	ch = rogue_frontend_text_overlay_pick(
+	    "Letters select, arrows move, Enter changes, Space/Esc closes");
+	rogue_frontend_text_overlay_clear();
+	if (ch == ESCAPE || ch == ' ' || ch == 'Q')
+	    break;
+	ch = (char) tolower((unsigned char) ch);
+	index = ch - 'a';
+	if (index >= 0 && index < (int) NUM_OPTS)
+	    tile_change_option(&optlist[index]);
+    }
+
+    clearok(curscr, TRUE);
+    touchwin(stdscr);
+}
+
+static void
+tile_option_line(char key, OPTION *op, char *line, int line_size)
+{
+    char value[MAXSTR];
+
+    if (op->o_putfunc == put_bool)
+	snprintf(value, sizeof(value), "%s",
+		 *(bool *) op->o_opt ? "True" : "False");
+    else if (op->o_putfunc == put_inv_t)
+	snprintf(value, sizeof(value), "%s", inv_t_name[*(int *) op->o_opt]);
+    else
+	snprintf(value, sizeof(value), "%s", (char *) op->o_opt);
+
+    snprintf(line, line_size, "%c) %s (\"%s\"): %s",
+	     key, op->o_prompt, op->o_name, value);
+}
+
+static void
+tile_change_option(OPTION *op)
+{
+    bool was_sf;
+    char updated[MAXSTR];
+
+    if (op->o_putfunc == put_bool)
+    {
+	if (op->o_getfunc == get_sf)
+	{
+	    was_sf = see_floor;
+	    see_floor = (bool) !see_floor;
+	    if (was_sf != see_floor)
+	    {
+		if (!see_floor)
+		{
+		    see_floor = TRUE;
+		    erase_lamp(&hero, proom);
+		    see_floor = FALSE;
+		}
+		else
+		    look(FALSE);
+	    }
+	}
+	else
+	    *(bool *) op->o_opt = (bool) !*(bool *) op->o_opt;
+    }
+    else if (op->o_putfunc == put_inv_t)
+	*(int *) op->o_opt = (*(int *) op->o_opt + 1) % 3;
+    else
+    {
+	if (rogue_frontend_text_input("Option", op->o_prompt,
+				      (char *) op->o_opt,
+				      updated, sizeof(updated)))
+	    strucpy((char *) op->o_opt, updated, (int) strlen(updated));
+    }
 }
 
 /*
@@ -255,6 +357,18 @@ get_str(void *vopt, WINDOW *win)
     int i;
     signed char c;
     static char buf[MAXSTR];
+
+    if (rogue_frontend_is_tiles() && win == stdscr)
+    {
+	if (rogue_frontend_text_input("Input", huh, opt, buf, sizeof(buf)))
+	{
+	    if (buf[0] != '\0')
+		strucpy(opt, buf, (int) strlen(buf));
+	    mpos += (int) strlen(buf);
+	    return NORM;
+	}
+	return QUIT;
+    }
 
     getyx(win, oy, ox);
     wrefresh(win);

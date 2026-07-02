@@ -14,6 +14,7 @@
 #include <time.h>
 #include <curses.h>
 #include "rogue.h"
+#include "frontend.h"
 
 /*
  * main:
@@ -26,6 +27,8 @@ main(int argc, char **argv, char **envp)
     int lowtime;
 
     md_init();
+    if (!rogue_frontend_init(&argc, argv))
+	my_exit(1);
 
 #ifdef MASTER
     /*
@@ -82,6 +85,8 @@ main(int argc, char **argv, char **envp)
     {
 	if (strcmp(argv[1], "-s") == 0)
 	{
+	    if (rogue_frontend_is_tiles() && !rogue_frontend_start())
+		my_exit(1);
 	    noscore = TRUE;
 	    score(0, -1, 0);
 	    exit(0);
@@ -95,6 +100,8 @@ main(int argc, char **argv, char **envp)
 	    level = rnd(100) + 1;
 	    initscr();
 	    getltchars();
+	    if (rogue_frontend_is_tiles() && !rogue_frontend_start())
+		my_exit(1);
 	    death(death_monst());
 	    exit(0);
 	}
@@ -106,11 +113,18 @@ main(int argc, char **argv, char **envp)
 	    my_exit(1);
 #ifdef MASTER
     if (wizard)
-	printf("Hello %s, welcome to dungeon #%d", whoami, dnum);
+    {
+	if (!rogue_frontend_is_tiles())
+	    printf("Hello %s, welcome to dungeon #%d", whoami, dnum);
+    }
     else
 #endif
-	printf("Hello %s, just a moment while I dig the dungeon...", whoami);
-    fflush(stdout);
+    {
+	if (!rogue_frontend_is_tiles())
+	    printf("Hello %s, just a moment while I dig the dungeon...", whoami);
+    }
+    if (!rogue_frontend_is_tiles())
+	fflush(stdout);
 
     initscr();				/* Start up cursor package */
     init_probs();			/* Set up prob tables for objects */
@@ -126,7 +140,11 @@ main(int argc, char **argv, char **envp)
      */
     if (LINES < NUMLINES || COLS < NUMCOLS)
     {
-	printf("\nSorry, the screen must be at least %dx%d\n", NUMLINES, NUMCOLS);
+	if (!rogue_frontend_notice(
+		"Screen Too Small",
+		"Rogue needs a terminal at least 80 columns by 24 rows."))
+	    printf("\nSorry, the screen must be at least %dx%d\n",
+		   NUMLINES, NUMCOLS);
 	endwin();
 	my_exit(1);
     }
@@ -141,6 +159,14 @@ main(int argc, char **argv, char **envp)
     noscore = wizard;
 #endif
     new_level();			/* Draw current level */
+    if (!rogue_frontend_start())
+    {
+	endwin();
+	my_exit(1);
+    }
+    rogue_frontend_render();
+    if (rogue_frontend_smoke_requested())
+	my_exit(0);
     /*
      * Start up daemons and fuses
      */
@@ -238,8 +264,7 @@ tstp(int ignored)
     getyx(curscr, y, x);
     mvcur(y, x, oy, ox);
     fflush(stdout);
-    curscr->_cury = oy;
-    curscr->_curx = ox;
+    wmove(curscr, oy, ox);
 }
 
 /*
@@ -299,8 +324,17 @@ quit(int sig)
     if (!q_comm)
 	mpos = 0;
     getyx(curscr, oy, ox);
-    msg("really quit?");
-    if (readchar() == 'y')
+    if (rogue_frontend_is_tiles())
+    {
+	if (!rogue_frontend_confirm("Quit", "Really quit?"))
+	    goto no_quit;
+    }
+    else
+    {
+	msg("really quit?");
+	if (readchar() != 'y')
+	    goto no_quit;
+    }
     {
 	signal(SIGINT, leave);
 	clear();
@@ -310,8 +344,7 @@ quit(int sig)
 	score(purse, 1, 0);
 	my_exit(0);
     }
-    else
-    {
+no_quit:
 	move(0, 0);
 	clrtoeol();
 	status();
@@ -320,7 +353,6 @@ quit(int sig)
 	mpos = 0;
 	count = 0;
 	to_death = FALSE;
-    }
 }
 
 /*
@@ -355,6 +387,13 @@ leave(int sig)
 void
 shell()
 {
+    if (rogue_frontend_is_tiles())
+    {
+	msg("shell escape is not available in tile mode");
+	after = FALSE;
+	return;
+    }
+
     /*
      * Set the terminal back to original mode
      */
@@ -390,6 +429,7 @@ shell()
 void
 my_exit(int st)
 {
+    rogue_frontend_shutdown();
     resetltchars();
     exit(st);
 }

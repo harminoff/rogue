@@ -12,6 +12,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <signal.h>
@@ -20,6 +21,7 @@
 #include <fcntl.h>
 #include <curses.h>
 #include "rogue.h"
+#include "frontend.h"
 #include "score.h"
 
 static char *rip[] = {
@@ -38,6 +40,8 @@ static char *rip[] = {
 "         ________)/\\\\_//(\\/(/\\)/\\//\\/|_)_______\n",
     0
 };
+
+static bool tile_score_pause_shown = FALSE;
 
 /*
  * score:
@@ -63,18 +67,26 @@ score(int amount, int flags, char monst)
 	"A total winner",
 	"killed with Amulet"
     };
+    char line[2 * MAXSTR];
 
     start_score();
 
- if (flags >= 0
+    if (flags >= 0
 #ifdef MASTER
             || wizard
 #endif
         )
     {
-	mvaddstr(LINES - 1, 0 , "[Press return to continue]");
-        refresh();
-        wgetnstr(stdscr,prbuf,80);
+	if (rogue_frontend_is_tiles() && tile_score_pause_shown)
+	    tile_score_pause_shown = FALSE;
+	else if (rogue_frontend_is_tiles())
+	    rogue_frontend_wait_for_return("Press Enter to show scores");
+	else
+	{
+	    mvaddstr(LINES - 1, 0 , "[Press return to continue]");
+	    refresh();
+	    wgetnstr(stdscr,prbuf,80);
+	}
  	endwin();
         printf("\n");
         resetltchars();
@@ -157,24 +169,51 @@ score(int amount, int flags, char monst)
     /*
      * Print the list
      */
-    if (flags != -1)
+    if (rogue_frontend_is_tiles())
+    {
+	snprintf(line, sizeof(line), "Top %s %s:",
+		 Numname, allscore ? "Scores" : "Rogueists");
+	rogue_frontend_text_overlay_begin("Scores");
+	rogue_frontend_text_overlay_add(line);
+	rogue_frontend_text_overlay_add("   Score Name");
+    }
+    else if (flags != -1)
 	putchar('\n');
-    printf("Top %s %s:\n", Numname, allscore ? "Scores" : "Rogueists");
-    printf("   Score Name\n");
+    if (!rogue_frontend_is_tiles())
+    {
+	printf("Top %s %s:\n", Numname, allscore ? "Scores" : "Rogueists");
+	printf("   Score Name\n");
+    }
     for (scp = top_ten; scp < endp; scp++)
     {
 	if (scp->sc_score) {
-	    if (sc2 == scp)
-            md_raw_standout();
-	    printf("%2d %5d %s: %s on level %d", (int) (scp - top_ten + 1),
-		scp->sc_score, scp->sc_name, reason[scp->sc_flags],
-		scp->sc_level);
-	    if (scp->sc_flags == 0 || scp->sc_flags == 3)
-		printf(" by %s", killname((char) scp->sc_monster, TRUE));
+	    if (rogue_frontend_is_tiles())
+	    {
+		snprintf(line, sizeof(line), "%s%2d %5d %s: %s on level %d%s%s.",
+			 sc2 == scp ? "> " : "  ",
+			 (int) (scp - top_ten + 1), scp->sc_score,
+			 scp->sc_name, reason[scp->sc_flags], scp->sc_level,
+			 (scp->sc_flags == 0 || scp->sc_flags == 3)
+			 ? " by " : "",
+			 (scp->sc_flags == 0 || scp->sc_flags == 3)
+			 ? killname((char) scp->sc_monster, TRUE) : "");
+		rogue_frontend_text_overlay_add(line);
+	    }
+	    else
+	    {
+		if (sc2 == scp)
+		    md_raw_standout();
+		printf("%2d %5d %s: %s on level %d", (int) (scp - top_ten + 1),
+		    scp->sc_score, scp->sc_name, reason[scp->sc_flags],
+		    scp->sc_level);
+		if (scp->sc_flags == 0 || scp->sc_flags == 3)
+		    printf(" by %s", killname((char) scp->sc_monster, TRUE));
+	    }
 #ifdef MASTER
 	    if (prflags == 1)
 	    {
-	    printf(" (%s)", md_getrealname(scp->sc_uid));
+		if (!rogue_frontend_is_tiles())
+		    printf(" (%s)", md_getrealname(scp->sc_uid));
 	    }
 	    else if (prflags == 2)
 	    {
@@ -196,13 +235,20 @@ score(int amount, int flags, char monst)
 	    }
 	    else
 #endif /* MASTER */
-                printf(".");
-	    if (sc2 == scp)
+	    if (!rogue_frontend_is_tiles())
+		printf(".");
+	    if (!rogue_frontend_is_tiles() && sc2 == scp)
 		    md_raw_standend();
-            putchar('\n');
+	    if (!rogue_frontend_is_tiles())
+		putchar('\n');
 	}
 	else
 	    break;
+    }
+    if (rogue_frontend_is_tiles())
+    {
+	rogue_frontend_text_overlay_show("Arrows/Page scroll, Space closes");
+	rogue_frontend_text_overlay_clear();
     }
     /*
      * Update the list file
@@ -228,6 +274,7 @@ void
 death(char monst)
 {
     char **dp, *killer;
+    char tile_killer[128];
     struct tm *lt;
     static time_t date;
     struct tm *localtime();
@@ -237,6 +284,12 @@ death(char monst)
     signal(SIGINT, leave);
     clear();
     killer = killname(monst, FALSE);
+    if (monst != 's' && monst != 'h')
+	snprintf(tile_killer, sizeof(tile_killer), "a%s %s",
+		 vowelstr(killer), killer);
+    else
+	snprintf(tile_killer, sizeof(tile_killer), "%s", killer);
+
     if (!tombstone)
     {
 	mvprintw(LINES - 2, 0, "Killed by ");
@@ -267,10 +320,21 @@ death(char monst)
     }
     move(LINES - 1, 0);
     refresh();
+    rogue_frontend_show_death(tile_killer, purse, (bool) amulet);
+    if (rogue_frontend_is_tiles())
+    {
+	rogue_frontend_wait_for_return("Press Enter to show scores");
+	tile_score_pause_shown = TRUE;
+    }
     score(purse, amulet ? 3 : 0, monst);
-    printf("[Press return to continue]");
-    fflush(stdout);
-    (void) fgets(prbuf,10,stdin);
+    if (rogue_frontend_is_tiles())
+	rogue_frontend_wait_for_return("Press Enter to exit");
+    else
+    {
+	printf("[Press return to continue]");
+	fflush(stdout);
+	(void) fgets(prbuf,10,stdin);
+    }
     my_exit(0);
 }
 
@@ -296,28 +360,49 @@ total_winner()
     struct obj_info *op;
     int worth = 0;
     int oldpurse;
+    char line[2 * MAXSTR];
 
-    clear();
-    standout();
-    addstr("                                                               \n");
-    addstr("  @   @               @   @           @          @@@  @     @  \n");
-    addstr("  @   @               @@ @@           @           @   @     @  \n");
-    addstr("  @   @  @@@  @   @   @ @ @  @@@   @@@@  @@@      @  @@@    @  \n");
-    addstr("   @@@@ @   @ @   @   @   @     @ @   @ @   @     @   @     @  \n");
-    addstr("      @ @   @ @   @   @   @  @@@@ @   @ @@@@@     @   @     @  \n");
-    addstr("  @   @ @   @ @  @@   @   @ @   @ @   @ @         @   @  @     \n");
-    addstr("   @@@   @@@   @@ @   @   @  @@@@  @@@@  @@@     @@@   @@   @  \n");
-    addstr("                                                               \n");
-    addstr("     Congratulations, you have made it to the light of day!    \n");
-    standend();
-    addstr("\nYou have joined the elite ranks of those who have escaped the\n");
-    addstr("Dungeons of Doom alive.  You journey home and sell all your loot at\n");
-    addstr("a great profit and are admitted to the Fighters' Guild.\n");
-    mvaddstr(LINES - 1, 0, "--Press space to continue--");
-    refresh();
-    wait_for(' ');
-    clear();
-    mvaddstr(0, 0, "   Worth  Item\n");
+    if (rogue_frontend_is_tiles())
+    {
+	rogue_frontend_text_overlay_begin("You Made It!");
+	rogue_frontend_text_overlay_add(
+	    "Congratulations, you have made it to the light of day!");
+	rogue_frontend_text_overlay_add("");
+	rogue_frontend_text_overlay_add(
+	    "You have joined the elite ranks of those who have escaped the");
+	rogue_frontend_text_overlay_add(
+	    "Dungeons of Doom alive. You journey home and sell all your loot");
+	rogue_frontend_text_overlay_add(
+	    "at a great profit and are admitted to the Fighters' Guild.");
+	rogue_frontend_text_overlay_show("Space closes");
+	rogue_frontend_text_overlay_clear();
+	rogue_frontend_text_overlay_begin("Spoils");
+	rogue_frontend_text_overlay_add("   Worth  Item");
+    }
+    else
+    {
+	clear();
+	standout();
+	addstr("                                                               \n");
+	addstr("  @   @               @   @           @          @@@  @     @  \n");
+	addstr("  @   @               @@ @@           @           @   @     @  \n");
+	addstr("  @   @  @@@  @   @   @ @ @  @@@   @@@@  @@@      @  @@@    @  \n");
+	addstr("   @@@@ @   @ @   @   @   @     @ @   @ @   @     @   @     @  \n");
+	addstr("      @ @   @ @   @   @   @  @@@@ @   @ @@@@@     @   @     @  \n");
+	addstr("  @   @ @   @ @  @@   @   @ @   @ @   @ @         @   @  @     \n");
+	addstr("   @@@   @@@   @@ @   @   @  @@@@  @@@@  @@@     @@@   @@   @  \n");
+	addstr("                                                               \n");
+	addstr("     Congratulations, you have made it to the light of day!    \n");
+	standend();
+	addstr("\nYou have joined the elite ranks of those who have escaped the\n");
+	addstr("Dungeons of Doom alive.  You journey home and sell all your loot at\n");
+	addstr("a great profit and are admitted to the Fighters' Guild.\n");
+	mvaddstr(LINES - 1, 0, "--Press space to continue--");
+	refresh();
+	wait_for(' ');
+	clear();
+	mvaddstr(0, 0, "   Worth  Item\n");
+    }
     oldpurse = purse;
     for (obj = pack; obj != NULL; obj = next(obj))
     {
@@ -376,11 +461,29 @@ total_winner()
 	}
 	if (worth < 0)
 	    worth = 0;
-	printw("%c) %5d  %s\n", obj->o_packch, worth, inv_name(obj, FALSE));
+	if (rogue_frontend_is_tiles())
+	{
+	    snprintf(line, sizeof(line), "%c) %5d  %s",
+		     obj->o_packch, worth, inv_name(obj, FALSE));
+	    rogue_frontend_text_overlay_add(line);
+	}
+	else
+	    printw("%c) %5d  %s\n", obj->o_packch, worth, inv_name(obj, FALSE));
 	purse += worth;
     }
-    printw("   %5d  Gold Pieces          ", oldpurse);
-    refresh();
+    if (rogue_frontend_is_tiles())
+    {
+	snprintf(line, sizeof(line), "   %5d  Gold Pieces", oldpurse);
+	rogue_frontend_text_overlay_add(line);
+	rogue_frontend_text_overlay_show("Space closes");
+	rogue_frontend_text_overlay_clear();
+	tile_score_pause_shown = TRUE;
+    }
+    else
+    {
+	printw("   %5d  Gold Pieces          ", oldpurse);
+	refresh();
+    }
     score(purse, 2, ' ');
     my_exit(0);
 }

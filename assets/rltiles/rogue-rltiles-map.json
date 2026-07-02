@@ -1,0 +1,76 @@
+{
+  "schema": 1,
+  "atlas": {
+    "image": "rltiles-2d.png",
+    "metadata": "rltiles-2d.json",
+    "tileSize": 32
+  },
+  "notes": [
+    "This file maps Rogue semantics to rltiles atlas keys.",
+    "The upstream rltiles JSON is an atlas manifest, not gameplay semantics.",
+    "Map-visible object categories stay generic so tile rendering does not reveal hidden item identity."
+  ],
+  "terrain": {
+    "empty": { "glyph": " ", "atlas": null },
+    "floor": { "glyph": ".", "atlas": "floor_of_a_room" },
+    "passage": { "glyph": "#", "atlas": "corridor" },
+    "door": { "glyph": "+", "atlas": "dngn_closed_door" },
+    "vertical_wall": { "glyph": "|", "atlas": "dngn_rock_wall_00" },
+    "horizontal_wall": { "glyph": "-", "atlas": "dngn_rock_wall_00" },
+    "stairs_down": { "glyph": "%", "atlas": "staircase_down" },
+    "known_trap": { "glyph": "^", "atlas": "dngn_trap_mechanical" }
+  },
+  "traps": {
+    "trapdoor": { "id": 0, "atlas": "trap_door" },
+    "arrow": { "id": 1, "atlas": "arrow_trap" },
+    "sleeping_gas": { "id": 2, "atlas": "sleeping_gas_trap" },
+    "bear": { "id": 3, "atlas": "bear_trap" },
+    "teleport": { "id": 4, "atlas": "teleportation_trap" },
+    "poison_dart": { "id": 5, "atlas": "dart_trap" },
+    "rust": { "id": 6, "atlas": "rust_trap" },
+    "mysterious": { "id": 7, "atlas": "dngn_trap_magical" }
+  },
+  "objects": {
+    "gold": { "glyph": "*", "atlas": "gold_piece" },
+    "potion": { "glyph": "!", "atlas": "bubbly" },
+    "scroll": { "glyph": "?", "atlas": "vellum" },
+    "magic": { "glyph": "$", "atlas": "i-magic" },
+    "food": { "glyph": ":", "atlas": "food_ration" },
+    "weapon": { "glyph": ")", "atlas": "long_sword" },
+    "armor": { "glyph": "]", "atlas": "leather_armor" },
+    "amulet": { "glyph": ",", "atlas": "amulet_of_yendor" },
+    "ring": { "glyph": "=", "atlas": "ring_green" },
+    "stick": { "glyph": "/", "atlas": "staff00" }
+  },
+  "actors": {
+    "player": { "glyph": "@", "atlas": "human" }
+  },
+  "monsters": {
+    "A": { "name": "aquator", "atlas": "water_elemental", "note": "closest water-themed rltiles fit" },
+    "B": { "name": "bat", "atlas": "bat" },
+    "C": { "name": "centaur", "atlas": "plains_centaur" },
+    "D": { "name": "dragon", "atlas": "green_dragon" },
+    "E": { "name": "emu", "atlas": "chickatrice", "note": "closest bird-like rltiles fit" },
+    "F": { "name": "venus flytrap", "atlas": "plant" },
+    "G": { "name": "griffin", "atlas": "griffon", "note": "rltiles spelling" },
+    "H": { "name": "hobgoblin", "atlas": "hobgoblin" },
+    "I": { "name": "ice monster", "atlas": "ice_beast" },
+    "J": { "name": "jabberwock", "atlas": "jabberwock" },
+    "K": { "name": "kestrel", "atlas": "bat", "note": "no kestrel/hawk atlas key in rltiles" },
+    "L": { "name": "leprechaun", "atlas": "leprechaun" },
+    "M": { "name": "medusa", "atlas": "medusa" },
+    "N": { "name": "nymph", "atlas": "wood_nymph" },
+    "O": { "name": "orc", "atlas": "orc" },
+    "P": { "name": "phantom", "atlas": "phantom" },
+    "Q": { "name": "quagga", "atlas": "horse", "note": "closest equine rltiles fit" },
+    "R": { "name": "rattlesnake", "atlas": "snake" },
+    "S": { "name": "snake", "atlas": "snake" },
+    "T": { "name": "troll", "atlas": "troll" },
+    "U": { "name": "black unicorn", "atlas": "black_unicorn" },
+    "V": { "name": "vampire", "atlas": "vampire" },
+    "W": { "name": "wraith", "atlas": "wraith" },
+    "X": { "name": "xeroc", "atlas": "small_mimic" },
+    "Y": { "name": "yeti", "atlas": "yeti" },
+    "Z": { "name": "zombie", "atlas": "human_zombie" }
+  }
+}

@@ -48,6 +48,7 @@
 #include <time.h>
 #include <curses.h>
 #include "extern.h"
+#include "frontend.h"
 
 #define NOOP(x) (x += 0)
 
@@ -120,8 +121,13 @@ open_score()
     }
 
     if (scoreboard == NULL) { 
-         fprintf(stderr, "Could not open %s for writing: %s\n", scorefile, strerror(errno)); 
-         fflush(stderr); 
+	snprintf(prbuf, MAXSTR, "Could not open %s for writing: %s",
+		 scorefile, strerror(errno));
+	if (!rogue_frontend_notice("Score File Error", prbuf))
+	{
+	    fprintf(stderr, "%s\n", prbuf);
+	    fflush(stderr);
+	}
     } 
 #else
     scoreboard = NULL;
@@ -400,10 +406,22 @@ over:
     }
     else
     {
-	printf("The score file is very busy.  Do you want to wait longer\n");
-	printf("for it to become free so your score can get posted?\n");
-	printf("If so, type \"y\"\n");
-	(void) fgets(prbuf, MAXSTR, stdin);
+	if (rogue_frontend_is_tiles())
+	{
+	    if (rogue_frontend_confirm(
+		    "Score File Busy",
+		    "Wait longer so your score can get posted?"))
+		prbuf[0] = 'y';
+	    else
+		prbuf[0] = '\0';
+	}
+	else
+	{
+	    printf("The score file is very busy.  Do you want to wait longer\n");
+	    printf("for it to become free so your score can get posted?\n");
+	    printf("If so, type \"y\"\n");
+	    (void) fgets(prbuf, MAXSTR, stdin);
+	}
 	if (prbuf[0] == 'y')
 	    for (;;)
 	    {
