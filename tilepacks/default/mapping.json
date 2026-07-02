@@ -1,0 +1,181 @@
+{
+  "schemaVersion": 1,
+  "roles": {
+    "terrain.floor": {
+      "index": 1378,
+      "name": "floor_of_a_room"
+    },
+    "terrain.passage": {
+      "index": 1434,
+      "name": "corridor"
+    },
+    "terrain.door": {
+      "index": 1367,
+      "name": "dngn_closed_door"
+    },
+    "terrain.vertical_wall": {
+      "index": 1350,
+      "name": "dngn_rock_wall_00"
+    },
+    "terrain.horizontal_wall": {
+      "index": 1350,
+      "name": "dngn_rock_wall_00"
+    },
+    "terrain.stairs_down": {
+      "index": 1381,
+      "name": "staircase_down"
+    },
+    "terrain.known_trap": {
+      "index": 1382,
+      "name": "dngn_trap_mechanical"
+    },
+    "object.gold": {
+      "index": 1084,
+      "name": "gold_piece"
+    },
+    "object.potion": {
+      "index": 1274,
+      "name": "bubbly"
+    },
+    "object.scroll": {
+      "index": 1306,
+      "name": "vellum"
+    },
+    "object.magic": {
+      "index": 1034,
+      "name": "i-magic"
+    },
+    "object.food": {
+      "index": 1265,
+      "name": "food_ration"
+    },
+    "object.weapon": {
+      "index": 1106,
+      "name": "long_sword"
+    },
+    "object.armor": {
+      "index": 1160,
+      "name": "leather_armor"
+    },
+    "object.amulet": {
+      "index": 1207,
+      "name": "amulet_of_yendor"
+    },
+    "object.ring": {
+      "index": 992,
+      "name": "ring_green"
+    },
+    "object.stick": {
+      "index": 1061,
+      "name": "staff00"
+    },
+    "actor.player": {
+      "index": 74,
+      "name": "human"
+    },
+    "monster.A": {
+      "index": 334,
+      "name": "water_elemental"
+    },
+    "monster.B": {
+      "index": 434,
+      "name": "bat"
+    },
+    "monster.C": {
+      "index": 229,
+      "name": "plains_centaur"
+    },
+    "monster.D": {
+      "index": 108,
+      "name": "green_dragon"
+    },
+    "monster.E": {
+      "index": 338,
+      "name": "chickatrice"
+    },
+    "monster.F": {
+      "index": 172,
+      "name": "plant"
+    },
+    "monster.G": {
+      "index": 137,
+      "name": "griffon"
+    },
+    "monster.H": {
+      "index": 386,
+      "name": "hobgoblin"
+    },
+    "monster.I": {
+      "index": 140,
+      "name": "ice_beast"
+    },
+    "monster.J": {
+      "index": 469,
+      "name": "jabberwock"
+    },
+    "monster.K": {
+      "index": 434,
+      "name": "bat"
+    },
+    "monster.L": {
+      "index": 378,
+      "name": "leprechaun"
+    },
+    "monster.M": {
+      "index": 547,
+      "name": "medusa"
+    },
+    "monster.N": {
+      "index": 382,
+      "name": "wood_nymph"
+    },
+    "monster.O": {
+      "index": 387,
+      "name": "orc"
+    },
+    "monster.P": {
+      "index": 298,
+      "name": "phantom"
+    },
+    "monster.Q": {
+      "index": 415,
+      "name": "horse"
+    },
+    "monster.R": {
+      "index": 183,
+      "name": "snake"
+    },
+    "monster.S": {
+      "index": 183,
+      "name": "snake"
+    },
+    "monster.T": {
+      "index": 189,
+      "name": "troll"
+    },
+    "monster.U": {
+      "index": 413,
+      "name": "black_unicorn"
+    },
+    "monster.V": {
+      "index": 194,
+      "name": "vampire"
+    },
+    "monster.W": {
+      "index": 202,
+      "name": "wraith"
+    },
+    "monster.X": {
+      "index": 379,
+      "name": "small_mimic"
+    },
+    "monster.Y": {
+      "index": 513,
+      "name": "yeti"
+    },
+    "monster.Z": {
+      "index": 520,
+      "name": "human_zombie"
+    }
+  }
+}
