@@ -36,4 +36,12 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "assets") -Destination (Join-Path $p
 Copy-Item -LiteralPath (Join-Path $repoRoot "tilepacks") -Destination (Join-Path $packageDir "tilepacks") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "tile_picker") -Destination (Join-Path $packageDir "tile_picker") -Recurse -Force
 
+$tilePickerExe = Join-Path $repoRoot "dist\picker-build\TilePicker.exe"
+if (Test-Path $tilePickerExe) {
+    Copy-Item -LiteralPath $tilePickerExe -Destination (Join-Path $packageDir "TilePicker.exe") -Force
+}
+else {
+    Write-Warning "TilePicker.exe was not found. Run scripts\build-tile-picker-exe.ps1 before final packaging."
+}
+
 Write-Host "Packaged: $packageDir"
