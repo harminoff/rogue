@@ -56,6 +56,17 @@ jobs:
           "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
           "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
 
+      - name: Install MSYS2 package dependencies
+        run: |
+          C:\msys64\usr\bin\pacman.exe -S --noconfirm --needed `
+            mingw-w64-x86_64-gcc `
+            mingw-w64-x86_64-make `
+            mingw-w64-x86_64-pkgconf `
+            mingw-w64-x86_64-ncurses `
+            mingw-w64-x86_64-allegro
+          Get-ChildItem C:\msys64\mingw64\bin -Filter "*pthread*" -ErrorAction SilentlyContinue | Select-Object FullName
+          Get-ChildItem C:\msys64\mingw64\lib -Filter "*curses*" -ErrorAction SilentlyContinue | Select-Object FullName
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

@@ -42,15 +42,19 @@ $ncursesDllCandidates = @(
     (Join-Path $mingwBin "libncurses.dll")
 )
 $ncursesDll = $ncursesDllCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-$winpthreadDll = Join-Path $mingwBin "libwinpthread-1.dll"
+$winpthreadDllCandidates = @(
+    (Join-Path $mingwBin "libwinpthread-1.dll"),
+    (Join-Path $MsysRoot "ucrt64\bin\libwinpthread-1.dll"),
+    (Join-Path $MsysRoot "clang64\bin\libwinpthread-1.dll")
+)
+$winpthreadDll = $winpthreadDllCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 $pkgConfig = Join-Path $mingwBin "pkg-config.exe"
 $objdump = Join-Path $mingwBin "objdump.exe"
 $mingwGcc = Join-Path $mingwBin "gcc.exe"
 
 foreach ($path in @(
     (Join-Path $msysUsrBin "tar.exe"),
-    (Join-Path $msysUsrBin "sed.exe"),
-    $winpthreadDll
+    (Join-Path $msysUsrBin "sed.exe")
 )) {
     if (-not (Test-Path $path)) {
         throw "Missing dependency: $path. Install with: C:\msys64\usr\bin\pacman.exe -S mingw-w64-x86_64-ncurses"
@@ -240,7 +244,9 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($ncursesDll)) {
         Copy-Item -LiteralPath $ncursesDll -Destination (Join-Path $buildDir (Split-Path -Leaf $ncursesDll)) -Force
     }
-    Copy-Item -LiteralPath $winpthreadDll -Destination (Join-Path $buildDir "libwinpthread-1.dll") -Force
+    if (-not [string]::IsNullOrWhiteSpace($winpthreadDll)) {
+        Copy-Item -LiteralPath $winpthreadDll -Destination (Join-Path $buildDir "libwinpthread-1.dll") -Force
+    }
     if ($Tiles) {
         Copy-DependentDlls -Binary (Join-Path $buildDir "rogue54.exe")
     }
@@ -253,4 +259,6 @@ Write-Host "Built: $(Join-Path $buildDir 'rogue54.exe')"
 if (-not [string]::IsNullOrWhiteSpace($ncursesDll)) {
     Write-Host "Runtime DLL: $(Join-Path $buildDir (Split-Path -Leaf $ncursesDll))"
 }
-Write-Host "Runtime DLL: $(Join-Path $buildDir 'libwinpthread-1.dll')"
+if (-not [string]::IsNullOrWhiteSpace($winpthreadDll)) {
+    Write-Host "Runtime DLL: $(Join-Path $buildDir 'libwinpthread-1.dll')"
+}
