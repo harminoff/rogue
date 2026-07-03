@@ -110,7 +110,9 @@ fight(coord *mp, THING *weap, bool thrown)
     {
 	damage_done = oldhp - tp->t_stats.s_hpt;
 	if (damage_done > 0)
-	    rogue_frontend_record_damage(damage_done, 0);
+	    rogue_frontend_record_damage(damage_done, 0,
+					 tp->t_stats.s_hpt,
+					 tp->t_stats.s_maxhp);
 	did_hit = FALSE;
 	if (thrown)
 	    thunk(weap, mname, terse);
@@ -174,7 +176,7 @@ attack(THING *mp)
     {
 	damage_taken = oldhp - pstats.s_hpt;
 	if (damage_taken > 0)
-	    rogue_frontend_record_damage(0, damage_taken);
+	    rogue_frontend_record_damage(0, damage_taken, 0, 0);
 	if (mp->t_type != 'I')
 	{
 	    if (has_hit)

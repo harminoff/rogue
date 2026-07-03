@@ -89,6 +89,7 @@ try {
         "main.c",
         "command.c",
         "extern.h",
+        "fight.c",
         "io.c",
         "mach_dep.c",
         "options.c",

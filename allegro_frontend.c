@@ -94,9 +94,13 @@ static int render_origin_y = 0;
 static char message_log[ROGUE_MESSAGE_LOG_LINES][ROGUE_OVERLAY_LINE_LEN];
 static int message_damage_dealt[ROGUE_MESSAGE_LOG_LINES];
 static int message_damage_taken[ROGUE_MESSAGE_LOG_LINES];
+static int message_enemy_hp[ROGUE_MESSAGE_LOG_LINES];
+static int message_enemy_max_hp[ROGUE_MESSAGE_LOG_LINES];
 static int message_log_count = 0;
 static int pending_damage_dealt = 0;
 static int pending_damage_taken = 0;
+static int pending_enemy_hp = 0;
+static int pending_enemy_max_hp = 0;
 static ROGUE_BLOOD_SPLAT blood_splats[ROGUE_BLOOD_SPLATS];
 static int blood_splat_count = 0;
 static unsigned int blood_rng = 0x6d2b79f5u;
@@ -1192,6 +1196,8 @@ count_log_entry_lines(int index, int max_chars)
 	lines++;
     if (message_damage_taken[index] > 0)
 	lines++;
+    if (message_enemy_max_hp[index] > 0)
+	lines++;
 
     return lines;
 }
@@ -1247,6 +1253,13 @@ draw_log_damage_lines(int index, int x, int *y, int line_height)
 	snprintf(line, sizeof(line), "Damage taken: %d",
 		 message_damage_taken[index]);
 	al_draw_text(font, al_map_rgb(238, 82, 82), x, *y, 0, line);
+	*y += line_height + 1;
+    }
+    if (message_enemy_max_hp[index] > 0)
+    {
+	snprintf(line, sizeof(line), "Enemy HP: %d/%d",
+		 message_enemy_hp[index], message_enemy_max_hp[index]);
+	al_draw_text(font, al_map_rgb(214, 190, 124), x, *y, 0, line);
 	*y += line_height + 1;
     }
 }
@@ -1778,6 +1791,8 @@ rogue_allegro_record_message(const char *message)
 		     message_log[i]);
 	    message_damage_dealt[i - 1] = message_damage_dealt[i];
 	    message_damage_taken[i - 1] = message_damage_taken[i];
+	    message_enemy_hp[i - 1] = message_enemy_hp[i];
+	    message_enemy_max_hp[i - 1] = message_enemy_max_hp[i];
 	}
 	message_log_count = ROGUE_MESSAGE_LOG_LINES - 1;
     }
@@ -1786,9 +1801,13 @@ rogue_allegro_record_message(const char *message)
 	     sizeof(message_log[message_log_count]), "%s", message);
     message_damage_dealt[message_log_count] = pending_damage_dealt;
     message_damage_taken[message_log_count] = pending_damage_taken;
+    message_enemy_hp[message_log_count] = pending_enemy_hp;
+    message_enemy_max_hp[message_log_count] = pending_enemy_max_hp;
     message_log_count++;
     pending_damage_dealt = 0;
     pending_damage_taken = 0;
+    pending_enemy_hp = 0;
+    pending_enemy_max_hp = 0;
 
     if (contains_text(message, "welcome to level"))
 	clear_blood_splats();
@@ -1800,12 +1819,18 @@ rogue_allegro_record_message(const char *message)
 }
 
 void
-rogue_allegro_record_damage(int dealt, int taken)
+rogue_allegro_record_damage(int dealt, int taken, int enemy_hp,
+			    int enemy_max_hp)
 {
     if (dealt > 0)
 	pending_damage_dealt += dealt;
     if (taken > 0)
 	pending_damage_taken += taken;
+    if (enemy_max_hp > 0)
+    {
+	pending_enemy_hp = clamp_int(enemy_hp, 0, enemy_max_hp);
+	pending_enemy_max_hp = enemy_max_hp;
+    }
 }
 
 void
@@ -2292,5 +2317,7 @@ rogue_allegro_shutdown(void)
     message_log_count = 0;
     pending_damage_dealt = 0;
     pending_damage_taken = 0;
+    pending_enemy_hp = 0;
+    pending_enemy_max_hp = 0;
     blood_splat_count = 0;
 }
