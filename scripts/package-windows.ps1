@@ -15,9 +15,22 @@ if ([string]::IsNullOrWhiteSpace($ZipPath)) {
     $ZipPath = Join-Path $distRoot "RogueTiles-windows-x64.zip"
 }
 
+function Invoke-RepoScript {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ScriptPath,
+        [string[]]$Arguments = @()
+    )
+
+    & powershell -ExecutionPolicy Bypass -File $ScriptPath @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "Script failed with exit code ${LASTEXITCODE}: $ScriptPath $($Arguments -join ' ')"
+    }
+}
+
 if (-not $SkipBuild) {
-    powershell -ExecutionPolicy Bypass -File (Join-Path $repoRoot "scripts\build-runtime-tilepacks.ps1")
-    powershell -ExecutionPolicy Bypass -File (Join-Path $repoRoot "scripts\build-windows-native.ps1") -MsysRoot $MsysRoot -Tiles
+    Invoke-RepoScript -ScriptPath (Join-Path $repoRoot "scripts\build-runtime-tilepacks.ps1")
+    Invoke-RepoScript -ScriptPath (Join-Path $repoRoot "scripts\build-windows-native.ps1") -Arguments @("-MsysRoot", $MsysRoot, "-Tiles")
 }
 
 New-Item -ItemType Directory -Force $packageDir | Out-Null

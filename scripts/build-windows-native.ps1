@@ -23,7 +23,11 @@ $archive = Join-Path $buildDir "rogue-src.tar"
 $msysUsrBin = Join-Path $MsysRoot "usr\bin"
 $mingwBin = Join-Path $MsysRoot "mingw64\bin"
 $mingwLib = Join-Path $MsysRoot "mingw64\lib"
-$ncursesHeaders = Join-Path $MsysRoot "mingw64\include\ncursesw"
+$ncursesHeaderCandidates = @(
+    (Join-Path $MsysRoot "mingw64\include\ncursesw"),
+    (Join-Path $MsysRoot "mingw64\include\ncurses")
+)
+$ncursesHeaders = $ncursesHeaderCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 $ncursesImport = Join-Path $mingwLib "libncursesw.dll.a"
 $ncursesDll = Join-Path $mingwBin "libncursesw6.dll"
 $winpthreadDll = Join-Path $mingwBin "libwinpthread-1.dll"
@@ -34,7 +38,6 @@ $mingwGcc = Join-Path $mingwBin "gcc.exe"
 foreach ($path in @(
     (Join-Path $msysUsrBin "tar.exe"),
     (Join-Path $msysUsrBin "sed.exe"),
-    $ncursesHeaders,
     $ncursesImport,
     $ncursesDll,
     $winpthreadDll
@@ -42,6 +45,10 @@ foreach ($path in @(
     if (-not (Test-Path $path)) {
         throw "Missing dependency: $path. Install with: C:\msys64\usr\bin\pacman.exe -S mingw-w64-x86_64-ncurses"
     }
+}
+
+if ([string]::IsNullOrWhiteSpace($ncursesHeaders)) {
+    throw "Missing dependency: ncurses headers. Install with: C:\msys64\usr\bin\pacman.exe -S mingw-w64-x86_64-ncurses"
 }
 
 if ($Tiles) {
@@ -140,7 +147,7 @@ New-Item -ItemType Directory -Force $includeDir | Out-Null
 #ifndef ROGUE_NATIVE_BUILD_CURSES_H
 #define ROGUE_NATIVE_BUILD_CURSES_H
 
-#include "C:/msys64/mingw64/include/ncursesw/curses.h"
+#include "$(($ncursesHeaders -replace '\\', '/'))/curses.h"
 
 #endif
 "@ | Set-Content -LiteralPath (Join-Path $includeDir "curses.h") -NoNewline
@@ -149,7 +156,7 @@ New-Item -ItemType Directory -Force $includeDir | Out-Null
 #ifndef ROGUE_NATIVE_BUILD_TERM_H
 #define ROGUE_NATIVE_BUILD_TERM_H
 
-#include "C:/msys64/mingw64/include/ncursesw/term.h"
+#include "$(($ncursesHeaders -replace '\\', '/'))/term.h"
 
 #endif
 "@ | Set-Content -LiteralPath (Join-Path $includeDir "term.h") -NoNewline
