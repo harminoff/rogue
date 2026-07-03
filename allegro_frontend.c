@@ -20,8 +20,13 @@
 #include "tilepack.h"
 
 #define ROGUE_DEFAULT_TILE_DRAW_SIZE 32
-#define ROGUE_VIEW_COLS 40
-#define ROGUE_VIEW_ROWS (NUMLINES - 1)
+#define ROGUE_STATUS_HEIGHT 96
+#define ROGUE_MIN_TILE_DRAW_SIZE 16
+#define ROGUE_MAX_TILE_DRAW_SIZE 64
+#define ROGUE_TILE_ZOOM_STEP 4
+#define ROGUE_DEFAULT_VIEW_COLS 40
+#define ROGUE_MAX_VIEW_COLS NUMCOLS
+#define ROGUE_MAX_VIEW_ROWS (NUMLINES - 1)
 #define ROGUE_REPEAT_DELAY_SECONDS 0.30
 #define ROGUE_REPEAT_RATE_SECONDS 0.13
 #define ROGUE_FONT_SIZE 32
@@ -37,18 +42,21 @@ typedef struct rogue_allegro_settings {
     int tile_draw_size;
     ROGUE_ALLEGRO_VIEW view_mode;
     bool shader_enabled;
+    bool fullscreen;
+    int windowed_width;
+    int windowed_height;
 } ROGUE_ALLEGRO_SETTINGS;
 
 static ROGUE_ALLEGRO_SETTINGS settings = {
     ROGUE_DEFAULT_TILE_DRAW_SIZE,
     ROGUE_ALLEGRO_VIEW_TILES,
-    FALSE
+    FALSE,
+    FALSE,
+    ROGUE_DEFAULT_VIEW_COLS * ROGUE_DEFAULT_TILE_DRAW_SIZE,
+    ROGUE_MAX_VIEW_ROWS * ROGUE_DEFAULT_TILE_DRAW_SIZE + ROGUE_STATUS_HEIGHT
 };
 
 #define ROGUE_TILE_DRAW_SIZE (settings.tile_draw_size)
-#define ROGUE_STATUS_HEIGHT 96
-#define ROGUE_WINDOW_WIDTH (ROGUE_VIEW_COLS * ROGUE_TILE_DRAW_SIZE)
-#define ROGUE_WINDOW_HEIGHT (ROGUE_VIEW_ROWS * ROGUE_TILE_DRAW_SIZE + ROGUE_STATUS_HEIGHT)
 
 static ALLEGRO_DISPLAY *display = NULL;
 static ALLEGRO_EVENT_QUEUE *queue = NULL;
@@ -60,6 +68,8 @@ static int suppress_key_char_keycode = 0;
 static int held_movement_keycode = 0;
 static char held_movement = '\0';
 static double held_movement_next_time = 0.0;
+static int render_origin_x = 0;
+static int render_origin_y = 0;
 static bool prompt_active = FALSE;
 static char prompt_text[128];
 static bool death_overlay_active = FALSE;
@@ -150,13 +160,61 @@ load_ui_font(void)
 }
 
 static int
-camera_left(void)
+clamp_int(int value, int min_value, int max_value)
+{
+    if (value < min_value)
+	return min_value;
+    if (value > max_value)
+	return max_value;
+    return value;
+}
+
+static int
+display_width(void)
+{
+    if (display == NULL)
+	return settings.windowed_width;
+    return al_get_display_width(display);
+}
+
+static int
+display_height(void)
+{
+    if (display == NULL)
+	return settings.windowed_height;
+    return al_get_display_height(display);
+}
+
+static int
+view_cols(void)
+{
+    int cols;
+
+    cols = display_width() / ROGUE_TILE_DRAW_SIZE;
+    return clamp_int(cols, 1, ROGUE_MAX_VIEW_COLS);
+}
+
+static int
+view_rows(void)
+{
+    int available;
+    int rows;
+
+    available = display_height() - ROGUE_STATUS_HEIGHT;
+    if (available < ROGUE_TILE_DRAW_SIZE)
+	available = ROGUE_TILE_DRAW_SIZE;
+    rows = available / ROGUE_TILE_DRAW_SIZE;
+    return clamp_int(rows, 1, ROGUE_MAX_VIEW_ROWS);
+}
+
+static int
+camera_left(int cols)
 {
     int left;
     int max_left;
 
-    left = hero.x - ROGUE_VIEW_COLS / 2;
-    max_left = NUMCOLS - ROGUE_VIEW_COLS;
+    left = hero.x - cols / 2;
+    max_left = NUMCOLS - cols;
 
     if (left < 0)
 	left = 0;
@@ -164,6 +222,87 @@ camera_left(void)
 	left = max_left;
 
     return left;
+}
+
+static int
+camera_top(int rows)
+{
+    int top;
+    int max_top;
+
+    top = hero.y - rows / 2;
+    max_top = ROGUE_MAX_VIEW_ROWS - rows;
+
+    if (top < 0)
+	top = 0;
+    if (top > max_top)
+	top = max_top;
+    if (top < 0)
+	top = 0;
+
+    return top;
+}
+
+static void
+toggle_fullscreen(void)
+{
+    bool fullscreen;
+
+    if (display == NULL)
+	return;
+
+    fullscreen = !settings.fullscreen;
+    if (fullscreen)
+    {
+	settings.windowed_width = display_width();
+	settings.windowed_height = display_height();
+    }
+
+    if (al_set_display_flag(display, ALLEGRO_FULLSCREEN_WINDOW, fullscreen))
+    {
+	settings.fullscreen = fullscreen;
+	if (!fullscreen)
+	    al_resize_display(display, settings.windowed_width,
+			      settings.windowed_height);
+    }
+}
+
+static void
+set_zoom(int tile_draw_size)
+{
+    settings.tile_draw_size = clamp_int(tile_draw_size,
+					ROGUE_MIN_TILE_DRAW_SIZE,
+					ROGUE_MAX_TILE_DRAW_SIZE);
+}
+
+static bool
+handle_view_key(int keycode)
+{
+    switch (keycode)
+    {
+	case ALLEGRO_KEY_F10:
+	    settings.view_mode = (settings.view_mode == ROGUE_ALLEGRO_VIEW_TILES)
+		? ROGUE_ALLEGRO_VIEW_GLYPHS
+		: ROGUE_ALLEGRO_VIEW_TILES;
+	    return TRUE;
+	case ALLEGRO_KEY_F11:
+	    toggle_fullscreen();
+	    return TRUE;
+	case ALLEGRO_KEY_EQUALS:
+	case ALLEGRO_KEY_PAD_PLUS:
+	    set_zoom(settings.tile_draw_size + ROGUE_TILE_ZOOM_STEP);
+	    return TRUE;
+	case ALLEGRO_KEY_MINUS:
+	case ALLEGRO_KEY_PAD_MINUS:
+	    set_zoom(settings.tile_draw_size - ROGUE_TILE_ZOOM_STEP);
+	    return TRUE;
+	case ALLEGRO_KEY_0:
+	case ALLEGRO_KEY_PAD_0:
+	    set_zoom(ROGUE_DEFAULT_TILE_DRAW_SIZE);
+	    return TRUE;
+	default:
+	    return FALSE;
+    }
 }
 
 static char
@@ -255,8 +394,8 @@ draw_glyph_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
     int dx, dy;
     char text[2];
 
-    dx = screen_x * ROGUE_TILE_DRAW_SIZE;
-    dy = screen_y * ROGUE_TILE_DRAW_SIZE;
+    dx = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE;
+    dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
 
     bg = al_map_rgb(10, 10, 12);
     fg = al_map_rgb(220, 220, 210);
@@ -345,7 +484,8 @@ draw_atlas_tile_region(int atlas_index, int sx_offset, int sy_offset,
 
 static void
 draw_wall_edge_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell,
-		    ROGUE_TILE_CELL view[ROGUE_VIEW_ROWS][ROGUE_VIEW_COLS])
+		    ROGUE_TILE_CELL view[ROGUE_MAX_VIEW_ROWS][ROGUE_MAX_VIEW_COLS],
+		    int rows, int cols)
 {
     int dx, dy;
     int edge;
@@ -354,8 +494,8 @@ draw_wall_edge_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell,
     int wall_index;
     bool open_left, open_right, open_up, open_down;
 
-    dx = screen_x * ROGUE_TILE_DRAW_SIZE;
-    dy = screen_y * ROGUE_TILE_DRAW_SIZE;
+    dx = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE;
+    dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
     source_w = rogue_tilepack_source_width();
     source_h = rogue_tilepack_source_height();
     edge = ROGUE_TILE_DRAW_SIZE / 6;
@@ -369,11 +509,11 @@ draw_wall_edge_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell,
 
     open_left = (bool)(screen_x > 0
 		       && is_wall_edge_neighbor(&view[screen_y][screen_x - 1]));
-    open_right = (bool)(screen_x + 1 < ROGUE_VIEW_COLS
+    open_right = (bool)(screen_x + 1 < cols
 			&& is_wall_edge_neighbor(&view[screen_y][screen_x + 1]));
     open_up = (bool)(screen_y > 0
 		     && is_wall_edge_neighbor(&view[screen_y - 1][screen_x]));
-    open_down = (bool)(screen_y + 1 < ROGUE_VIEW_ROWS
+    open_down = (bool)(screen_y + 1 < rows
 		       && is_wall_edge_neighbor(&view[screen_y + 1][screen_x]));
 
     al_draw_filled_rectangle(dx, dy, dx + ROGUE_TILE_DRAW_SIZE,
@@ -417,8 +557,8 @@ draw_tile_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
     int underlay_index;
     ALLEGRO_COLOR fallback;
 
-    dx = screen_x * ROGUE_TILE_DRAW_SIZE;
-    dy = screen_y * ROGUE_TILE_DRAW_SIZE;
+    dx = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE;
+    dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
 
     atlas_index = resolved_cell_index(cell);
     underlay_index = resolved_underlay_index(cell);
@@ -450,6 +590,8 @@ static void
 draw_status(void)
 {
     int y;
+    int w;
+    int h;
     int armor;
     char line[256];
     int line_height;
@@ -457,36 +599,42 @@ draw_status(void)
     int second_line_y;
     static char *state_name[] = { "", "Hungry", "Weak", "Faint" };
 
-    y = ROGUE_VIEW_ROWS * ROGUE_TILE_DRAW_SIZE;
+    w = display_width();
+    h = display_height();
+    y = h - ROGUE_STATUS_HEIGHT;
+    if (y < 0)
+	y = 0;
     armor = (cur_armor != NULL ? cur_armor->o_arm : pstats.s_arm);
     line_height = al_get_font_line_height(font);
     first_line_y = y + 8;
     second_line_y = first_line_y + line_height + 6;
 
-    al_draw_filled_rectangle(0, y, ROGUE_WINDOW_WIDTH, ROGUE_WINDOW_HEIGHT,
+    al_draw_filled_rectangle(0, y, w, h,
 			     al_map_rgb(5, 5, 8));
-    al_draw_line(0, y, ROGUE_WINDOW_WIDTH, y, al_map_rgb(80, 80, 90), 1);
+    al_draw_line(0, y, w, y, al_map_rgb(80, 80, 90), 1);
 
     snprintf(line, sizeof(line),
 	     "Level:%d  Gold:%d  HP:%d(%d)  ST:%u  Arm:%d  Exp:%d/%d %s",
 	     level, purse, pstats.s_hpt, max_hp, pstats.s_str, armor,
 	     pstats.s_lvl, pstats.s_exp, state_name[hungry_state]);
 
-    al_draw_text(font, al_map_rgb(230, 230, 220), ROGUE_WINDOW_WIDTH / 2,
+    al_draw_text(font, al_map_rgb(230, 230, 220), w / 2,
 		 first_line_y, ALLEGRO_ALIGN_CENTRE, line);
     al_draw_text(font, al_map_rgb(180, 200, 255), 8, second_line_y, 0, huh);
     if (prompt_active)
-	al_draw_text(font, al_map_rgb(245, 226, 170), ROGUE_WINDOW_WIDTH - 8,
+	al_draw_text(font, al_map_rgb(245, 226, 170), w - 8,
 		     second_line_y, ALLEGRO_ALIGN_RIGHT, prompt_text);
     else
-	al_draw_text(font, al_map_rgb(160, 160, 160), ROGUE_WINDOW_WIDTH - 8,
-		     second_line_y, ALLEGRO_ALIGN_RIGHT, "F10 toggles view");
+	al_draw_text(font, al_map_rgb(160, 160, 160), w - 8,
+		     second_line_y, ALLEGRO_ALIGN_RIGHT,
+		     "F10 view  F11 full  +/- zoom");
 }
 
 static void
 draw_text_overlay(void)
 {
     int x, y, w, h;
+    int window_w, window_h;
     int i;
     int line_index;
     int line_height;
@@ -498,6 +646,8 @@ draw_text_overlay(void)
     if (!text_overlay_active)
 	return;
 
+    window_w = display_width();
+    window_h = display_height();
     line_height = al_get_font_line_height(font);
     visible_lines = text_overlay_line_count;
     if (visible_lines > 14)
@@ -532,12 +682,14 @@ draw_text_overlay(void)
 	    text_overlay_scroll = 0;
     }
 
-    w = ROGUE_WINDOW_WIDTH - 160;
+    w = window_w - 160;
     if (w < 520)
-	w = ROGUE_WINDOW_WIDTH - 48;
+	w = window_w - 48;
+    if (w > window_w - 48)
+	w = window_w - 48;
     h = 96 + visible_lines * (line_height + 2);
-    x = (ROGUE_WINDOW_WIDTH - w) / 2;
-    y = (ROGUE_WINDOW_HEIGHT - h) / 2;
+    x = (window_w - w) / 2;
+    y = (window_h - h) / 2;
 
     bg = al_map_rgba(8, 9, 13, 244);
     border = al_map_rgb(120, 126, 150);
@@ -582,6 +734,7 @@ static void
 draw_death_overlay(void)
 {
     int x, y, w, h;
+    int window_w, window_h;
     int line_height;
     int text_y;
     ALLEGRO_COLOR bg, border, title, text, muted;
@@ -589,11 +742,15 @@ draw_death_overlay(void)
     if (!death_overlay_active)
 	return;
 
+    window_w = display_width();
+    window_h = display_height();
     w = 560;
+    if (w > window_w - 48)
+	w = window_w - 48;
     line_height = al_get_font_line_height(font);
     h = 260;
-    x = (ROGUE_WINDOW_WIDTH - w) / 2;
-    y = (ROGUE_WINDOW_HEIGHT - h) / 2;
+    x = (window_w - w) / 2;
+    y = (window_h - h) / 2;
 
     bg = al_map_rgb(12, 10, 10);
     border = al_map_rgb(150, 36, 36);
@@ -655,7 +812,9 @@ rogue_allegro_start(bool smoke)
     al_init_primitives_addon();
 
     al_set_new_display_option(ALLEGRO_VSYNC, 1, ALLEGRO_SUGGEST);
-    display = al_create_display(ROGUE_WINDOW_WIDTH, ROGUE_WINDOW_HEIGHT);
+    al_set_new_display_flags(ALLEGRO_RESIZABLE);
+    display = al_create_display(settings.windowed_width,
+				settings.windowed_height);
     if (display == NULL)
     {
 	allegro_start_error("Could not create Allegro display.");
@@ -706,32 +865,48 @@ rogue_allegro_render(void)
 {
     int screen_y, screen_x;
     int world_x;
+    int world_y;
     int left;
-    ROGUE_TILE_CELL view[ROGUE_VIEW_ROWS][ROGUE_VIEW_COLS];
+    int top;
+    int rows;
+    int cols;
+    ROGUE_TILE_CELL view[ROGUE_MAX_VIEW_ROWS][ROGUE_MAX_VIEW_COLS];
     ROGUE_TILE_CELL *cell;
 
     if (!started)
 	return;
 
-    left = camera_left();
-    for (screen_y = 0; screen_y < ROGUE_VIEW_ROWS; screen_y++)
-	for (screen_x = 0; screen_x < ROGUE_VIEW_COLS; screen_x++)
+    rows = view_rows();
+    cols = view_cols();
+    left = camera_left(cols);
+    top = camera_top(rows);
+    render_origin_x = (display_width() - cols * ROGUE_TILE_DRAW_SIZE) / 2;
+    if (render_origin_x < 0)
+	render_origin_x = 0;
+    render_origin_y = ((display_height() - ROGUE_STATUS_HEIGHT)
+		       - rows * ROGUE_TILE_DRAW_SIZE) / 2;
+    if (render_origin_y < 0)
+	render_origin_y = 0;
+    for (screen_y = 0; screen_y < rows; screen_y++)
+	for (screen_x = 0; screen_x < cols; screen_x++)
 	{
 	    world_x = left + screen_x;
-	    rogue_tile_describe_cell(screen_y, world_x,
+	    world_y = top + screen_y;
+	    rogue_tile_describe_cell(world_y, world_x,
 				     &view[screen_y][screen_x]);
 	}
 
     al_clear_to_color(al_map_rgb(0, 0, 0));
     al_hold_bitmap_drawing(TRUE);
-    for (screen_y = 0; screen_y < ROGUE_VIEW_ROWS; screen_y++)
-	for (screen_x = 0; screen_x < ROGUE_VIEW_COLS; screen_x++)
+    for (screen_y = 0; screen_y < rows; screen_y++)
+	for (screen_x = 0; screen_x < cols; screen_x++)
 	{
 	    cell = &view[screen_y][screen_x];
 	    if (settings.view_mode == ROGUE_ALLEGRO_VIEW_TILES)
 	    {
 		if (is_wall_cell(cell))
-		    draw_wall_edge_cell(screen_x, screen_y, cell, view);
+		    draw_wall_edge_cell(screen_x, screen_y, cell, view,
+					rows, cols);
 		else
 		    draw_tile_cell(screen_x, screen_y, cell);
 	    }
@@ -795,14 +970,19 @@ rogue_allegro_readchar(void)
 
 	if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
 	    return 'Q';
+	if (event.type == ALLEGRO_EVENT_DISPLAY_RESIZE)
+	{
+	    al_acknowledge_resize(display);
+	    rogue_allegro_render();
+	    continue;
+	}
 
 	if (event.type == ALLEGRO_EVENT_KEY_DOWN)
 	{
-	    if (event.keyboard.keycode == ALLEGRO_KEY_F10)
+	    if (handle_view_key(event.keyboard.keycode))
 	    {
-		settings.view_mode = (settings.view_mode == ROGUE_ALLEGRO_VIEW_TILES)
-		    ? ROGUE_ALLEGRO_VIEW_GLYPHS
-		    : ROGUE_ALLEGRO_VIEW_TILES;
+		suppress_key_char_keycode = event.keyboard.keycode;
+		rogue_allegro_render();
 		continue;
 	    }
 
@@ -938,15 +1118,20 @@ rogue_allegro_text_overlay_show(const char *prompt)
 	    ch = 'Q';
 	    break;
 	}
+	if (event.type == ALLEGRO_EVENT_DISPLAY_RESIZE)
+	{
+	    al_acknowledge_resize(display);
+	    rogue_allegro_render();
+	    continue;
+	}
 	if (event.type != ALLEGRO_EVENT_KEY_DOWN)
 	    continue;
 
 	switch (event.keyboard.keycode)
 	{
-	    case ALLEGRO_KEY_F10:
-		settings.view_mode = (settings.view_mode == ROGUE_ALLEGRO_VIEW_TILES)
-		    ? ROGUE_ALLEGRO_VIEW_GLYPHS
-		    : ROGUE_ALLEGRO_VIEW_TILES;
+	    default:
+		if (handle_view_key(event.keyboard.keycode))
+		    suppress_key_char_keycode = event.keyboard.keycode;
 		break;
 	    case ALLEGRO_KEY_UP:
 	    case ALLEGRO_KEY_PAD_8:
@@ -1032,16 +1217,20 @@ rogue_allegro_text_overlay_pick(const char *prompt)
 	    chosen = 'Q';
 	    break;
 	}
+	if (event.type == ALLEGRO_EVENT_DISPLAY_RESIZE)
+	{
+	    al_acknowledge_resize(display);
+	    rogue_allegro_render();
+	    continue;
+	}
 
 	if (event.type == ALLEGRO_EVENT_KEY_DOWN)
 	{
 	    switch (event.keyboard.keycode)
 	    {
-		case ALLEGRO_KEY_F10:
-		    settings.view_mode =
-			(settings.view_mode == ROGUE_ALLEGRO_VIEW_TILES)
-			? ROGUE_ALLEGRO_VIEW_GLYPHS
-			: ROGUE_ALLEGRO_VIEW_TILES;
+		default:
+		    if (handle_view_key(event.keyboard.keycode))
+			suppress_key_char_keycode = event.keyboard.keycode;
 		    break;
 		case ALLEGRO_KEY_ESCAPE:
 		    chosen = ESCAPE;
@@ -1084,6 +1273,11 @@ rogue_allegro_text_overlay_pick(const char *prompt)
 
 	if (event.type == ALLEGRO_EVENT_KEY_CHAR)
 	{
+	    if (event.keyboard.keycode == suppress_key_char_keycode)
+	    {
+		suppress_key_char_keycode = 0;
+		continue;
+	    }
 	    if (event.keyboard.unichar > 0 && event.keyboard.unichar < 128)
 	    {
 		typed = (char) event.keyboard.unichar;
@@ -1131,7 +1325,7 @@ rogue_allegro_text_input(const char *title, const char *prompt,
 {
     ALLEGRO_EVENT event;
     char input[MAXSTR];
-    char display[ROGUE_OVERLAY_LINE_LEN];
+    char input_display[ROGUE_OVERLAY_LINE_LEN];
     int len;
     bool done;
     bool accepted;
@@ -1159,8 +1353,8 @@ rogue_allegro_text_input(const char *title, const char *prompt,
     {
 	rogue_allegro_text_overlay_begin(title);
 	rogue_allegro_text_overlay_add(prompt);
-	snprintf(display, sizeof(display), "> %s_", input);
-	rogue_allegro_text_overlay_add(display);
+	snprintf(input_display, sizeof(input_display), "> %s_", input);
+	rogue_allegro_text_overlay_add(input_display);
 	snprintf(text_overlay_prompt, sizeof(text_overlay_prompt),
 		 "Enter accepts, Esc cancels, Backspace deletes");
 	text_overlay_active = TRUE;
@@ -1169,15 +1363,19 @@ rogue_allegro_text_input(const char *title, const char *prompt,
 	al_wait_for_event(queue, &event);
 	if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
 	    break;
+	if (event.type == ALLEGRO_EVENT_DISPLAY_RESIZE)
+	{
+	    al_acknowledge_resize(display);
+	    rogue_allegro_render();
+	    continue;
+	}
 	if (event.type == ALLEGRO_EVENT_KEY_DOWN)
 	{
 	    switch (event.keyboard.keycode)
 	    {
-		case ALLEGRO_KEY_F10:
-		    settings.view_mode =
-			(settings.view_mode == ROGUE_ALLEGRO_VIEW_TILES)
-			? ROGUE_ALLEGRO_VIEW_GLYPHS
-			: ROGUE_ALLEGRO_VIEW_TILES;
+		default:
+		    if (handle_view_key(event.keyboard.keycode))
+			suppress_key_char_keycode = event.keyboard.keycode;
 		    break;
 		case ALLEGRO_KEY_ESCAPE:
 		    done = TRUE;
@@ -1198,6 +1396,11 @@ rogue_allegro_text_input(const char *title, const char *prompt,
 	    && event.keyboard.unichar > 0
 	    && event.keyboard.unichar < 128)
 	{
+	    if (event.keyboard.keycode == suppress_key_char_keycode)
+	    {
+		suppress_key_char_keycode = 0;
+		continue;
+	    }
 	    if (isprint((unsigned char) event.keyboard.unichar)
 		&& len + 1 < (int) sizeof(input)
 		&& len + 1 < out_size)
