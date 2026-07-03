@@ -18,6 +18,11 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("rogue_frontend_record_damage(0, damage_taken);", fight_c)
         self.assertIn("Damage dealt: %d", allegro_c)
         self.assertIn("Damage taken: %d", allegro_c)
+        record_message = allegro_c[
+            allegro_c.index("rogue_allegro_record_message"):
+            allegro_c.index("rogue_allegro_record_damage")
+        ]
+        self.assertIn("rogue_allegro_render();", record_message)
 
 
 if __name__ == "__main__":

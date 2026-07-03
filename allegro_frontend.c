@@ -1795,6 +1795,8 @@ rogue_allegro_record_message(const char *message)
     else if (settings.blood_spatter_enabled
 	     && message_is_blood_trigger(message))
 	spawn_blood_spatter();
+
+    rogue_allegro_render();
 }
 
 void
