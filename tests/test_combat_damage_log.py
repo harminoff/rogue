@@ -278,6 +278,36 @@ class CombatDamageLogTests(unittest.TestCase):
             render.index("draw_scene_with_gloom_shader();"),
         )
 
+    def test_optional_enemy_health_overlay_uses_visible_monster_stats(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("enemy_health_overlay_enabled", allegro_c)
+        self.assertIn('"enemyHealthOverlay"', allegro_c)
+        self.assertIn("Enemy Health Overlay", allegro_c)
+        self.assertIn("draw_enemy_health_overlays", allegro_c)
+        self.assertIn("draw_enemy_health_overlay_cell", allegro_c)
+
+        overlay = allegro_c[
+            allegro_c.index("draw_enemy_health_overlay_cell"):
+            allegro_c.index("draw_enemy_health_overlays")
+        ]
+        self.assertIn("moat(cell->y, cell->x)", overlay)
+        self.assertIn("monster->t_stats.s_hpt", overlay)
+        self.assertIn("monster->t_stats.s_maxhp", overlay)
+        self.assertIn("monster->t_stats.s_lvl", overlay)
+        self.assertIn("monster->t_stats.s_arm", overlay)
+        self.assertIn("monster->t_disguise != monster->t_type", overlay)
+
+        render = allegro_c[
+            allegro_c.index("void\nrogue_allegro_render(void)"):
+            allegro_c.index("char\nrogue_allegro_readchar")
+        ]
+        self.assertIn("draw_enemy_health_overlays(view, rows, cols);", render)
+        self.assertLess(
+            render.index("draw_actor_foreground_cell"),
+            render.index("draw_enemy_health_overlays(view, rows, cols);"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

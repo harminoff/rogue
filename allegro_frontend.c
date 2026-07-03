@@ -31,6 +31,7 @@
 #define ROGUE_REPEAT_DELAY_SECONDS 0.30
 #define ROGUE_REPEAT_RATE_SECONDS 0.13
 #define ROGUE_FONT_SIZE 32
+#define ROGUE_SMALL_FONT_SIZE 16
 #define ROGUE_OVERLAY_MAX_LINES 160
 #define ROGUE_OVERLAY_LINE_LEN 160
 #define ROGUE_MESSAGE_LOG_LINES 64
@@ -67,6 +68,7 @@ typedef struct rogue_allegro_settings {
     bool pixel_sharpen_enabled;
     bool posterize_enabled;
     bool blood_spatter_enabled;
+    bool enemy_health_overlay_enabled;
     bool side_panel_log_enabled;
     bool stylized_log_enabled;
     bool stylized_bottom_bar_enabled;
@@ -98,6 +100,7 @@ static ROGUE_ALLEGRO_SETTINGS settings = {
     FALSE,
     FALSE,
     FALSE,
+    FALSE,
     ROGUE_DEFAULT_WALL_THICKNESS,
     FALSE,
     ROGUE_DEFAULT_VIEW_COLS * ROGUE_DEFAULT_TILE_DRAW_SIZE,
@@ -114,6 +117,7 @@ static ALLEGRO_BITMAP *scene_source_bitmap = NULL;
 static ALLEGRO_SHADER *gloom_shader = NULL;
 static ALLEGRO_SHADER *postprocess_shader = NULL;
 static ALLEGRO_FONT *font = NULL;
+static ALLEGRO_FONT *small_font = NULL;
 static bool started = FALSE;
 static bool smoke_mode = FALSE;
 static bool shader_smoke_mode = FALSE;
@@ -244,6 +248,24 @@ load_ui_font(void)
     return loaded;
 }
 
+static ALLEGRO_FONT *
+load_small_ui_font(void)
+{
+    ALLEGRO_FONT *loaded;
+
+    loaded = al_load_ttf_font("assets/fonts/monogram/monogram.ttf",
+			      ROGUE_SMALL_FONT_SIZE,
+			      ALLEGRO_TTF_MONOCHROME);
+    if (loaded == NULL)
+	loaded = al_load_ttf_font("../assets/fonts/monogram/monogram.ttf",
+				  ROGUE_SMALL_FONT_SIZE,
+				  ALLEGRO_TTF_MONOCHROME);
+    if (loaded == NULL)
+	loaded = font;
+
+    return loaded;
+}
+
 static bool
 json_bool_field(const char *json, const char *key, bool fallback)
 {
@@ -343,6 +365,8 @@ load_settings(void)
 	text, "stylizedBottomBar", settings.stylized_bottom_bar_enabled);
     settings.blood_spatter_enabled = json_bool_field(
 	text, "bloodSpatter", settings.blood_spatter_enabled);
+    settings.enemy_health_overlay_enabled = json_bool_field(
+	text, "enemyHealthOverlay", settings.enemy_health_overlay_enabled);
     settings.dungeon_gloom_enabled = json_bool_field(
 	text, "dungeonGloom",
 	json_bool_field(text, "shaders", settings.dungeon_gloom_enabled));
@@ -374,6 +398,7 @@ save_settings(void)
 	    "  \"stylizedLog\": %s,\n"
 	    "  \"stylizedBottomBar\": %s,\n"
 	    "  \"bloodSpatter\": %s,\n"
+	    "  \"enemyHealthOverlay\": %s,\n"
 	    "  \"dungeonGloom\": %s,\n"
 	    "  \"damageFlash\": %s,\n"
 	    "  \"lowHpPulse\": %s,\n"
@@ -385,6 +410,7 @@ save_settings(void)
 	    settings.stylized_log_enabled ? "true" : "false",
 	    settings.stylized_bottom_bar_enabled ? "true" : "false",
 	    settings.blood_spatter_enabled ? "true" : "false",
+	    settings.enemy_health_overlay_enabled ? "true" : "false",
 	    settings.dungeon_gloom_enabled ? "true" : "false",
 	    settings.damage_flash_enabled ? "true" : "false",
 	    settings.low_hp_pulse_enabled ? "true" : "false",
@@ -1207,6 +1233,9 @@ show_settings_menu(void)
 	snprintf(line, sizeof(line), "f) Wall Thickness: %s",
 		 wall_thickness_name());
 	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "g) Enemy Health Overlay: %s",
+		 settings.enemy_health_overlay_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
 	rogue_allegro_text_overlay_add("");
 	rogue_allegro_text_overlay_add("Visual-only settings. Gameplay rules stay unchanged.");
 
@@ -1247,6 +1276,12 @@ show_settings_menu(void)
 	    case 'f':
 	    case 'F':
 		cycle_wall_thickness();
+		save_settings();
+		break;
+	    case 'g':
+	    case 'G':
+		settings.enemy_health_overlay_enabled =
+		    !settings.enemy_health_overlay_enabled;
 		save_settings();
 		break;
 	    default:
@@ -1610,6 +1645,122 @@ draw_actor_foreground_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
     dx = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE;
     dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
     draw_atlas_tile(atlas_index, dx, dy);
+}
+
+static void
+draw_enemy_health_overlay_cell(int screen_x, int screen_y,
+			       ROGUE_TILE_CELL *cell)
+{
+    THING *monster;
+    ALLEGRO_FONT *label_font;
+    ALLEGRO_COLOR back_color;
+    ALLEGRO_COLOR border_color;
+    ALLEGRO_COLOR fill_color;
+    ALLEGRO_COLOR text_color;
+    char label[64];
+    int hp;
+    int maxhp;
+    int dx;
+    int dy;
+    int panel_w;
+    int panel_h;
+    int panel_x;
+    int panel_y;
+    int bar_x;
+    int bar_y;
+    int bar_w;
+    int bar_h;
+    int fill_w;
+    int text_w;
+    int play_w;
+
+    if (!settings.enemy_health_overlay_enabled)
+	return;
+    if (cell == NULL || cell->layer != ROGUE_TILE_ACTOR || !cell->visible)
+	return;
+    if (cell->glyph < 'A' || cell->glyph > 'Z')
+	return;
+
+    monster = moat(cell->y, cell->x);
+    if (monster == NULL || !see_monst(monster))
+	return;
+    if (monster->t_disguise != monster->t_type)
+	return;
+
+    hp = monster->t_stats.s_hpt;
+    maxhp = monster->t_stats.s_maxhp;
+    if (maxhp <= 0)
+	return;
+    hp = clamp_int(hp, 0, maxhp);
+
+    label_font = (small_font != NULL) ? small_font : font;
+    snprintf(label, sizeof(label), "HP %d/%d  L%d  Arm %d", hp, maxhp,
+	     monster->t_stats.s_lvl, monster->t_stats.s_arm);
+    text_w = al_get_text_width(label_font, label);
+    bar_w = ROGUE_TILE_DRAW_SIZE;
+    if (bar_w < 28)
+	bar_w = 28;
+    panel_w = text_w + 10;
+    if (panel_w < bar_w + 8)
+	panel_w = bar_w + 8;
+    panel_h = ROGUE_SMALL_FONT_SIZE + 12;
+
+    dx = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE;
+    dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
+    panel_x = dx + ROGUE_TILE_DRAW_SIZE / 2 - panel_w / 2;
+    panel_y = dy - panel_h - 2;
+    play_w = play_area_width();
+    if (panel_x < 2)
+	panel_x = 2;
+    if (panel_x + panel_w > play_w - 2)
+	panel_x = play_w - panel_w - 2;
+    if (panel_x < 2)
+	panel_x = 2;
+    if (panel_y < 2)
+	panel_y = dy + ROGUE_TILE_DRAW_SIZE + 2;
+
+    bar_x = panel_x + (panel_w - bar_w) / 2;
+    bar_y = panel_y + 3;
+    bar_h = 4;
+    fill_w = (bar_w * hp) / maxhp;
+
+    back_color = al_map_rgba(8, 10, 14, 210);
+    border_color = al_map_rgba(198, 214, 235, 185);
+    fill_color = al_map_rgb(100, 220, 120);
+    if (hp * 4 <= maxhp)
+	fill_color = al_map_rgb(230, 72, 72);
+    else if (hp * 2 <= maxhp)
+	fill_color = al_map_rgb(232, 190, 76);
+    text_color = al_map_rgb(238, 242, 236);
+
+    al_draw_filled_rectangle(panel_x, panel_y, panel_x + panel_w,
+			     panel_y + panel_h, back_color);
+    al_draw_rectangle(panel_x + 0.5f, panel_y + 0.5f,
+		      panel_x + panel_w - 0.5f,
+		      panel_y + panel_h - 0.5f, border_color, 1.0f);
+    al_draw_filled_rectangle(bar_x, bar_y, bar_x + bar_w,
+			     bar_y + bar_h, al_map_rgb(42, 50, 52));
+    al_draw_filled_rectangle(bar_x, bar_y, bar_x + fill_w,
+			     bar_y + bar_h, fill_color);
+    al_draw_text(label_font, text_color, panel_x + panel_w / 2,
+		 panel_y + 7, ALLEGRO_ALIGN_CENTRE, label);
+}
+
+static void
+draw_enemy_health_overlays(
+    ROGUE_TILE_CELL view[ROGUE_MAX_VIEW_ROWS][ROGUE_MAX_VIEW_COLS],
+    int rows, int cols)
+{
+    int screen_y;
+    int screen_x;
+
+    if (!settings.enemy_health_overlay_enabled)
+	return;
+
+    for (screen_y = 0; screen_y < rows; screen_y++)
+	for (screen_x = 0; screen_x < cols; screen_x++)
+	    draw_enemy_health_overlay_cell(screen_x, screen_y,
+					   &view[screen_y][screen_x]);
 }
 
 static int
@@ -2505,6 +2656,7 @@ rogue_allegro_start(bool smoke)
 	allegro_start_error("Could not create Allegro font.");
 	return FALSE;
     }
+    small_font = load_small_ui_font();
 
     started = TRUE;
     return TRUE;
@@ -2578,6 +2730,7 @@ rogue_allegro_render(void)
 	for (screen_x = 0; screen_x < cols; screen_x++)
 	    draw_actor_foreground_cell(screen_x, screen_y,
 				       &view[screen_y][screen_x]);
+    draw_enemy_health_overlays(view, rows, cols);
     if (render_to_scene)
 	save_shader_smoke_bitmap("rogue_scene_before_shader.png",
 				 scene_bitmap);
@@ -3264,6 +3417,8 @@ rogue_allegro_wait_for_return(const char *prompt)
 void
 rogue_allegro_shutdown(void)
 {
+    if (small_font != NULL && small_font != font)
+	al_destroy_font(small_font);
     if (font != NULL)
 	al_destroy_font(font);
     if (gloom_shader != NULL)
@@ -3282,6 +3437,7 @@ rogue_allegro_shutdown(void)
 	al_destroy_display(display);
 
     font = NULL;
+    small_font = NULL;
     gloom_shader = NULL;
     postprocess_shader = NULL;
     scene_bitmap = NULL;
