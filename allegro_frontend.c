@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <string.h>
+#include <stdlib.h>
 #include <curses.h>
 #ifdef _WIN32
 #include <windows.h>
@@ -37,6 +38,9 @@
 #define ROGUE_SIDE_PANEL_MAX_WIDTH 420
 #define ROGUE_BLOOD_SPLATS 96
 #define ROGUE_BLOOD_DROPS_PER_HIT 5
+#define ROGUE_MIN_WALL_THICKNESS 1
+#define ROGUE_DEFAULT_WALL_THICKNESS 2
+#define ROGUE_MAX_WALL_THICKNESS 3
 
 typedef enum rogue_allegro_view {
     ROGUE_ALLEGRO_VIEW_TILES,
@@ -51,6 +55,7 @@ typedef struct rogue_allegro_settings {
     bool side_panel_log_enabled;
     bool stylized_log_enabled;
     bool stylized_bottom_bar_enabled;
+    int wall_thickness;
     bool fullscreen;
     int windowed_width;
     int windowed_height;
@@ -74,6 +79,7 @@ static ROGUE_ALLEGRO_SETTINGS settings = {
     FALSE,
     FALSE,
     FALSE,
+    ROGUE_DEFAULT_WALL_THICKNESS,
     FALSE,
     ROGUE_DEFAULT_VIEW_COLS * ROGUE_DEFAULT_TILE_DRAW_SIZE,
     ROGUE_MAX_VIEW_ROWS * ROGUE_DEFAULT_TILE_DRAW_SIZE + ROGUE_STATUS_HEIGHT
@@ -226,6 +232,36 @@ json_bool_field(const char *json, const char *key, bool fallback)
     return fallback;
 }
 
+static int
+json_int_field(const char *json, const char *key, int fallback,
+	       int min_value, int max_value)
+{
+    char pattern[64];
+    const char *p;
+    char *end;
+    long value;
+
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    p = strstr(json, pattern);
+    if (p == NULL)
+	return fallback;
+    p = strchr(p + strlen(pattern), ':');
+    if (p == NULL)
+	return fallback;
+    p++;
+    while (*p != '\0' && isspace((unsigned char) *p))
+	p++;
+
+    value = strtol(p, &end, 10);
+    if (end == p)
+	return fallback;
+    if (value < min_value)
+	return min_value;
+    if (value > max_value)
+	return max_value;
+    return (int) value;
+}
+
 static void
 init_settings_path(void)
 {
@@ -274,6 +310,9 @@ load_settings(void)
 	text, "bloodSpatter", settings.blood_spatter_enabled);
     settings.shader_enabled = json_bool_field(
 	text, "shaders", settings.shader_enabled);
+    settings.wall_thickness = json_int_field(
+	text, "wallThickness", settings.wall_thickness,
+	ROGUE_MIN_WALL_THICKNESS, ROGUE_MAX_WALL_THICKNESS);
 }
 
 static void
@@ -291,13 +330,15 @@ save_settings(void)
 	    "  \"stylizedLog\": %s,\n"
 	    "  \"stylizedBottomBar\": %s,\n"
 	    "  \"bloodSpatter\": %s,\n"
-	    "  \"shaders\": %s\n"
+	    "  \"shaders\": %s,\n"
+	    "  \"wallThickness\": %d\n"
 	    "}\n",
 	    settings.side_panel_log_enabled ? "true" : "false",
 	    settings.stylized_log_enabled ? "true" : "false",
 	    settings.stylized_bottom_bar_enabled ? "true" : "false",
 	    settings.blood_spatter_enabled ? "true" : "false",
-	    settings.shader_enabled ? "true" : "false");
+	    settings.shader_enabled ? "true" : "false",
+	    settings.wall_thickness);
     fclose(file);
 }
 
@@ -502,6 +543,28 @@ load_current_atlas(void)
     return TRUE;
 }
 
+static const char *
+wall_thickness_name(void)
+{
+    switch (settings.wall_thickness)
+    {
+	case ROGUE_MIN_WALL_THICKNESS:
+	    return "Thin";
+	case ROGUE_MAX_WALL_THICKNESS:
+	    return "Thick";
+	default:
+	    return "Medium";
+    }
+}
+
+static void
+cycle_wall_thickness(void)
+{
+    settings.wall_thickness++;
+    if (settings.wall_thickness > ROGUE_MAX_WALL_THICKNESS)
+	settings.wall_thickness = ROGUE_MIN_WALL_THICKNESS;
+}
+
 static void
 show_tilepack_menu(void)
 {
@@ -592,11 +655,14 @@ show_settings_menu(void)
 	snprintf(line, sizeof(line), "e) Shaders: %s",
 		 settings.shader_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "f) Wall Thickness: %s",
+		 wall_thickness_name());
+	rogue_allegro_text_overlay_add(line);
 	rogue_allegro_text_overlay_add("");
 	rogue_allegro_text_overlay_add("Visual-only settings. Gameplay rules stay unchanged.");
 
 	selected = rogue_allegro_text_overlay_pick(
-	    "Enter toggles, Esc closes");
+	    "Enter changes, Esc closes");
 	rogue_allegro_text_overlay_clear();
 
 	switch (selected)
@@ -628,6 +694,11 @@ show_settings_menu(void)
 	    case 'e':
 	    case 'E':
 		settings.shader_enabled = !settings.shader_enabled;
+		save_settings();
+		break;
+	    case 'f':
+	    case 'F':
+		cycle_wall_thickness();
 		save_settings();
 		break;
 	    default:
@@ -811,6 +882,46 @@ is_wall_edge_neighbor(const ROGUE_TILE_CELL *cell)
     return !is_wall_cell(cell);
 }
 
+static int
+wall_thickness_from_size(int size)
+{
+    int edge;
+
+    switch (settings.wall_thickness)
+    {
+	case ROGUE_MIN_WALL_THICKNESS:
+	    edge = size / 10;
+	    break;
+	case ROGUE_MAX_WALL_THICKNESS:
+	    edge = size / 4;
+	    break;
+	default:
+	    edge = size / 6;
+	    break;
+    }
+
+    if (edge < 2)
+	edge = 2;
+    if (edge > size)
+	edge = size;
+    return edge;
+}
+
+static int
+wall_thickness_pixels(void)
+{
+    return wall_thickness_from_size(ROGUE_TILE_DRAW_SIZE);
+}
+
+static int
+wall_thickness_source_pixels(int source_w, int source_h)
+{
+    int size;
+
+    size = (source_w < source_h) ? source_w : source_h;
+    return wall_thickness_from_size(size);
+}
+
 static void
 draw_atlas_tile_region(int atlas_index, int sx_offset, int sy_offset,
 		       int source_w, int source_h, int dx, int dy,
@@ -842,14 +953,8 @@ draw_wall_edge_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell,
     dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
     source_w = rogue_tilepack_source_width();
     source_h = rogue_tilepack_source_height();
-    edge = ROGUE_TILE_DRAW_SIZE / 6;
-    if (edge < 4)
-	edge = 4;
-    if (edge > ROGUE_TILE_DRAW_SIZE)
-	edge = ROGUE_TILE_DRAW_SIZE;
-    source_edge = source_w / 6;
-    if (source_edge < 4)
-	source_edge = 4;
+    edge = wall_thickness_pixels();
+    source_edge = wall_thickness_source_pixels(source_w, source_h);
 
     open_left = (bool)(screen_x > 0
 		       && is_wall_edge_neighbor(&view[screen_y][screen_x - 1]));

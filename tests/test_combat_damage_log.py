@@ -121,6 +121,25 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("draw_glyph_foreground_cell", foreground)
         self.assertNotIn("underlay", foreground)
 
+    def test_wall_thickness_is_a_persisted_setting(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("wall_thickness", allegro_c)
+        self.assertIn('"wallThickness"', allegro_c)
+        self.assertIn("json_int_field", allegro_c)
+        self.assertIn("wall_thickness_name", allegro_c)
+        self.assertIn("Wall Thickness", allegro_c)
+        self.assertIn("cycle_wall_thickness", allegro_c)
+
+        draw_wall = allegro_c[
+            allegro_c.index("draw_wall_edge_cell"):
+            allegro_c.index("draw_tile_cell")
+        ]
+        self.assertIn("wall_thickness_pixels()", draw_wall)
+        self.assertIn("wall_thickness_source_pixels(source_w, source_h)", draw_wall)
+        self.assertNotIn("ROGUE_TILE_DRAW_SIZE / 6", draw_wall)
+        self.assertNotIn("source_w / 6", draw_wall)
+
 
 if __name__ == "__main__":
     unittest.main()
