@@ -1,0 +1,114 @@
+name: Windows Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: "Create or update a GitHub Release"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      release_tag:
+        description: "Release tag to publish when create_release is true"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows package
+    runs-on: windows-latest
+
+    defaults:
+      run:
+        shell: pwsh
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up MSYS2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            git
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-make
+            mingw-w64-x86_64-pkgconf
+            mingw-w64-x86_64-ncurses
+            mingw-w64-x86_64-allegro
+
+      - name: Add MinGW tools to PATH
+        run: |
+          "C:\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+          "C:\msys64\usr\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Python packaging tools
+        run: python -m pip install --upgrade pip pyinstaller
+
+      - name: Validate RL Tiles mapping
+        run: powershell -ExecutionPolicy Bypass -File scripts\validate-rltiles.ps1
+
+      - name: Run Python tests
+        run: |
+          python tests\test_combat_damage_log.py
+          python tests\test_tilepack_writer.py
+          python tests\test_tile_picker_packaged.py
+          python tests\test_tile_picker_generation.py
+
+      - name: Build tile picker executable
+        run: powershell -ExecutionPolicy Bypass -File scripts\build-tile-picker-exe.ps1
+
+      - name: Build and package RogueTiles
+        run: powershell -ExecutionPolicy Bypass -File scripts\package-windows.ps1 -Zip
+
+      - name: Upload Windows zip artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RogueTiles-windows-x64
+          path: dist\RogueTiles-windows-x64.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') || inputs.create_release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            if ("${{ inputs.release_tag }}" -eq "") {
+              throw "release_tag is required when create_release is true."
+            }
+            $tag = "${{ inputs.release_tag }}"
+          }
+          $notes = @"
+          RogueTiles Windows build.
+
+          Download RogueTiles-windows-x64.zip, extract it, and run RogueTiles.exe.
+          TilePicker.exe is included for custom tile set editing.
+          "@
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag dist\RogueTiles-windows-x64.zip --target "${{ github.sha }}" --title "RogueTiles $tag" --notes $notes
+          }
+          else {
+            gh release upload $tag dist\RogueTiles-windows-x64.zip --clobber
+          }

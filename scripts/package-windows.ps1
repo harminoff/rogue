@@ -1,6 +1,8 @@
 param(
     [string]$MsysRoot = "C:\msys64",
-    [switch]$SkipBuild
+    [switch]$SkipBuild,
+    [switch]$Zip,
+    [string]$ZipPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -8,6 +10,10 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $distRoot = Join-Path $repoRoot "dist"
 $packageDir = Join-Path $distRoot "RogueTiles"
 $nativeDir = Join-Path $repoRoot "native-build"
+
+if ([string]::IsNullOrWhiteSpace($ZipPath)) {
+    $ZipPath = Join-Path $distRoot "RogueTiles-windows-x64.zip"
+}
 
 if (-not $SkipBuild) {
     powershell -ExecutionPolicy Bypass -File (Join-Path $repoRoot "scripts\build-runtime-tilepacks.ps1")
@@ -49,3 +55,20 @@ else {
 }
 
 Write-Host "Packaged: $packageDir"
+
+if ($Zip) {
+    $resolvedDist = (Resolve-Path $distRoot).Path
+    $zipParent = Split-Path -Parent $ZipPath
+    if (-not (Test-Path $zipParent)) {
+        New-Item -ItemType Directory -Force $zipParent | Out-Null
+    }
+    $resolvedZipParent = (Resolve-Path $zipParent).Path
+    if (-not $resolvedZipParent.StartsWith($resolvedDist)) {
+        throw "Refusing to write release zip outside dist: $ZipPath"
+    }
+    if (Test-Path $ZipPath) {
+        Remove-Item -LiteralPath $ZipPath -Force
+    }
+    Compress-Archive -LiteralPath $packageDir -DestinationPath $ZipPath -Force
+    Write-Host "Release zip: $ZipPath"
+}
