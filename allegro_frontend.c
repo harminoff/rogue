@@ -38,6 +38,8 @@
 #define ROGUE_SIDE_PANEL_MAX_WIDTH 420
 #define ROGUE_BLOOD_SPLATS 96
 #define ROGUE_BLOOD_DROPS_PER_HIT 5
+#define ROGUE_GLOOM_STRENGTH 0.62f
+#define ROGUE_GLOOM_RADIUS 0.34f
 #define ROGUE_MIN_WALL_THICKNESS 1
 #define ROGUE_DEFAULT_WALL_THICKNESS 2
 #define ROGUE_THICK_WALL_THICKNESS 3
@@ -92,9 +94,14 @@ static ROGUE_ALLEGRO_SETTINGS settings = {
 static ALLEGRO_DISPLAY *display = NULL;
 static ALLEGRO_EVENT_QUEUE *queue = NULL;
 static ALLEGRO_BITMAP *atlas = NULL;
+static ALLEGRO_BITMAP *scene_bitmap = NULL;
+static ALLEGRO_SHADER *gloom_shader = NULL;
 static ALLEGRO_FONT *font = NULL;
 static bool started = FALSE;
 static bool smoke_mode = FALSE;
+static bool gloom_shader_failed = FALSE;
+static int scene_bitmap_width = 0;
+static int scene_bitmap_height = 0;
 static int suppress_key_char_keycode = 0;
 static int held_movement_keycode = 0;
 static char held_movement = '\0';
@@ -567,6 +574,125 @@ cycle_wall_thickness(void)
     settings.wall_thickness++;
     if (settings.wall_thickness > ROGUE_MAX_WALL_THICKNESS)
 	settings.wall_thickness = ROGUE_MIN_WALL_THICKNESS;
+}
+
+static const char *gloom_pixel_shader_source =
+    "#ifdef GL_ES\n"
+    "precision mediump float;\n"
+    "#endif\n"
+    "uniform sampler2D al_tex;\n"
+    "uniform float u_gloom_strength;\n"
+    "uniform float u_gloom_radius;\n"
+    "varying vec4 varying_color;\n"
+    "varying vec2 varying_texcoord;\n"
+    "void main()\n"
+    "{\n"
+    "    vec4 color = varying_color * texture2D(al_tex, varying_texcoord);\n"
+    "    vec2 p = varying_texcoord - vec2(0.5, 0.5);\n"
+    "    float dist = length(p);\n"
+    "    float gloom = smoothstep(u_gloom_radius, 0.78, dist);\n"
+    "    color.rgb *= 1.0 - gloom * u_gloom_strength;\n"
+    "    gl_FragColor = color;\n"
+    "}\n";
+
+static bool
+ensure_scene_bitmap(void)
+{
+    int w, h;
+
+    if (display == NULL)
+	return FALSE;
+
+    w = display_width();
+    h = display_height();
+    if (w <= 0 || h <= 0)
+	return FALSE;
+
+    if (scene_bitmap != NULL
+	&& scene_bitmap_width == w
+	&& scene_bitmap_height == h)
+	return TRUE;
+
+    if (scene_bitmap != NULL)
+	al_destroy_bitmap(scene_bitmap);
+
+    scene_bitmap = al_create_bitmap(w, h);
+    if (scene_bitmap == NULL)
+    {
+	scene_bitmap_width = 0;
+	scene_bitmap_height = 0;
+	return FALSE;
+    }
+
+    scene_bitmap_width = w;
+    scene_bitmap_height = h;
+    return TRUE;
+}
+
+static bool
+ensure_gloom_shader(void)
+{
+    ALLEGRO_SHADER *shader;
+    ALLEGRO_SHADER_PLATFORM platform;
+    const char *vertex_source;
+    const char *log;
+
+    if (gloom_shader != NULL)
+	return TRUE;
+    if (gloom_shader_failed)
+	return FALSE;
+
+    shader = al_create_shader(ALLEGRO_SHADER_GLSL);
+    if (shader == NULL)
+    {
+	gloom_shader_failed = TRUE;
+	return FALSE;
+    }
+
+    platform = al_get_shader_platform(shader);
+    vertex_source = al_get_default_shader_source(platform,
+						 ALLEGRO_VERTEX_SHADER);
+    if (vertex_source == NULL
+	|| !al_attach_shader_source(shader, ALLEGRO_VERTEX_SHADER,
+				    vertex_source)
+	|| !al_attach_shader_source(shader, ALLEGRO_PIXEL_SHADER,
+				    gloom_pixel_shader_source)
+	|| !al_build_shader(shader))
+    {
+	log = al_get_shader_log(shader);
+	if (log != NULL && *log != '\0')
+	    fprintf(stderr, "Gloom shader disabled: %s\n", log);
+	al_destroy_shader(shader);
+	gloom_shader_failed = TRUE;
+	return FALSE;
+    }
+
+    gloom_shader = shader;
+    return TRUE;
+}
+
+static void
+draw_scene_with_gloom_shader(void)
+{
+    if (scene_bitmap == NULL)
+	return;
+
+    al_set_target_backbuffer(display);
+    al_clear_to_color(al_map_rgb(0, 0, 0));
+
+    if (settings.shader_enabled && ensure_gloom_shader())
+    {
+	if (al_use_shader(gloom_shader))
+	{
+	    al_set_shader_float("u_gloom_strength", ROGUE_GLOOM_STRENGTH);
+	    al_set_shader_float("u_gloom_radius", ROGUE_GLOOM_RADIUS);
+	    al_draw_bitmap(scene_bitmap, 0, 0, 0);
+	    al_use_shader(NULL);
+	    return;
+	}
+    }
+
+    al_draw_bitmap(scene_bitmap, 0, 0, 0);
 }
 
 static void
@@ -1929,7 +2055,7 @@ rogue_allegro_start(bool smoke)
     al_init_primitives_addon();
 
     al_set_new_display_option(ALLEGRO_VSYNC, 1, ALLEGRO_SUGGEST);
-    al_set_new_display_flags(ALLEGRO_RESIZABLE);
+    al_set_new_display_flags(ALLEGRO_RESIZABLE | ALLEGRO_OPENGL);
     display = al_create_display(settings.windowed_width,
 				settings.windowed_height);
     if (display == NULL)
@@ -1974,6 +2100,7 @@ rogue_allegro_render(void)
     int top;
     int rows;
     int cols;
+    bool render_to_scene;
     ROGUE_TILE_CELL view[ROGUE_MAX_VIEW_ROWS][ROGUE_MAX_VIEW_COLS];
     ROGUE_TILE_CELL *cell;
 
@@ -2000,6 +2127,12 @@ rogue_allegro_render(void)
 				     &view[screen_y][screen_x]);
 	}
 
+    render_to_scene = (bool)(settings.shader_enabled && ensure_scene_bitmap());
+    if (render_to_scene)
+	al_set_target_bitmap(scene_bitmap);
+    else
+	al_set_target_backbuffer(display);
+
     al_clear_to_color(al_map_rgb(0, 0, 0));
     al_hold_bitmap_drawing(TRUE);
     for (screen_y = 0; screen_y < rows; screen_y++)
@@ -2024,6 +2157,10 @@ rogue_allegro_render(void)
 	for (screen_x = 0; screen_x < cols; screen_x++)
 	    draw_actor_foreground_cell(screen_x, screen_y,
 				       &view[screen_y][screen_x]);
+    if (render_to_scene)
+	draw_scene_with_gloom_shader();
+    else
+	al_set_target_backbuffer(display);
     draw_status();
     draw_side_panel();
     draw_text_overlay();
@@ -2699,6 +2836,10 @@ rogue_allegro_shutdown(void)
 {
     if (font != NULL)
 	al_destroy_font(font);
+    if (gloom_shader != NULL)
+	al_destroy_shader(gloom_shader);
+    if (scene_bitmap != NULL)
+	al_destroy_bitmap(scene_bitmap);
     if (atlas != NULL)
 	al_destroy_bitmap(atlas);
     if (queue != NULL)
@@ -2707,6 +2848,8 @@ rogue_allegro_shutdown(void)
 	al_destroy_display(display);
 
     font = NULL;
+    gloom_shader = NULL;
+    scene_bitmap = NULL;
     atlas = NULL;
     queue = NULL;
     display = NULL;
@@ -2714,6 +2857,9 @@ rogue_allegro_shutdown(void)
     held_movement_keycode = 0;
     held_movement = '\0';
     held_movement_next_time = 0.0;
+    gloom_shader_failed = FALSE;
+    scene_bitmap_width = 0;
+    scene_bitmap_height = 0;
     prompt_active = FALSE;
     death_overlay_active = FALSE;
     text_overlay_active = FALSE;

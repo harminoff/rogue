@@ -149,6 +149,29 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("case ROGUE_FULL_WALL_THICKNESS", thickness)
         self.assertIn("return size;", thickness)
 
+    def test_dungeon_gloom_shader_pipeline_exists(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("gloom_shader", allegro_c)
+        self.assertIn("scene_bitmap", allegro_c)
+        self.assertIn("ensure_scene_bitmap", allegro_c)
+        self.assertIn("ensure_gloom_shader", allegro_c)
+        self.assertIn("draw_scene_with_gloom_shader", allegro_c)
+        self.assertIn("ROGUE_GLOOM_STRENGTH", allegro_c)
+        self.assertIn("ROGUE_GLOOM_RADIUS", allegro_c)
+        self.assertIn("u_gloom_strength", allegro_c)
+        self.assertIn("u_gloom_radius", allegro_c)
+
+        render = allegro_c[
+            allegro_c.index("void\nrogue_allegro_render(void)"):
+            allegro_c.index("char\nrogue_allegro_readchar")
+        ]
+        self.assertIn("draw_scene_with_gloom_shader();", render)
+        self.assertLess(
+            render.index("draw_scene_with_gloom_shader();"),
+            render.index("draw_status();"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
