@@ -130,6 +130,8 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("wall_thickness_name", allegro_c)
         self.assertIn("Wall Thickness", allegro_c)
         self.assertIn("cycle_wall_thickness", allegro_c)
+        self.assertIn("#define ROGUE_MAX_WALL_THICKNESS 4", allegro_c)
+        self.assertIn('return "Full";', allegro_c)
 
         draw_wall = allegro_c[
             allegro_c.index("draw_wall_edge_cell"):
@@ -139,6 +141,13 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("wall_thickness_source_pixels(source_w, source_h)", draw_wall)
         self.assertNotIn("ROGUE_TILE_DRAW_SIZE / 6", draw_wall)
         self.assertNotIn("source_w / 6", draw_wall)
+
+        thickness = allegro_c[
+            allegro_c.index("wall_thickness_from_size"):
+            allegro_c.index("wall_thickness_pixels")
+        ]
+        self.assertIn("case ROGUE_FULL_WALL_THICKNESS", thickness)
+        self.assertIn("return size;", thickness)
 
 
 if __name__ == "__main__":

@@ -40,7 +40,9 @@
 #define ROGUE_BLOOD_DROPS_PER_HIT 5
 #define ROGUE_MIN_WALL_THICKNESS 1
 #define ROGUE_DEFAULT_WALL_THICKNESS 2
-#define ROGUE_MAX_WALL_THICKNESS 3
+#define ROGUE_THICK_WALL_THICKNESS 3
+#define ROGUE_FULL_WALL_THICKNESS 4
+#define ROGUE_MAX_WALL_THICKNESS 4
 
 typedef enum rogue_allegro_view {
     ROGUE_ALLEGRO_VIEW_TILES,
@@ -550,8 +552,10 @@ wall_thickness_name(void)
     {
 	case ROGUE_MIN_WALL_THICKNESS:
 	    return "Thin";
-	case ROGUE_MAX_WALL_THICKNESS:
+	case ROGUE_THICK_WALL_THICKNESS:
 	    return "Thick";
+	case ROGUE_FULL_WALL_THICKNESS:
+	    return "Full";
 	default:
 	    return "Medium";
     }
@@ -892,9 +896,11 @@ wall_thickness_from_size(int size)
 	case ROGUE_MIN_WALL_THICKNESS:
 	    edge = size / 10;
 	    break;
-	case ROGUE_MAX_WALL_THICKNESS:
+	case ROGUE_THICK_WALL_THICKNESS:
 	    edge = size / 4;
 	    break;
+	case ROGUE_FULL_WALL_THICKNESS:
+	    return size;
 	default:
 	    edge = size / 6;
 	    break;
