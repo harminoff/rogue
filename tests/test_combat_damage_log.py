@@ -40,6 +40,19 @@ class CombatDamageLogTests(unittest.TestCase):
         ]
         self.assertIn("rogue_allegro_render();", record_message)
 
+    def test_bottom_message_is_hidden_when_side_log_is_enabled(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+        draw_status = allegro_c[
+            allegro_c.index("draw_status(void)"):
+            allegro_c.index("ascii_lower_char")
+        ]
+
+        self.assertIn("if (!settings.side_panel_log_enabled)", draw_status)
+        self.assertLess(
+            draw_status.index("if (!settings.side_panel_log_enabled)"),
+            draw_status.index("huh"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -938,7 +938,9 @@ draw_status(void)
 
     al_draw_text(font, al_map_rgb(230, 230, 220), w / 2,
 		 first_line_y, ALLEGRO_ALIGN_CENTRE, line);
-    al_draw_text(font, al_map_rgb(180, 200, 255), 8, second_line_y, 0, huh);
+    if (!settings.side_panel_log_enabled)
+	al_draw_text(font, al_map_rgb(180, 200, 255), 8, second_line_y,
+		     0, huh);
     if (prompt_active)
 	al_draw_text(font, al_map_rgb(245, 226, 170), w - 8,
 		     second_line_y, ALLEGRO_ALIGN_RIGHT, prompt_text);
