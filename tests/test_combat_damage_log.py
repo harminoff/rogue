@@ -208,6 +208,37 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("rogue_scene_after_shader.png", allegro_c)
         self.assertIn("al_save_bitmap", allegro_c)
 
+    def test_damage_flash_and_low_hp_pulse_settings_and_render_hooks(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("damage_flash_enabled", allegro_c)
+        self.assertIn("low_hp_pulse_enabled", allegro_c)
+        self.assertIn('"damageFlash"', allegro_c)
+        self.assertIn('"lowHpPulse"', allegro_c)
+        self.assertIn("Damage Flash", allegro_c)
+        self.assertIn("Low HP Pulse", allegro_c)
+
+        record_start = allegro_c.index("void\nrogue_allegro_record_damage")
+        record_damage = allegro_c[
+            record_start:
+            allegro_c.index("void\nrogue_allegro_text_overlay_begin", record_start)
+        ]
+        self.assertIn("damage_flash_until", record_damage)
+        self.assertIn("ROGUE_DAMAGE_FLASH_SECONDS", record_damage)
+
+        render = allegro_c[
+            allegro_c.index("void\nrogue_allegro_render(void)"):
+            allegro_c.index("char\nrogue_allegro_readchar")
+        ]
+        self.assertIn("draw_visual_effect_overlays();", render)
+        self.assertLess(
+            render.index("draw_visual_effect_overlays();"),
+            render.index("draw_status();"),
+        )
+        self.assertIn("draw_damage_flash_overlay", allegro_c)
+        self.assertIn("draw_low_hp_pulse_overlay", allegro_c)
+        self.assertIn("low_hp_pulse_alpha", allegro_c)
+
 
 if __name__ == "__main__":
     unittest.main()

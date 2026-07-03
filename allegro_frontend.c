@@ -40,6 +40,11 @@
 #define ROGUE_BLOOD_DROPS_PER_HIT 5
 #define ROGUE_GLOOM_STRENGTH 0.62f
 #define ROGUE_GLOOM_RADIUS 0.34f
+#define ROGUE_DAMAGE_FLASH_SECONDS 0.22
+#define ROGUE_DAMAGE_FLASH_ALPHA 0.44f
+#define ROGUE_LOW_HP_PULSE_SECONDS 1.15
+#define ROGUE_LOW_HP_PULSE_MIN_ALPHA 0.10f
+#define ROGUE_LOW_HP_PULSE_MAX_ALPHA 0.30f
 #define ROGUE_MIN_WALL_THICKNESS 1
 #define ROGUE_DEFAULT_WALL_THICKNESS 2
 #define ROGUE_THICK_WALL_THICKNESS 3
@@ -55,6 +60,8 @@ typedef struct rogue_allegro_settings {
     int tile_draw_size;
     ROGUE_ALLEGRO_VIEW view_mode;
     bool dungeon_gloom_enabled;
+    bool damage_flash_enabled;
+    bool low_hp_pulse_enabled;
     bool blood_spatter_enabled;
     bool side_panel_log_enabled;
     bool stylized_log_enabled;
@@ -78,6 +85,8 @@ typedef struct rogue_blood_splat {
 static ROGUE_ALLEGRO_SETTINGS settings = {
     ROGUE_DEFAULT_TILE_DRAW_SIZE,
     ROGUE_ALLEGRO_VIEW_TILES,
+    FALSE,
+    FALSE,
     FALSE,
     FALSE,
     FALSE,
@@ -107,6 +116,7 @@ static int suppress_key_char_keycode = 0;
 static int held_movement_keycode = 0;
 static char held_movement = '\0';
 static double held_movement_next_time = 0.0;
+static double damage_flash_until = 0.0;
 static int render_origin_x = 0;
 static int render_origin_y = 0;
 static char message_log[ROGUE_MESSAGE_LOG_LINES][ROGUE_OVERLAY_LINE_LEN];
@@ -327,6 +337,10 @@ load_settings(void)
     settings.dungeon_gloom_enabled = json_bool_field(
 	text, "dungeonGloom",
 	json_bool_field(text, "shaders", settings.dungeon_gloom_enabled));
+    settings.damage_flash_enabled = json_bool_field(
+	text, "damageFlash", settings.damage_flash_enabled);
+    settings.low_hp_pulse_enabled = json_bool_field(
+	text, "lowHpPulse", settings.low_hp_pulse_enabled);
     settings.wall_thickness = json_int_field(
 	text, "wallThickness", settings.wall_thickness,
 	ROGUE_MIN_WALL_THICKNESS, ROGUE_MAX_WALL_THICKNESS);
@@ -348,6 +362,8 @@ save_settings(void)
 	    "  \"stylizedBottomBar\": %s,\n"
 	    "  \"bloodSpatter\": %s,\n"
 	    "  \"dungeonGloom\": %s,\n"
+	    "  \"damageFlash\": %s,\n"
+	    "  \"lowHpPulse\": %s,\n"
 	    "  \"wallThickness\": %d\n"
 	    "}\n",
 	    settings.side_panel_log_enabled ? "true" : "false",
@@ -355,6 +371,8 @@ save_settings(void)
 	    settings.stylized_bottom_bar_enabled ? "true" : "false",
 	    settings.blood_spatter_enabled ? "true" : "false",
 	    settings.dungeon_gloom_enabled ? "true" : "false",
+	    settings.damage_flash_enabled ? "true" : "false",
+	    settings.low_hp_pulse_enabled ? "true" : "false",
 	    settings.wall_thickness);
     fclose(file);
 }
@@ -768,6 +786,89 @@ draw_scene_with_gloom_shader(void)
 }
 
 static void
+draw_alpha_overlay(ALLEGRO_COLOR color)
+{
+    int old_blender_op;
+    int old_blender_src;
+    int old_blender_dst;
+
+    al_get_blender(&old_blender_op, &old_blender_src, &old_blender_dst);
+    al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
+    al_draw_filled_rectangle(0, 0, (float)play_area_width(),
+			     (float)(display_height() - ROGUE_STATUS_HEIGHT),
+			     color);
+    al_set_blender(old_blender_op, old_blender_src, old_blender_dst);
+}
+
+static void
+draw_damage_flash_overlay(void)
+{
+    double remaining;
+    float alpha;
+
+    if (!settings.damage_flash_enabled)
+	return;
+
+    remaining = damage_flash_until - al_get_time();
+    if (remaining <= 0.0)
+	return;
+
+    alpha = (float)(remaining / ROGUE_DAMAGE_FLASH_SECONDS);
+    if (alpha > 1.0f)
+	alpha = 1.0f;
+    draw_alpha_overlay(al_map_rgba_f(1.0f, 0.08f, 0.02f,
+				     alpha * ROGUE_DAMAGE_FLASH_ALPHA));
+}
+
+static float
+low_hp_pulse_alpha(void)
+{
+    double now;
+    double cycles;
+    double phase;
+    double ramp;
+
+    if (!settings.low_hp_pulse_enabled)
+	return 0.0f;
+    if (max_hp <= 0 || pstats.s_hpt <= 0)
+	return 0.0f;
+    if (pstats.s_hpt * 4 > max_hp)
+	return 0.0f;
+
+    now = al_get_time();
+    cycles = (double)((int)(now / ROGUE_LOW_HP_PULSE_SECONDS));
+    phase = now - cycles * ROGUE_LOW_HP_PULSE_SECONDS;
+    if (phase < ROGUE_LOW_HP_PULSE_SECONDS * 0.5)
+	ramp = phase / (ROGUE_LOW_HP_PULSE_SECONDS * 0.5);
+    else
+	ramp = 1.0 - ((phase - ROGUE_LOW_HP_PULSE_SECONDS * 0.5)
+		      / (ROGUE_LOW_HP_PULSE_SECONDS * 0.5));
+
+    return (float)(ROGUE_LOW_HP_PULSE_MIN_ALPHA
+		   + ramp * (ROGUE_LOW_HP_PULSE_MAX_ALPHA
+			     - ROGUE_LOW_HP_PULSE_MIN_ALPHA));
+}
+
+static void
+draw_low_hp_pulse_overlay(void)
+{
+    float alpha;
+
+    alpha = low_hp_pulse_alpha();
+    if (alpha <= 0.0f)
+	return;
+
+    draw_alpha_overlay(al_map_rgba_f(0.75f, 0.0f, 0.0f, alpha));
+}
+
+static void
+draw_visual_effect_overlays(void)
+{
+    draw_low_hp_pulse_overlay();
+    draw_damage_flash_overlay();
+}
+
+static void
 show_shader_settings_menu(void)
 {
     char line[ROGUE_OVERLAY_LINE_LEN];
@@ -780,6 +881,12 @@ show_shader_settings_menu(void)
 	rogue_allegro_text_overlay_begin("Shader Settings");
 	snprintf(line, sizeof(line), "a) Dungeon Gloom: %s",
 		 settings.dungeon_gloom_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "b) Damage Flash: %s",
+		 settings.damage_flash_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "c) Low HP Pulse: %s",
+		 settings.low_hp_pulse_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
 	rogue_allegro_text_overlay_add("");
 	rogue_allegro_text_overlay_add("Shader effects are independent and visual-only.");
@@ -794,6 +901,18 @@ show_shader_settings_menu(void)
 	    case 'A':
 		settings.dungeon_gloom_enabled =
 		    !settings.dungeon_gloom_enabled;
+		save_settings();
+		break;
+	    case 'b':
+	    case 'B':
+		settings.damage_flash_enabled =
+		    !settings.damage_flash_enabled;
+		save_settings();
+		break;
+	    case 'c':
+	    case 'C':
+		settings.low_hp_pulse_enabled =
+		    !settings.low_hp_pulse_enabled;
 		save_settings();
 		break;
 	    default:
@@ -2273,6 +2392,7 @@ rogue_allegro_render(void)
 	draw_scene_with_gloom_shader();
     else
 	al_set_target_backbuffer(display);
+    draw_visual_effect_overlays();
     draw_status();
     draw_side_panel();
     draw_text_overlay();
@@ -2478,7 +2598,10 @@ rogue_allegro_record_damage(int dealt, int taken, int enemy_hp,
     if (dealt > 0)
 	pending_damage_dealt += dealt;
     if (taken > 0)
+    {
 	pending_damage_taken += taken;
+	damage_flash_until = al_get_time() + ROGUE_DAMAGE_FLASH_SECONDS;
+    }
     if (enemy_max_hp > 0)
     {
 	pending_enemy_hp = clamp_int(enemy_hp, 0, enemy_max_hp);
@@ -2969,6 +3092,7 @@ rogue_allegro_shutdown(void)
     held_movement_keycode = 0;
     held_movement = '\0';
     held_movement_next_time = 0.0;
+    damage_flash_until = 0.0;
     gloom_shader_failed = FALSE;
     shader_smoke_mode = FALSE;
     scene_bitmap_width = 0;
