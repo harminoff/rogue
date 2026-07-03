@@ -222,6 +222,7 @@
   </div>
 
   <script src="data/picker_data.js"></script>
+  <script src="custom_catalog.js"></script>
   <script>
     const data = window.ROGUE_TILE_PICKER_DATA;
     const PAGE_SIZE = 180;
@@ -239,6 +240,7 @@
     let page = 0;
     let serverReady = false;
     let customSource = null;
+    let customColumnsTouched = false;
 
     const roleList = document.getElementById("roleList");
     const tileGrid = document.getElementById("tileGrid");
@@ -494,9 +496,16 @@
     document.getElementById("groupFilter").addEventListener("change", renderRoles);
     document.getElementById("tileSearch").addEventListener("input", () => { page = 0; renderGrid(); });
     sourceModeEl.addEventListener("change", () => { sourceMode = sourceModeEl.value; page = 0; renderAll(); });
-    for (const id of ["customTileW", "customTileH", "customCols"]) {
-      document.getElementById(id).addEventListener("change", rebuildCustomCatalog);
+    for (const id of ["customTileW", "customTileH"]) {
+      document.getElementById(id).addEventListener("change", () => {
+        customColumnsTouched = false;
+        rebuildCustomCatalog();
+      });
     }
+    document.getElementById("customCols").addEventListener("change", () => {
+      customColumnsTouched = true;
+      rebuildCustomCatalog();
+    });
     document.getElementById("customNames").addEventListener("change", rebuildCustomCatalog);
     document.getElementById("tileUpload").addEventListener("change", event => {
       const file = event.target.files?.[0];
@@ -507,17 +516,23 @@
           fileName: file.name,
           dataUrl: reader.result,
           atlas: {
-            columns: Number(document.getElementById("customCols").value) || 1,
+            columns: 1,
             tileWidth: Number(document.getElementById("customTileW").value) || 32,
             tileHeight: Number(document.getElementById("customTileH").value) || 32,
           },
           tiles: [],
         };
-        customImage.onload = rebuildCustomCatalog;
+        customColumnsTouched = false;
+        customImage.onload = () => {
+          const tileWidth = Number(document.getElementById("customTileW").value) || 32;
+          document.getElementById("customCols").value =
+            RogueCustomCatalog.inferColumns(customImage.naturalWidth, tileWidth);
+          rebuildCustomCatalog();
+        };
         customImage.src = customSource.dataUrl;
         sourceMode = "custom";
         sourceModeEl.value = "custom";
-        statusEl.textContent = "Custom tilemap loaded";
+        statusEl.textContent = "Loading custom tilemap...";
         renderAll();
       };
       reader.readAsDataURL(file);
@@ -525,18 +540,23 @@
 
     function rebuildCustomCatalog() {
       if (!customSource || !customImage.naturalWidth) return;
-      const columns = Number(document.getElementById("customCols").value) || 1;
       const tileWidth = Number(document.getElementById("customTileW").value) || 32;
       const tileHeight = Number(document.getElementById("customTileH").value) || tileWidth;
+      const columns = customColumnsTouched ? Number(document.getElementById("customCols").value) : undefined;
       const names = document.getElementById("customNames").value.split(/\r?\n/).map(line => line.trim());
-      const rows = Math.floor(customImage.naturalHeight / tileHeight);
-      const count = Math.max(0, rows * columns);
-      customSource.atlas = {columns, tileWidth, tileHeight};
-      customSource.tiles = Array.from({length: count}, (_, index) => ({
-        index,
-        name: names[index] || `tile_${String(index).padStart(4, "0")}`,
-      }));
+      const catalog = RogueCustomCatalog.buildCustomCatalog(
+        customImage.naturalWidth,
+        customImage.naturalHeight,
+        tileWidth,
+        tileHeight,
+        columns,
+        names
+      );
+      customSource.atlas = catalog.atlas;
+      customSource.tiles = catalog.tiles;
+      document.getElementById("customCols").value = catalog.atlas.columns;
       page = 0;
+      statusEl.textContent = `Custom tilemap loaded: ${catalog.atlas.columns} x ${Math.floor(customImage.naturalHeight / catalog.atlas.tileHeight)} tiles`;
       renderAll();
     }
 
