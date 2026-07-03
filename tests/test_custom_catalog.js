@@ -13,4 +13,10 @@ const clamped = catalog.buildCustomCatalog(544, 832, 32, 32, 999, []);
 assert.strictEqual(clamped.atlas.columns, 17);
 assert.strictEqual(clamped.tiles.length, 442);
 
+const image = {complete: true, naturalWidth: 544};
+const renderable = catalog.withImage(result, image);
+assert.strictEqual(renderable.image, image);
+assert.strictEqual(renderable.tiles.length, 442);
+assert.strictEqual(renderable.atlas.columns, 17);
+
 console.log("custom catalog tests passed");

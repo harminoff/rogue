@@ -253,7 +253,8 @@
 
     function activeCatalog() {
       if (sourceMode === "custom") {
-        return customSource || {tiles: [], image: customImage, atlas: {columns: 1, tileWidth: 32, tileHeight: 32}};
+        if (customSource) return RogueCustomCatalog.withImage(customSource, customImage);
+        return {tiles: [], image: customImage, atlas: {columns: 1, tileWidth: 32, tileHeight: 32}};
       }
       return {tiles: data.rltiles.tiles, image: rlImage, atlas: data.rltiles.atlas};
     }

@@ -34,9 +34,17 @@
     };
   }
 
+  function withImage(source, image) {
+    return {
+      ...source,
+      image,
+    };
+  }
+
   root.RogueCustomCatalog = {
     inferColumns,
     buildCustomCatalog,
+    withImage,
   };
 
   if (typeof module !== "undefined") {
