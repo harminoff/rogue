@@ -85,14 +85,29 @@ class VariantMetadataTest(unittest.TestCase):
         tiles_text = (ROOT / "tiles.c").read_text(encoding="utf-8")
         makefile_text = (ROOT / "Makefile.std").read_text(encoding="utf-8")
         main_text = (ROOT / "main.c").read_text(encoding="utf-8")
+        port_text = (ROOT / "variants" / "rogue36" / "rogue36_port.c").read_text(
+            encoding="utf-8"
+        )
+        symbols_text = (
+            ROOT / "variants" / "rogue36" / "rogue36_symbols.redef"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("rogue36_variant_status", variant_text)
         self.assertIn("rogue36_tile_describe_cell", variant_text)
         self.assertIn("rogue36_tile_describe_cell", tiles_text)
         self.assertIn('apply_variant_monster_mapping("rogue36"', tiles_text)
+        self.assertIn("glyph_is_object", tiles_text)
+        self.assertIn("object_visible", tiles_text)
         self.assertIn("ROGUE36_CFILES", makefile_text)
         self.assertIn("rogue36_port.c", makefile_text)
         self.assertIn("rogue36_main", main_text)
+        self.assertIn("extern struct thing rogue36_player", port_text)
+        self.assertIn("return rogue36_player.t_stats.s_hpt", port_text)
+        self.assertIn("return rogue36_hungry_state", port_text)
+        self.assertIn("for (item = rogue36_lvl_obj", port_text)
+        self.assertIn("max_hp rogue36_max_hp", symbols_text)
+        self.assertIn("cw rogue36_cw", symbols_text)
+        self.assertIn("mw rogue36_mw", symbols_text)
 
     def test_rogue36_core_menus_use_gui_overlays_in_tile_mode(self):
         command_text = (ROOT / "variants" / "rogue36" / "command.c").read_text(

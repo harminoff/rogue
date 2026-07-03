@@ -8,6 +8,19 @@
 #include "port/termios.h"
 #include "rogue.h"
 
+extern WINDOW *rogue36_cw;
+extern WINDOW *rogue36_mw;
+extern struct object *rogue36_cur_armor;
+extern struct linked_list *rogue36_lvl_obj;
+extern struct linked_list *rogue36_mlist;
+extern struct room rogue36_rooms[MAXROOMS];
+extern struct thing rogue36_player;
+extern int rogue36_level;
+extern int rogue36_purse;
+extern int rogue36_max_hp;
+extern int rogue36_hungry_state;
+extern char rogue36_huh[80];
+
 static char
 window_ch(WINDOW *win, int y, int x)
 {
@@ -80,22 +93,39 @@ rogue36_cfgetospeed(const struct termios *term)
     return 9600;
 }
 
+static struct room *
+rogue36_bridge_room_at(int y, int x)
+{
+    int i;
+    coord pos;
+
+    pos.y = y;
+    pos.x = x;
+    for (i = 0; i < MAXROOMS; i++)
+    {
+	if (!(rogue36_rooms[i].r_flags & ISGONE)
+	    && inroom(&rogue36_rooms[i], &pos))
+	    return &rogue36_rooms[i];
+    }
+    return NULL;
+}
+
 int
 rogue36_bridge_hero_y(void)
 {
-    return hero.y;
+    return rogue36_player.t_pos.y;
 }
 
 int
 rogue36_bridge_hero_x(void)
 {
-    return hero.x;
+    return rogue36_player.t_pos.x;
 }
 
 int
 rogue36_bridge_level(void)
 {
-    return level;
+    return rogue36_level;
 }
 
 int
@@ -113,61 +143,62 @@ rogue36_bridge_map_cols(void)
 int
 rogue36_bridge_gold(void)
 {
-    return purse;
+    return rogue36_purse;
 }
 
 int
 rogue36_bridge_hp(void)
 {
-    return pstats.s_hpt;
+    return rogue36_player.t_stats.s_hpt;
 }
 
 int
 rogue36_bridge_max_hp(void)
 {
-    return max_hp;
+    return rogue36_max_hp;
 }
 
 unsigned int
 rogue36_bridge_strength(void)
 {
-    return (unsigned int) pstats.s_str.st_str;
+    return (unsigned int) rogue36_player.t_stats.s_str.st_str;
 }
 
 int
 rogue36_bridge_armor(void)
 {
-    return cur_armor != NULL ? cur_armor->o_ac : pstats.s_arm;
+    return rogue36_cur_armor != NULL ? rogue36_cur_armor->o_ac
+				     : rogue36_player.t_stats.s_arm;
 }
 
 int
 rogue36_bridge_exp_level(void)
 {
-    return pstats.s_lvl;
+    return rogue36_player.t_stats.s_lvl;
 }
 
 long
 rogue36_bridge_exp_points(void)
 {
-    return pstats.s_exp;
+    return rogue36_player.t_stats.s_exp;
 }
 
 int
 rogue36_bridge_hungry_state(void)
 {
-    return hungry_state;
+    return rogue36_hungry_state;
 }
 
 const char *
 rogue36_bridge_message(void)
 {
-    return huh;
+    return rogue36_huh;
 }
 
 char
 rogue36_bridge_visible_ch(int y, int x)
 {
-    return window_ch(cw, y, x);
+    return window_ch(rogue36_cw, y, x);
 }
 
 char
@@ -179,28 +210,49 @@ rogue36_bridge_terrain_ch(int y, int x)
 char
 rogue36_bridge_monster_window_ch(int y, int x)
 {
-    return window_ch(mw, y, x);
+    return window_ch(rogue36_mw, y, x);
 }
 
 void *
 rogue36_bridge_monster_at(int y, int x)
 {
     struct linked_list *item;
+    struct thing *monster;
 
-    item = find_mons(y, x);
-    return item == NULL ? NULL : (void *) ldata(item);
+    for (item = rogue36_mlist; item != NULL; item = next(item))
+    {
+	monster = (struct thing *) ldata(item);
+	if (monster->t_pos.y == y && monster->t_pos.x == x)
+	    return (void *) monster;
+    }
+    return NULL;
 }
 
 int
 rogue36_bridge_player_is_blind(void)
 {
-    return on(player, ISBLIND);
+    return on(rogue36_player, ISBLIND);
 }
 
 int
 rogue36_bridge_cansee(int y, int x)
 {
-    return cansee(y, x);
+    struct room *hero_room;
+    struct room *cell_room;
+
+    if (rogue36_bridge_player_is_blind())
+	return FALSE;
+
+    hero_room = rogue36_bridge_room_at(rogue36_player.t_pos.y,
+				       rogue36_player.t_pos.x);
+    cell_room = rogue36_bridge_room_at(y, x);
+
+    if (hero_room != NULL && hero_room == cell_room
+	&& !(hero_room->r_flags & ISDARK))
+	return TRUE;
+
+    return DISTANCE(rogue36_player.t_pos.y, rogue36_player.t_pos.x, y, x)
+	< 3 * 3;
 }
 
 int
@@ -208,7 +260,7 @@ rogue36_bridge_see_monst(void *monster)
 {
     if (monster == NULL)
 	return FALSE;
-    if (on(*(struct thing *) monster, ISINVIS) && off(player, CANSEE))
+    if (on(*(struct thing *) monster, ISINVIS) && off(rogue36_player, CANSEE))
 	return FALSE;
     return TRUE;
 }
@@ -231,7 +283,7 @@ rogue36_bridge_object_type_at(int y, int x)
     struct linked_list *item;
     struct object *obj;
 
-    for (item = lvl_obj; item != NULL; item = next(item))
+    for (item = rogue36_lvl_obj; item != NULL; item = next(item))
     {
 	obj = (struct object *) ldata(item);
 	if (obj->o_pos.y == y && obj->o_pos.x == x)

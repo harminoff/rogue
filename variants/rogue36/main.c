@@ -146,14 +146,6 @@ char **envp;
     hw = newwin(LINES, COLS, 0, 0);
     waswizard = wizard;
     new_level();			/* Draw current level */
-    if (!rogue_frontend_start())
-    {
-	endwin();
-	exit(1);
-    }
-    rogue_frontend_render();
-    if (rogue_frontend_smoke_requested())
-	exit(0);
     /*
      * Start up daemons and fuses
      */
@@ -218,6 +210,14 @@ char **envp;
     obj->o_count = 1;
     obj->o_which = 0;
     add_pack(item, TRUE);
+    if (!rogue_frontend_start())
+    {
+	endwin();
+	exit(1);
+    }
+    rogue_frontend_render();
+    if (rogue_frontend_smoke_requested())
+	exit(0);
     playit();
 }
 

@@ -38,6 +38,7 @@ countch rogue36_countch
 cur_armor rogue36_cur_armor
 cur_ring rogue36_cur_ring
 cur_weapon rogue36_cur_weapon
+cw rogue36_cw
 d_level rogue36_d_level
 d_list rogue36_d_list
 d_slot rogue36_d_slot
@@ -157,6 +158,7 @@ lvl_obj rogue36_lvl_obj
 main rogue36_main
 max_level rogue36_max_level
 max_stats rogue36_max_stats
+max_hp rogue36_max_hp
 metal rogue36_metal
 miss rogue36_miss
 missile rogue36_missile
@@ -165,6 +167,7 @@ money rogue36_money
 monsters rogue36_monsters
 mpos rogue36_mpos
 msg rogue36_msg
+mw rogue36_mw
 new_item rogue36_new_item
 new_level rogue36_new_level
 new_monster rogue36_new_monster

@@ -547,6 +547,8 @@ rogue36_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
     char monster_glyph;
     char object_glyph;
     char terrain_glyph;
+    bool object_visible;
+    bool glyph_is_object;
     bool visible;
     bool seen;
     static bool known_cells[ROGUE36_MAXLINES][ROGUE36_MAXCOLS];
@@ -578,12 +580,15 @@ rogue36_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
     glyph = rogue36_bridge_visible_ch(y, x);
     terrain_glyph = rogue36_bridge_terrain_ch(y, x);
     monster_glyph = rogue36_bridge_monster_window_ch(y, x);
+    object_glyph = rogue36_bridge_object_type_at(y, x);
+    glyph_is_object = (object_glyph != '\0' && glyph == object_glyph);
     visible = ((rogue36_bridge_hero_y() == y
 		&& rogue36_bridge_hero_x() == x)
 	       || (glyph != ' '
 		   && !rogue36_bridge_player_is_blind()
 		   && rogue36_bridge_cansee(y, x)));
-    seen = (bool)(glyph != ' ');
+    object_visible = (bool)(object_glyph != '\0' && visible);
+    seen = (bool)(glyph != ' ' && !glyph_is_object);
 
     if (visible || seen)
 	known_cells[y][x] = TRUE;
@@ -637,8 +642,10 @@ rogue36_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
 	return;
     }
 
-    object_glyph = rogue36_bridge_object_type_at(y, x);
-    if (find_glyph_mapping(glyph) == NULL && object_glyph != '\0')
+    if (!object_visible && glyph_is_object)
+	glyph = terrain_glyph;
+    if (object_visible && find_glyph_mapping(glyph) == NULL
+	&& object_glyph != '\0')
 	glyph = object_glyph;
     if (glyph == ' ' && terrain_glyph != ' ')
 	glyph = terrain_glyph;
