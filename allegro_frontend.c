@@ -721,16 +721,18 @@ drain_keyboard_events(void)
 }
 
 static void
-draw_glyph_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
+draw_glyph_foreground_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
 {
-    ALLEGRO_COLOR bg, fg;
+    ALLEGRO_COLOR fg;
     int dx, dy;
     char text[2];
+
+    if (cell == NULL || cell->glyph == ' ')
+	return;
 
     dx = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE;
     dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
 
-    bg = al_map_rgb(10, 10, 12);
     fg = al_map_rgb(220, 220, 210);
     if (cell->layer == ROGUE_TILE_OBJECT)
 	fg = al_map_rgb(240, 210, 80);
@@ -739,16 +741,25 @@ draw_glyph_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
     else if (cell->glyph == '|' || cell->glyph == '-')
 	fg = al_map_rgb(150, 150, 150);
 
+    text[0] = cell->glyph;
+    text[1] = '\0';
+    al_draw_text(font, fg, dx + ROGUE_TILE_DRAW_SIZE / 2, dy + 1,
+		 ALLEGRO_ALIGN_CENTRE, text);
+}
+
+static void
+draw_glyph_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
+{
+    ALLEGRO_COLOR bg;
+    int dx, dy;
+
+    dx = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE;
+    dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
+
+    bg = al_map_rgb(10, 10, 12);
     al_draw_filled_rectangle(dx, dy, dx + ROGUE_TILE_DRAW_SIZE,
 			     dy + ROGUE_TILE_DRAW_SIZE, bg);
-
-    if (cell->glyph != ' ')
-    {
-	text[0] = cell->glyph;
-	text[1] = '\0';
-	al_draw_text(font, fg, dx + ROGUE_TILE_DRAW_SIZE / 2,
-		     dy + 1, ALLEGRO_ALIGN_CENTRE, text);
-    }
+    draw_glyph_foreground_cell(screen_x, screen_y, cell);
 }
 
 static void
@@ -916,6 +927,33 @@ draw_tile_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
 	return;
     }
 
+    draw_atlas_tile(atlas_index, dx, dy);
+}
+
+static void
+draw_actor_foreground_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
+{
+    int dx, dy;
+    int atlas_index;
+
+    if (cell == NULL || cell->layer != ROGUE_TILE_ACTOR)
+	return;
+
+    if (settings.view_mode == ROGUE_ALLEGRO_VIEW_GLYPHS)
+    {
+	draw_glyph_foreground_cell(screen_x, screen_y, cell);
+	return;
+    }
+
+    atlas_index = resolved_cell_index(cell);
+    if (atlas_index < 0 || atlas == NULL)
+    {
+	draw_glyph_foreground_cell(screen_x, screen_y, cell);
+	return;
+    }
+
+    dx = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE;
+    dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
     draw_atlas_tile(atlas_index, dx, dy);
 }
 
@@ -1871,6 +1909,10 @@ rogue_allegro_render(void)
     al_hold_bitmap_drawing(FALSE);
 
     draw_blood_splats(left, top, rows, cols);
+    for (screen_y = 0; screen_y < rows; screen_y++)
+	for (screen_x = 0; screen_x < cols; screen_x++)
+	    draw_actor_foreground_cell(screen_x, screen_y,
+				       &view[screen_y][screen_x]);
     draw_status();
     draw_side_panel();
     draw_text_overlay();

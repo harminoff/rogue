@@ -100,6 +100,27 @@ class CombatDamageLogTests(unittest.TestCase):
         ]
         self.assertIn("find_blood_splat_cell(&y, &x)", spawn_splat)
 
+    def test_actor_foreground_draws_after_blood(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("draw_actor_foreground_cell", allegro_c)
+        render = allegro_c[
+            allegro_c.index("void\nrogue_allegro_render(void)"):
+            allegro_c.index("char\nrogue_allegro_readchar")
+        ]
+        self.assertLess(
+            render.index("draw_blood_splats(left, top, rows, cols);"),
+            render.index("draw_actor_foreground_cell"),
+        )
+
+        foreground = allegro_c[
+            allegro_c.index("draw_actor_foreground_cell"):
+            allegro_c.index("static int\nstatus_piece_width")
+        ]
+        self.assertIn("cell->layer != ROGUE_TILE_ACTOR", foreground)
+        self.assertIn("draw_glyph_foreground_cell", foreground)
+        self.assertNotIn("underlay", foreground)
+
 
 if __name__ == "__main__":
     unittest.main()
