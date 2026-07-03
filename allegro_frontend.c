@@ -35,6 +35,8 @@
 #define ROGUE_MESSAGE_LOG_LINES 64
 #define ROGUE_SIDE_PANEL_MIN_WIDTH 280
 #define ROGUE_SIDE_PANEL_MAX_WIDTH 420
+#define ROGUE_BLOOD_SPLATS 96
+#define ROGUE_BLOOD_DROPS_PER_HIT 5
 
 typedef enum rogue_allegro_view {
     ROGUE_ALLEGRO_VIEW_TILES,
@@ -52,6 +54,16 @@ typedef struct rogue_allegro_settings {
     int windowed_width;
     int windowed_height;
 } ROGUE_ALLEGRO_SETTINGS;
+
+typedef struct rogue_blood_splat {
+    int x;
+    int y;
+    int level;
+    int radius;
+    int alpha;
+    int offset_x;
+    int offset_y;
+} ROGUE_BLOOD_SPLAT;
 
 static ROGUE_ALLEGRO_SETTINGS settings = {
     ROGUE_DEFAULT_TILE_DRAW_SIZE,
@@ -81,6 +93,9 @@ static int render_origin_x = 0;
 static int render_origin_y = 0;
 static char message_log[ROGUE_MESSAGE_LOG_LINES][ROGUE_OVERLAY_LINE_LEN];
 static int message_log_count = 0;
+static ROGUE_BLOOD_SPLAT blood_splats[ROGUE_BLOOD_SPLATS];
+static int blood_splat_count = 0;
+static unsigned int blood_rng = 0x6d2b79f5u;
 static bool prompt_active = FALSE;
 static char prompt_text[128];
 static bool death_overlay_active = FALSE;
@@ -957,6 +972,119 @@ contains_text(const char *text, const char *needle)
     return FALSE;
 }
 
+static int
+blood_random(int limit)
+{
+    if (limit <= 0)
+	return 0;
+
+    blood_rng = blood_rng * 1664525u + 1013904223u;
+    return (int) ((blood_rng >> 16) % (unsigned int) limit);
+}
+
+static bool
+message_is_blood_trigger(const char *message)
+{
+    if (message == NULL)
+	return FALSE;
+
+    if (contains_text(message, "miss")
+	|| contains_text(message, "can't")
+	|| contains_text(message, "cannot")
+	|| contains_text(message, "no damage"))
+	return FALSE;
+
+    return contains_text(message, "hit")
+	|| contains_text(message, "defeated")
+	|| contains_text(message, "killed")
+	|| contains_text(message, "wounded");
+}
+
+static void
+clear_blood_splats(void)
+{
+    blood_splat_count = 0;
+}
+
+static void
+add_blood_splat(int y, int x)
+{
+    ROGUE_BLOOD_SPLAT *splat;
+    int slot;
+
+    if (blood_splat_count < ROGUE_BLOOD_SPLATS)
+	slot = blood_splat_count++;
+    else
+	slot = blood_random(ROGUE_BLOOD_SPLATS);
+
+    splat = &blood_splats[slot];
+    splat->x = clamp_int(x, 0, NUMCOLS - 1);
+    splat->y = clamp_int(y, 0, ROGUE_MAX_VIEW_ROWS - 1);
+    splat->level = level;
+    splat->radius = 2 + blood_random(4);
+    splat->alpha = 130 + blood_random(86);
+    splat->offset_x = 8 + blood_random(17);
+    splat->offset_y = 8 + blood_random(17);
+}
+
+static void
+spawn_blood_spatter(void)
+{
+    int i;
+    int y;
+    int x;
+
+    for (i = 0; i < ROGUE_BLOOD_DROPS_PER_HIT; i++)
+    {
+	y = hero.y + blood_random(3) - 1;
+	x = hero.x + blood_random(3) - 1;
+	add_blood_splat(y, x);
+    }
+}
+
+static void
+draw_blood_splats(int left, int top, int rows, int cols)
+{
+    int i;
+    int screen_x;
+    int screen_y;
+    int px;
+    int py;
+    int radius;
+    ALLEGRO_COLOR color;
+    ROGUE_BLOOD_SPLAT *splat;
+
+    if (!settings.blood_spatter_enabled || blood_splat_count <= 0)
+	return;
+
+    for (i = 0; i < blood_splat_count; i++)
+    {
+	splat = &blood_splats[i];
+	if (splat->level != level)
+	    continue;
+
+	screen_x = splat->x - left;
+	screen_y = splat->y - top;
+	if (screen_x < 0 || screen_x >= cols
+	    || screen_y < 0 || screen_y >= rows)
+	    continue;
+
+	px = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE
+	     + (splat->offset_x * ROGUE_TILE_DRAW_SIZE) / 32;
+	py = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE
+	     + (splat->offset_y * ROGUE_TILE_DRAW_SIZE) / 32;
+	radius = (splat->radius * ROGUE_TILE_DRAW_SIZE) / 32;
+	if (radius < 1)
+	    radius = 1;
+	color = al_map_rgba(118, 11, 18, splat->alpha);
+	al_draw_filled_circle(px, py, radius, color);
+	if (radius > 2)
+	    al_draw_filled_circle(px + radius, py - radius / 2,
+				  radius / 2, al_map_rgba(70, 4, 9,
+							   splat->alpha));
+    }
+}
+
 static ALLEGRO_COLOR
 log_message_color(const char *message)
 {
@@ -1436,6 +1564,7 @@ rogue_allegro_render(void)
 	}
     al_hold_bitmap_drawing(FALSE);
 
+    draw_blood_splats(left, top, rows, cols);
     draw_status();
     draw_side_panel();
     draw_text_overlay();
@@ -1610,6 +1739,12 @@ rogue_allegro_record_message(const char *message)
     snprintf(message_log[message_log_count],
 	     sizeof(message_log[message_log_count]), "%s", message);
     message_log_count++;
+
+    if (contains_text(message, "welcome to level"))
+	clear_blood_splats();
+    else if (settings.blood_spatter_enabled
+	     && message_is_blood_trigger(message))
+	spawn_blood_spatter();
 }
 
 void
@@ -2094,4 +2229,5 @@ rogue_allegro_shutdown(void)
     text_overlay_active = FALSE;
     text_overlay_line_count = 0;
     message_log_count = 0;
+    blood_splat_count = 0;
 }
