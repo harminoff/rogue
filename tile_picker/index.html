@@ -186,6 +186,7 @@
         <input id="tileSearch" type="search" placeholder="Search tiles" style="flex: 1">
         <label class="file" for="tileUpload">Upload PNG</label>
         <input class="hidden" id="tileUpload" type="file" accept="image/png,image/*">
+        <select id="customSourceFilter"><option value="">All custom sources</option></select>
       </div>
       <div class="grid" id="tileGrid"></div>
       <div class="pager">
@@ -216,6 +217,7 @@
           <label>Tile H <input id="customTileH" type="number" min="1" value="32"></label>
           <label>Columns <input id="customCols" type="number" min="1" value="1"></label>
         </div>
+        <button id="clearCustomBtn" type="button">Clear Custom Tilesets</button>
         <textarea id="customNames" placeholder="Optional names, one per tile"></textarea>
       </div>
     </section>
@@ -229,6 +231,7 @@
     const rlImage = new Image();
     rlImage.src = "assets/rltiles-2d.png";
     const customImage = new Image();
+    const customSourceImages = new Map();
 
     const roles = data.rogue.roles;
     const original = Object.fromEntries(roles.map(role => [role.role, role.currentRltilesName || ""]));
@@ -240,6 +243,8 @@
     let page = 0;
     let serverReady = false;
     let customSource = null;
+    let customSources = [];
+    let nextCustomSourceId = 1;
     let customColumnsTouched = false;
 
     const roleList = document.getElementById("roleList");
@@ -313,8 +318,11 @@
     function filteredTiles() {
       const catalog = activeCatalog();
       const query = document.getElementById("tileSearch").value.toLowerCase();
-      if (!query) return catalog.tiles;
-      return catalog.tiles.filter(tile => `${tile.name || ""} ${tile.index}`.toLowerCase().includes(query));
+      const sourceFilter = sourceMode === "custom" ? document.getElementById("customSourceFilter").value : "";
+      let tiles = catalog.tiles;
+      if (sourceFilter) tiles = tiles.filter(tile => tile.sourceId === sourceFilter);
+      if (!query) return tiles;
+      return tiles.filter(tile => `${tile.name || ""} ${tile.sourceName || ""} ${tile.sourceIndex ?? ""} ${tile.index}`.toLowerCase().includes(query));
     }
 
     function renderGrid() {
@@ -334,11 +342,16 @@
         canvas.height = 48;
         const label = document.createElement("div");
         label.className = "tile-label";
-        label.textContent = `${tile.name || "tile"} #${tile.index}`;
+        label.textContent = tile.sourceName ? `${tile.sourceName} #${tile.sourceIndex}` : `${tile.name || "tile"} #${tile.index}`;
         card.append(canvas, label);
         card.addEventListener("click", () => {
           if (sourceMode === "custom") {
-            customSelections[activeRole.role] = {index: tile.index, name: tile.name || `tile_${tile.index}`};
+            customSelections[activeRole.role] = {
+              index: tile.index,
+              name: tile.name || `tile_${tile.index}`,
+              sourceName: tile.sourceName,
+              sourceIndex: tile.sourceIndex,
+            };
           } else {
             rlSelections[activeRole.role] = tile.name;
           }
@@ -357,7 +370,9 @@
       const catalog = activeCatalog();
       document.getElementById("detailTitle").textContent = activeRole ? activeRole.label : "Choose a role";
       document.getElementById("detailMeta").textContent = activeRole ? activeRole.role : "";
-      document.getElementById("selectedText").textContent = tile ? `${tile.name || "tile"} #${tile.index}` : "No tile selected.";
+      document.getElementById("selectedText").textContent = tile
+        ? (tile.sourceName ? `${tile.name || "tile"} (${tile.sourceName} #${tile.sourceIndex})` : `${tile.name || "tile"} #${tile.index}`)
+        : "No tile selected.";
       document.getElementById("changedText").textContent = isChanged(activeRole) ? "Changed from baseline." : "Baseline selection.";
       drawTile(document.getElementById("selectedPreview"), catalog, tile, 64);
       document.getElementById("applyCustomBtn").disabled = !serverReady || !customSource;
@@ -392,16 +407,25 @@
     }
 
     function pickerConfig() {
-      return {sourceMode, rlSelections, customSelections, customSource};
+      return {sourceMode, rlSelections, customSelections, customSource, customSources};
     }
 
-    function loadPickerConfig(config) {
+    async function loadPickerConfig(config) {
       sourceMode = config.sourceMode || "rltiles";
       Object.assign(rlSelections, config.rlSelections || {});
       Object.assign(customSelections, config.customSelections || {});
-      customSource = config.customSource || customSource;
+      customSources = config.customSources || config.customSource?.sources || [];
+      nextCustomSourceId = 1 + customSources.reduce((max, source) => {
+        const match = String(source.id || "").match(/source_(\d+)/);
+        return Math.max(max, match ? Number(match[1]) : 0);
+      }, 0);
+      customSourceImages.clear();
+      for (const source of customSources) {
+        const image = await loadImage(source.dataUrl);
+        customSourceImages.set(source.id, image);
+      }
+      regenerateCombinedCustomCatalog();
       sourceModeEl.value = sourceMode;
-      if (customSource?.dataUrl) customImage.src = customSource.dataUrl;
       renderAll();
     }
 
@@ -483,7 +507,7 @@
       const response = await fetch(`/api/load-picker-config?name=${encodeURIComponent(name)}`, {cache: "no-store"});
       const result = await response.json();
       if (!response.ok || !result.ok) return alert(result.error || "Load failed.");
-      loadPickerConfig(result.profile);
+      await loadPickerConfig(result.profile);
     });
     document.getElementById("resetBtn").addEventListener("click", () => {
       if (!activeRole) return;
@@ -498,22 +522,31 @@
     document.getElementById("tileSearch").addEventListener("input", () => { page = 0; renderGrid(); });
     sourceModeEl.addEventListener("change", () => { sourceMode = sourceModeEl.value; page = 0; renderAll(); });
     for (const id of ["customTileW", "customTileH"]) {
-      document.getElementById(id).addEventListener("change", () => {
-        customColumnsTouched = false;
-        rebuildCustomCatalog();
-      });
+      document.getElementById(id).addEventListener("change", () => { customColumnsTouched = false; });
     }
     document.getElementById("customCols").addEventListener("change", () => {
       customColumnsTouched = true;
-      rebuildCustomCatalog();
     });
-    document.getElementById("customNames").addEventListener("change", rebuildCustomCatalog);
+    document.getElementById("customNames").addEventListener("change", () => {});
+    document.getElementById("customSourceFilter").addEventListener("change", () => { page = 0; renderGrid(); });
+    document.getElementById("clearCustomBtn").addEventListener("click", () => {
+      customSources = [];
+      customSourceImages.clear();
+      customSource = null;
+      for (const key of Object.keys(customSelections)) delete customSelections[key];
+      refreshCustomSourceFilter();
+      sourceMode = "custom";
+      sourceModeEl.value = "custom";
+      statusEl.textContent = "Custom tilesets cleared";
+      renderAll();
+    });
     document.getElementById("tileUpload").addEventListener("change", event => {
       const file = event.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      reader.onload = () => {
-        customSource = {
+      reader.onload = async () => {
+        const source = {
+          id: `source_${nextCustomSourceId++}`,
           fileName: file.name,
           dataUrl: reader.result,
           atlas: {
@@ -523,47 +556,107 @@
           },
           tiles: [],
         };
-        customColumnsTouched = false;
-        customImage.onload = () => {
-          const tileWidth = Number(document.getElementById("customTileW").value) || 32;
-          document.getElementById("customCols").value =
-            RogueCustomCatalog.inferColumns(customImage.naturalWidth, tileWidth);
-          rebuildCustomCatalog();
-        };
-        customImage.src = customSource.dataUrl;
+        const sourceImage = await loadImage(source.dataUrl);
+        customSourceImages.set(source.id, sourceImage);
+        document.getElementById("customCols").value =
+          RogueCustomCatalog.inferColumns(sourceImage.naturalWidth, source.atlas.tileWidth);
+        buildSourceCatalog(source, sourceImage);
+        customSources.push(source);
+        regenerateCombinedCustomCatalog();
         sourceMode = "custom";
         sourceModeEl.value = "custom";
-        statusEl.textContent = "Loading custom tilemap...";
+        statusEl.textContent = `Added ${source.fileName}`;
         renderAll();
       };
       reader.readAsDataURL(file);
+      event.target.value = "";
     });
 
-    function rebuildCustomCatalog() {
-      if (!customSource || !customImage.naturalWidth) return;
-      const tileWidth = Number(document.getElementById("customTileW").value) || 32;
-      const tileHeight = Number(document.getElementById("customTileH").value) || tileWidth;
+    function buildSourceCatalog(source, sourceImage) {
+      const tileWidth = source.atlas.tileWidth;
+      const tileHeight = source.atlas.tileHeight || tileWidth;
       const columns = customColumnsTouched ? Number(document.getElementById("customCols").value) : undefined;
       const names = document.getElementById("customNames").value.split(/\r?\n/).map(line => line.trim());
       let catalog = RogueCustomCatalog.buildCustomCatalog(
-        customImage.naturalWidth,
-        customImage.naturalHeight,
+        sourceImage.naturalWidth,
+        sourceImage.naturalHeight,
         tileWidth,
         tileHeight,
         columns,
         names
       );
-      const blankIndexes = detectBlankTileIndexes(catalog);
+      const blankIndexes = detectBlankTileIndexes(catalog, sourceImage);
       catalog = RogueCustomCatalog.hideBlankTiles(catalog, blankIndexes);
-      customSource.atlas = catalog.atlas;
-      customSource.tiles = catalog.tiles;
-      document.getElementById("customCols").value = catalog.atlas.columns;
+      source.atlas = catalog.atlas;
+      source.tiles = catalog.tiles;
+      source.blankHidden = blankIndexes.size;
+      source.tileCount = catalog.tiles.length;
+    }
+
+    function regenerateCombinedCustomCatalog() {
+      if (!customSources.length) {
+        customSource = null;
+        refreshCustomSourceFilter();
+        renderAll();
+        return;
+      }
+
+      const combinedColumns = 16;
+      const combined = RogueCustomCatalog.combineSources(customSources, combinedColumns);
+      const canvas = document.createElement("canvas");
+      const rows = Math.max(1, Math.ceil(combined.tiles.length / combined.atlas.columns));
+      canvas.width = combined.atlas.columns * combined.atlas.tileWidth;
+      canvas.height = rows * combined.atlas.tileHeight;
+      const ctx = canvas.getContext("2d");
+
+      for (const tile of combined.tiles) {
+        const source = customSources.find(candidate => candidate.id === tile.sourceId);
+        const image = customSourceImages.get(tile.sourceId);
+        if (!source || !image) continue;
+        const sx = (tile.sourceIndex % source.atlas.columns) * source.atlas.tileWidth;
+        const sy = Math.floor(tile.sourceIndex / source.atlas.columns) * source.atlas.tileHeight;
+        const dx = (tile.index % combined.atlas.columns) * combined.atlas.tileWidth;
+        const dy = Math.floor(tile.index / combined.atlas.columns) * combined.atlas.tileHeight;
+        ctx.drawImage(image, sx, sy, source.atlas.tileWidth, source.atlas.tileHeight,
+                      dx, dy, combined.atlas.tileWidth, combined.atlas.tileHeight);
+      }
+
+      customSource = {
+        fileName: "combined-custom-tiles.png",
+        dataUrl: canvas.toDataURL("image/png"),
+        atlas: combined.atlas,
+        tiles: combined.tiles,
+        sources: customSources,
+      };
+      customImage.onload = renderAll;
+      customImage.src = customSource.dataUrl;
+      refreshCustomSourceFilter();
       page = 0;
-      statusEl.textContent = `Custom tilemap loaded: ${catalog.tiles.length} tiles (${blankIndexes.size} blank hidden)`;
+      const hidden = customSources.reduce((sum, source) => sum + (source.blankHidden || 0), 0);
+      statusEl.textContent = `Custom atlas: ${combined.tiles.length} tiles from ${customSources.length} sources (${hidden} blank hidden)`;
       renderAll();
     }
 
-    function detectBlankTileIndexes(catalog) {
+    function refreshCustomSourceFilter() {
+      const select = document.getElementById("customSourceFilter");
+      const current = select.value;
+      select.replaceChildren(new Option("All custom sources", ""));
+      for (const source of customSources) {
+        select.append(new Option(`${source.fileName} (${source.tileCount || 0})`, source.id));
+      }
+      if (customSources.some(source => source.id === current)) select.value = current;
+    }
+
+    function loadImage(dataUrl) {
+      return new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = dataUrl;
+      });
+    }
+
+    function detectBlankTileIndexes(catalog, sourceImage) {
       const blankIndexes = new Set();
       const canvas = document.createElement("canvas");
       canvas.width = catalog.atlas.tileWidth;
@@ -576,7 +669,7 @@
         const sy = Math.floor(tile.index / catalog.atlas.columns) * catalog.atlas.tileHeight;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(
-          customImage,
+          sourceImage,
           sx,
           sy,
           catalog.atlas.tileWidth,
@@ -595,7 +688,7 @@
     }
 
     rlImage.onload = renderAll;
-    customImage.onload = rebuildCustomCatalog;
+    customImage.onload = renderAll;
     renderAll();
     checkServer();
   </script>

@@ -34,4 +34,31 @@ assert.strictEqual(filtered.tiles[0].index, 1);
 assert.strictEqual(filtered.tiles[filtered.tiles.length - 1].index, 440);
 assert.strictEqual(filtered.atlas.columns, 17);
 
+const sourceA = {
+  id: "source_1",
+  fileName: "first.png",
+  atlas: {columns: 2, tileWidth: 32, tileHeight: 32},
+  tiles: [
+    {index: 0, name: "floor"},
+    {index: 3, name: "wall"},
+  ],
+};
+const sourceB = {
+  id: "source_2",
+  fileName: "second.png",
+  atlas: {columns: 4, tileWidth: 32, tileHeight: 32},
+  tiles: [
+    {index: 4, name: "hero"},
+  ],
+};
+const combined = catalog.combineSources([sourceA, sourceB], 4);
+assert.strictEqual(combined.atlas.columns, 4);
+assert.strictEqual(combined.atlas.tileWidth, 32);
+assert.strictEqual(combined.atlas.tileHeight, 32);
+assert.strictEqual(combined.tiles.length, 3);
+assert.deepStrictEqual(combined.tiles.map(tile => tile.index), [0, 1, 2]);
+assert.deepStrictEqual(combined.tiles.map(tile => tile.sourceIndex), [0, 3, 4]);
+assert.deepStrictEqual(combined.tiles.map(tile => tile.sourceId), ["source_1", "source_1", "source_2"]);
+assert.strictEqual(combined.tiles[2].sourceName, "second.png");
+
 console.log("custom catalog tests passed");

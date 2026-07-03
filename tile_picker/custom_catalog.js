@@ -57,12 +57,44 @@
     };
   }
 
+  function combineSources(sources, columns) {
+    const validSources = Array.isArray(sources) ? sources : [];
+    const first = validSources.find(source => source && source.atlas) || {atlas: {}};
+    const tileWidth = positiveInt(first.atlas.tileWidth, 32);
+    const tileHeight = positiveInt(first.atlas.tileHeight, tileWidth);
+    const atlasColumns = positiveInt(columns, 8);
+    const tiles = [];
+
+    for (const source of validSources) {
+      if (!source || !source.atlas || !Array.isArray(source.tiles)) continue;
+      for (const tile of source.tiles) {
+        tiles.push({
+          index: tiles.length,
+          name: tile.name || `tile_${String(tiles.length).padStart(4, "0")}`,
+          sourceId: source.id,
+          sourceName: source.fileName || source.name || "tileset",
+          sourceIndex: tile.index,
+        });
+      }
+    }
+
+    return {
+      atlas: {
+        columns: atlasColumns,
+        tileWidth,
+        tileHeight,
+      },
+      tiles,
+    };
+  }
+
   root.RogueCustomCatalog = {
     inferColumns,
     buildCustomCatalog,
     withImage,
     isBlankTilePixels,
     hideBlankTiles,
+    combineSources,
   };
 
   if (typeof module !== "undefined") {
