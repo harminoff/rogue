@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -181,7 +182,25 @@ def save_profile(root: Path, payload: dict[str, Any]) -> dict[str, Any]:
         raise BadRequest("profile must be a JSON object")
     path = picker_profile_path(root, payload.get("name"))
     write_json(path, profile)
-    return {"ok": True, "name": path.stem, "path": relative_path(root, path)}
+    result = {"ok": True, "name": path.stem, "path": relative_path(root, path)}
+    if profile.get("sourceMode") == "custom" and isinstance(profile.get("customSource"), dict):
+        custom_source = profile["customSource"]
+        atlas = custom_source.get("atlas") if isinstance(custom_source.get("atlas"), dict) else {}
+        runtime_profile = {
+            "name": path.stem,
+            "source": {
+                "type": "embedded_png",
+                "fileName": custom_source.get("fileName") or "custom-tiles.png",
+                "dataUrl": custom_source.get("dataUrl"),
+                "tileWidth": atlas.get("tileWidth") or 32,
+                "tileHeight": atlas.get("tileHeight") or atlas.get("tileWidth") or 32,
+                "columns": atlas.get("columns") or 1,
+            },
+            "tiles": profile.get("customSelections") or {},
+        }
+        tilepack_writer.write_active_custom_pack(root, runtime_profile, path.stem)
+        result["tilepackPath"] = f"tilepacks/{path.stem}/tilepack.json"
+    return result
 
 
 def load_profile(root: Path, name: Any) -> dict[str, Any]:
@@ -193,8 +212,11 @@ def load_profile(root: Path, name: Any) -> dict[str, Any]:
 
 def delete_profile(root: Path, payload: dict[str, Any]) -> dict[str, Any]:
     path = picker_profile_path(root, payload.get("name"))
+    pack_dir = root / "tilepacks" / safe_profile_name(payload.get("name"))
     if path.exists():
         path.unlink()
+    if pack_dir.exists() and pack_dir.is_dir():
+        shutil.rmtree(pack_dir)
     return {"ok": True, "name": path.stem}
 
 

@@ -86,6 +86,12 @@ static int text_overlay_selected = -1;
 static int text_overlay_scroll = 0;
 static bool text_overlay_selectable = FALSE;
 
+void rogue_allegro_text_overlay_begin(const char *title);
+void rogue_allegro_text_overlay_add(const char *line);
+char rogue_allegro_text_overlay_pick(const char *prompt);
+void rogue_allegro_text_overlay_clear(void);
+bool rogue_allegro_notice(const char *title, const char *message);
+
 static void
 allegro_start_error(const char *message)
 {
@@ -280,11 +286,6 @@ handle_view_key(int keycode)
 {
     switch (keycode)
     {
-	case ALLEGRO_KEY_F10:
-	    settings.view_mode = (settings.view_mode == ROGUE_ALLEGRO_VIEW_TILES)
-		? ROGUE_ALLEGRO_VIEW_GLYPHS
-		: ROGUE_ALLEGRO_VIEW_TILES;
-	    return TRUE;
 	case ALLEGRO_KEY_F11:
 	    toggle_fullscreen();
 	    return TRUE;
@@ -302,6 +303,99 @@ handle_view_key(int keycode)
 	    return TRUE;
 	default:
 	    return FALSE;
+    }
+}
+
+static bool
+load_current_atlas(void)
+{
+    const char *atlas_path;
+    char parent_atlas_path[512];
+    ALLEGRO_BITMAP *loaded;
+
+    atlas_path = rogue_tilepack_atlas_path();
+    loaded = al_load_bitmap(atlas_path);
+    if (loaded == NULL)
+    {
+	snprintf(parent_atlas_path, sizeof(parent_atlas_path), "../%s",
+		 atlas_path);
+	loaded = al_load_bitmap(parent_atlas_path);
+    }
+    if (loaded == NULL)
+    {
+	snprintf(parent_atlas_path, sizeof(parent_atlas_path),
+		 "Could not load tile atlas: %s", atlas_path);
+	allegro_start_error(parent_atlas_path);
+	return FALSE;
+    }
+
+    if (atlas != NULL)
+	al_destroy_bitmap(atlas);
+    atlas = loaded;
+    return TRUE;
+}
+
+static void
+show_tilepack_menu(void)
+{
+    ROGUE_TILEPACK_CHOICE choices[ROGUE_TILEPACK_MAX_CHOICES];
+    char line[ROGUE_OVERLAY_LINE_LEN];
+    char choice_map[ROGUE_TILEPACK_MAX_CHOICES + 1];
+    int count;
+    int i;
+    char key;
+    char selected;
+    bool loaded_pack;
+
+    count = rogue_tilepack_list(choices, ROGUE_TILEPACK_MAX_CHOICES);
+
+    rogue_allegro_text_overlay_begin("Tile Set");
+    snprintf(line, sizeof(line), "a) Glyph Mode%s",
+	     settings.view_mode == ROGUE_ALLEGRO_VIEW_GLYPHS
+	     ? " [current]" : "");
+    rogue_allegro_text_overlay_add(line);
+    choice_map[0] = '\0';
+
+    if (count > 25)
+	count = 25;
+
+    for (i = 0; i < count && i + 1 < (int) sizeof(choice_map); i++)
+    {
+	key = (char) ('b' + i);
+	choice_map[i] = key;
+	snprintf(line, sizeof(line), "%c) %s%s", key, choices[i].label,
+		 choices[i].current
+		 && settings.view_mode == ROGUE_ALLEGRO_VIEW_TILES
+		 ? " [current]" : "");
+	rogue_allegro_text_overlay_add(line);
+    }
+    choice_map[i] = '\0';
+
+    selected = rogue_allegro_text_overlay_pick(
+	"Enter applies, Esc closes");
+    rogue_allegro_text_overlay_clear();
+
+    if (selected == 'a' || selected == 'A')
+    {
+	settings.view_mode = ROGUE_ALLEGRO_VIEW_GLYPHS;
+	return;
+    }
+
+    for (i = 0; i < count && choice_map[i] != '\0'; i++)
+    {
+	if (tolower((unsigned char) selected)
+	    != tolower((unsigned char) choice_map[i]))
+	    continue;
+
+	loaded_pack = rogue_tilepack_load_named(choices[i].id);
+	if (load_current_atlas())
+	{
+	    settings.view_mode = ROGUE_ALLEGRO_VIEW_TILES;
+	    if (!loaded_pack)
+		rogue_allegro_notice("Tile Set",
+				     "Could not load that tile set; using fallback.");
+	}
+	return;
     }
 }
 
@@ -627,7 +721,7 @@ draw_status(void)
     else
 	al_draw_text(font, al_map_rgb(160, 160, 160), w - 8,
 		     second_line_y, ALLEGRO_ALIGN_RIGHT,
-		     "F10 view  F11 full  +/- zoom");
+		     "F10 tiles  F11 full  +/- zoom");
 }
 
 static void
@@ -782,9 +876,6 @@ draw_death_overlay(void)
 bool
 rogue_allegro_start(bool smoke)
 {
-    const char *atlas_path;
-    char parent_atlas_path[512];
-
     smoke_mode = smoke;
 
     if (started)
@@ -833,21 +924,8 @@ rogue_allegro_start(bool smoke)
     al_register_event_source(queue, al_get_keyboard_event_source());
 
     rogue_tilepack_load();
-    atlas_path = rogue_tilepack_atlas_path();
-    atlas = al_load_bitmap(atlas_path);
-    if (atlas == NULL)
-    {
-	snprintf(parent_atlas_path, sizeof(parent_atlas_path), "../%s",
-		 atlas_path);
-	atlas = al_load_bitmap(parent_atlas_path);
-    }
-    if (atlas == NULL)
-    {
-	snprintf(parent_atlas_path, sizeof(parent_atlas_path),
-		 "Could not load tile atlas: %s", atlas_path);
-	allegro_start_error(parent_atlas_path);
+    if (!load_current_atlas())
 	return FALSE;
-    }
 
     font = load_ui_font();
     if (font == NULL)
@@ -979,6 +1057,13 @@ rogue_allegro_readchar(void)
 
 	if (event.type == ALLEGRO_EVENT_KEY_DOWN)
 	{
+	    if (event.keyboard.keycode == ALLEGRO_KEY_F10)
+	    {
+		show_tilepack_menu();
+		suppress_key_char_keycode = event.keyboard.keycode;
+		rogue_allegro_render();
+		continue;
+	    }
 	    if (handle_view_key(event.keyboard.keycode))
 	    {
 		suppress_key_char_keycode = event.keyboard.keycode;

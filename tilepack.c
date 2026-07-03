@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,6 +17,7 @@ static int atlas_columns = 30;
 static int source_width = 32;
 static int source_height = 32;
 static char status_text[256] = "built-in generated tile mapping";
+static char current_pack_id[64] = "generated";
 static bool loaded = FALSE;
 
 static char *
@@ -195,6 +197,100 @@ join_path(const char *dir, const char *name, char *out, size_t out_size)
     snprintf(out, out_size, "%s/%s", dir, name);
 }
 
+static bool
+valid_pack_id(const char *pack_id)
+{
+    const char *p;
+
+    if (pack_id == NULL || *pack_id == '\0')
+	return FALSE;
+
+    for (p = pack_id; *p != '\0'; p++)
+	if (!isalnum((unsigned char) *p) && *p != '_' && *p != '-')
+	    return FALSE;
+
+    return TRUE;
+}
+
+static void
+pack_tilepack_path(const char *pack_id, char *out, size_t out_size)
+{
+    snprintf(out, out_size, "tilepacks/%s/tilepack.json", pack_id);
+}
+
+static bool
+tilepack_json_summary(const char *tilepack_path, char *label,
+		      size_t label_size)
+{
+    char *json;
+    char image_name[256];
+    char mapping_name[256];
+    int width, height, columns;
+
+    json = read_text_file(tilepack_path);
+    if (json == NULL)
+	return FALSE;
+
+    if (!json_string_field(json, "image", image_name, sizeof(image_name))
+	|| !json_string_field(json, "mapping", mapping_name,
+			      sizeof(mapping_name))
+	|| !json_int_field(json, "tileWidth", &width)
+	|| !json_int_field(json, "tileHeight", &height)
+	|| !json_int_field(json, "columns", &columns)
+	|| width <= 0 || height <= 0 || columns <= 0)
+    {
+	free(json);
+	return FALSE;
+    }
+
+    if (!json_string_field(json, "name", label, label_size)
+	|| label[0] == '\0')
+    {
+	strncpy(label, tilepack_path, label_size - 1);
+	label[label_size - 1] = '\0';
+    }
+
+    free(json);
+    return TRUE;
+}
+
+static bool
+add_choice(ROGUE_TILEPACK_CHOICE *choices, int *count, int max_choices,
+	   const char *pack_id)
+{
+    ROGUE_TILEPACK_CHOICE *choice;
+    char tilepack_path[512];
+    char label[128];
+    int i;
+
+    if (choices == NULL || count == NULL || *count >= max_choices
+	|| !valid_pack_id(pack_id))
+	return FALSE;
+
+    for (i = 0; i < *count; i++)
+	if (strcmp(choices[i].id, pack_id) == 0)
+	    return FALSE;
+
+    pack_tilepack_path(pack_id, tilepack_path, sizeof(tilepack_path));
+    if (!tilepack_json_summary(tilepack_path, label, sizeof(label)))
+	return FALSE;
+
+    choice = &choices[*count];
+    strncpy(choice->id, pack_id, sizeof(choice->id) - 1);
+    choice->id[sizeof(choice->id) - 1] = '\0';
+    if (strcmp(pack_id, "active") == 0)
+	snprintf(choice->label, sizeof(choice->label), "Active - %s", label);
+    else if (strcmp(pack_id, "default") == 0)
+	snprintf(choice->label, sizeof(choice->label), "Default - %s", label);
+    else
+	snprintf(choice->label, sizeof(choice->label), "%s", label);
+    snprintf(choice->tilepack_path, sizeof(choice->tilepack_path), "%s",
+	     tilepack_path);
+    choice->current = (bool)(strcmp(current_pack_id, pack_id) == 0);
+    (*count)++;
+    return TRUE;
+}
+
 static void
 reset_to_generated(void)
 {
@@ -204,6 +300,8 @@ reset_to_generated(void)
     atlas_columns = rogue_tile_atlas_columns();
     source_width = rogue_tile_atlas_source_width();
     source_height = rogue_tile_atlas_source_height();
+    strncpy(current_pack_id, "generated", sizeof(current_pack_id) - 1);
+    current_pack_id[sizeof(current_pack_id) - 1] = '\0';
 }
 
 static bool
@@ -292,7 +390,7 @@ parse_mapping_roles(const char *json)
 }
 
 static bool
-load_tilepack_file(const char *tilepack_path)
+load_tilepack_file(const char *tilepack_path, const char *pack_id)
 {
     char *tilepack_json;
     char *mapping_json;
@@ -330,6 +428,11 @@ load_tilepack_file(const char *tilepack_path)
 
     entry_count = 0;
     parse_mapping_roles(mapping_json);
+    if (pack_id != NULL && *pack_id != '\0')
+    {
+	strncpy(current_pack_id, pack_id, sizeof(current_pack_id) - 1);
+	current_pack_id[sizeof(current_pack_id) - 1] = '\0';
+    }
     snprintf(status_text, sizeof(status_text), "loaded %s with %d role mappings",
 	     tilepack_path, entry_count);
     free(mapping_json);
@@ -346,14 +449,75 @@ rogue_tilepack_load(void)
     loaded = TRUE;
     reset_to_generated();
 
-    if (load_tilepack_file("tilepacks/active/tilepack.json"))
+    if (load_tilepack_file("tilepacks/active/tilepack.json", "active"))
 	return TRUE;
-    if (load_tilepack_file("tilepacks/default/tilepack.json"))
+    if (load_tilepack_file("tilepacks/default/tilepack.json", "default"))
 	return TRUE;
 
     snprintf(status_text, sizeof(status_text),
 	     "using generated fallback tile mapping");
     return FALSE;
+}
+
+bool
+rogue_tilepack_load_named(const char *pack_id)
+{
+    char tilepack_path[512];
+
+    if (!valid_pack_id(pack_id))
+	return FALSE;
+
+    loaded = TRUE;
+    reset_to_generated();
+    pack_tilepack_path(pack_id, tilepack_path, sizeof(tilepack_path));
+    if (load_tilepack_file(tilepack_path, pack_id))
+	return TRUE;
+
+    if (load_tilepack_file("tilepacks/default/tilepack.json", "default"))
+    {
+	snprintf(status_text, sizeof(status_text),
+		 "failed %s, loaded default tilepack", tilepack_path);
+	return FALSE;
+    }
+
+    snprintf(status_text, sizeof(status_text),
+	     "failed %s, using generated fallback tile mapping", tilepack_path);
+    return FALSE;
+}
+
+int
+rogue_tilepack_list(ROGUE_TILEPACK_CHOICE *choices, int max_choices)
+{
+    DIR *dir;
+    struct dirent *entry;
+    int count;
+
+    if (choices == NULL || max_choices <= 0)
+	return 0;
+
+    rogue_tilepack_load();
+    count = 0;
+    add_choice(choices, &count, max_choices, "active");
+    add_choice(choices, &count, max_choices, "default");
+
+    dir = opendir("tilepacks");
+    if (dir == NULL)
+	return count;
+
+    while ((entry = readdir(dir)) != NULL)
+    {
+	if (strcmp(entry->d_name, ".") == 0
+	    || strcmp(entry->d_name, "..") == 0
+	    || strcmp(entry->d_name, "active") == 0
+	    || strcmp(entry->d_name, "default") == 0)
+	    continue;
+	add_choice(choices, &count, max_choices, entry->d_name);
+	if (count >= max_choices)
+	    break;
+    }
+
+    closedir(dir);
+    return count;
 }
 
 const char *
@@ -421,4 +585,11 @@ rogue_tilepack_status(void)
 {
     rogue_tilepack_load();
     return status_text;
+}
+
+const char *
+rogue_tilepack_current_id(void)
+{
+    rogue_tilepack_load();
+    return current_pack_id;
 }
