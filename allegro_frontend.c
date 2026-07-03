@@ -32,6 +32,9 @@
 #define ROGUE_FONT_SIZE 32
 #define ROGUE_OVERLAY_MAX_LINES 160
 #define ROGUE_OVERLAY_LINE_LEN 160
+#define ROGUE_MESSAGE_LOG_LINES 64
+#define ROGUE_SIDE_PANEL_MIN_WIDTH 280
+#define ROGUE_SIDE_PANEL_MAX_WIDTH 420
 
 typedef enum rogue_allegro_view {
     ROGUE_ALLEGRO_VIEW_TILES,
@@ -42,6 +45,8 @@ typedef struct rogue_allegro_settings {
     int tile_draw_size;
     ROGUE_ALLEGRO_VIEW view_mode;
     bool shader_enabled;
+    bool blood_spatter_enabled;
+    bool side_panel_log_enabled;
     bool fullscreen;
     int windowed_width;
     int windowed_height;
@@ -50,6 +55,8 @@ typedef struct rogue_allegro_settings {
 static ROGUE_ALLEGRO_SETTINGS settings = {
     ROGUE_DEFAULT_TILE_DRAW_SIZE,
     ROGUE_ALLEGRO_VIEW_TILES,
+    FALSE,
+    FALSE,
     FALSE,
     FALSE,
     ROGUE_DEFAULT_VIEW_COLS * ROGUE_DEFAULT_TILE_DRAW_SIZE,
@@ -70,6 +77,8 @@ static char held_movement = '\0';
 static double held_movement_next_time = 0.0;
 static int render_origin_x = 0;
 static int render_origin_y = 0;
+static char message_log[ROGUE_MESSAGE_LOG_LINES][ROGUE_OVERLAY_LINE_LEN];
+static int message_log_count = 0;
 static bool prompt_active = FALSE;
 static char prompt_text[128];
 static bool death_overlay_active = FALSE;
@@ -85,12 +94,14 @@ static int text_overlay_line_count = 0;
 static int text_overlay_selected = -1;
 static int text_overlay_scroll = 0;
 static bool text_overlay_selectable = FALSE;
+static char settings_path[512] = "settings.json";
 
 void rogue_allegro_text_overlay_begin(const char *title);
 void rogue_allegro_text_overlay_add(const char *line);
 char rogue_allegro_text_overlay_pick(const char *prompt);
 void rogue_allegro_text_overlay_clear(void);
 bool rogue_allegro_notice(const char *title, const char *message);
+void rogue_allegro_render(void);
 
 static void
 allegro_start_error(const char *message)
@@ -165,6 +176,96 @@ load_ui_font(void)
     return loaded;
 }
 
+static bool
+json_bool_field(const char *json, const char *key, bool fallback)
+{
+    char pattern[64];
+    const char *p;
+
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    p = strstr(json, pattern);
+    if (p == NULL)
+	return fallback;
+    p = strchr(p + strlen(pattern), ':');
+    if (p == NULL)
+	return fallback;
+    p++;
+    while (*p != '\0' && isspace((unsigned char) *p))
+	p++;
+    if (strncmp(p, "true", 4) == 0)
+	return TRUE;
+    if (strncmp(p, "false", 5) == 0)
+	return FALSE;
+    return fallback;
+}
+
+static void
+init_settings_path(void)
+{
+#ifdef _WIN32
+    char exe_path[512];
+    char *slash;
+
+    if (GetModuleFileNameA(NULL, exe_path, sizeof(exe_path)) > 0)
+    {
+	exe_path[sizeof(exe_path) - 1] = '\0';
+	slash = strrchr(exe_path, '\\');
+	if (slash == NULL)
+	    slash = strrchr(exe_path, '/');
+	if (slash != NULL)
+	{
+	    *slash = '\0';
+	    snprintf(settings_path, sizeof(settings_path), "%s\\settings.json",
+		     exe_path);
+	}
+    }
+#endif
+}
+
+static void
+load_settings(void)
+{
+    FILE *file;
+    char text[2048];
+    size_t read_count;
+
+    file = fopen(settings_path, "rb");
+    if (file == NULL)
+	return;
+
+    read_count = fread(text, 1, sizeof(text) - 1, file);
+    fclose(file);
+    text[read_count] = '\0';
+
+    settings.side_panel_log_enabled = json_bool_field(
+	text, "sidePanelLog", settings.side_panel_log_enabled);
+    settings.blood_spatter_enabled = json_bool_field(
+	text, "bloodSpatter", settings.blood_spatter_enabled);
+    settings.shader_enabled = json_bool_field(
+	text, "shaders", settings.shader_enabled);
+}
+
+static void
+save_settings(void)
+{
+    FILE *file;
+
+    file = fopen(settings_path, "wb");
+    if (file == NULL)
+	return;
+
+    fprintf(file,
+	    "{\n"
+	    "  \"sidePanelLog\": %s,\n"
+	    "  \"bloodSpatter\": %s,\n"
+	    "  \"shaders\": %s\n"
+	    "}\n",
+	    settings.side_panel_log_enabled ? "true" : "false",
+	    settings.blood_spatter_enabled ? "true" : "false",
+	    settings.shader_enabled ? "true" : "false");
+    fclose(file);
+}
+
 static int
 clamp_int(int value, int min_value, int max_value)
 {
@@ -192,11 +293,42 @@ display_height(void)
 }
 
 static int
+side_panel_width(void)
+{
+    int width;
+    int max_width;
+
+    if (!settings.side_panel_log_enabled)
+	return 0;
+
+    max_width = display_width() - ROGUE_TILE_DRAW_SIZE;
+    if (max_width <= 0)
+	return 0;
+    width = display_width() / 4;
+    width = clamp_int(width, ROGUE_SIDE_PANEL_MIN_WIDTH,
+		      ROGUE_SIDE_PANEL_MAX_WIDTH);
+    if (width > max_width)
+	width = max_width;
+    return width;
+}
+
+static int
+play_area_width(void)
+{
+    int width;
+
+    width = display_width() - side_panel_width();
+    if (width < ROGUE_TILE_DRAW_SIZE)
+	width = ROGUE_TILE_DRAW_SIZE;
+    return width;
+}
+
+static int
 view_cols(void)
 {
     int cols;
 
-    cols = display_width() / ROGUE_TILE_DRAW_SIZE;
+    cols = play_area_width() / ROGUE_TILE_DRAW_SIZE;
     return clamp_int(cols, 1, ROGUE_MAX_VIEW_COLS);
 }
 
@@ -396,6 +528,60 @@ show_tilepack_menu(void)
 				     "Could not load that tile set; using fallback.");
 	}
 	return;
+    }
+}
+
+static void
+show_settings_menu(void)
+{
+    char line[ROGUE_OVERLAY_LINE_LEN];
+    char selected;
+    bool done;
+
+    done = FALSE;
+    while (!done)
+    {
+	rogue_allegro_text_overlay_begin("Settings");
+	snprintf(line, sizeof(line), "a) Side Panel Log: %s",
+		 settings.side_panel_log_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "b) Blood Spatter: %s",
+		 settings.blood_spatter_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "c) Shaders: %s",
+		 settings.shader_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
+	rogue_allegro_text_overlay_add("");
+	rogue_allegro_text_overlay_add("Visual-only settings. Gameplay rules stay unchanged.");
+
+	selected = rogue_allegro_text_overlay_pick(
+	    "Enter toggles, Esc closes");
+	rogue_allegro_text_overlay_clear();
+
+	switch (selected)
+	{
+	    case 'a':
+	    case 'A':
+		settings.side_panel_log_enabled =
+		    !settings.side_panel_log_enabled;
+		save_settings();
+		break;
+	    case 'b':
+	    case 'B':
+		settings.blood_spatter_enabled =
+		    !settings.blood_spatter_enabled;
+		save_settings();
+		break;
+	    case 'c':
+	    case 'C':
+		settings.shader_enabled = !settings.shader_enabled;
+		save_settings();
+		break;
+	    default:
+		done = TRUE;
+		break;
+	}
+	rogue_allegro_render();
     }
 }
 
@@ -693,7 +879,7 @@ draw_status(void)
     int second_line_y;
     static char *state_name[] = { "", "Hungry", "Weak", "Faint" };
 
-    w = display_width();
+    w = play_area_width();
     h = display_height();
     y = h - ROGUE_STATUS_HEIGHT;
     if (y < 0)
@@ -721,7 +907,70 @@ draw_status(void)
     else
 	al_draw_text(font, al_map_rgb(160, 160, 160), w - 8,
 		     second_line_y, ALLEGRO_ALIGN_RIGHT,
-		     "F10 tiles  F11 full  +/- zoom");
+		     "F10 tiles  F11 full  F12 settings");
+}
+
+static void
+draw_side_panel(void)
+{
+    int panel_w;
+    int x;
+    int y;
+    int i;
+    int first;
+    int line_height;
+    int max_lines;
+    int char_width;
+    int max_chars;
+    char visible[ROGUE_OVERLAY_LINE_LEN];
+    ALLEGRO_COLOR bg, border, title, text, muted;
+
+    panel_w = side_panel_width();
+    if (panel_w <= 0)
+	return;
+
+    x = display_width() - panel_w;
+    bg = al_map_rgb(8, 9, 13);
+    border = al_map_rgb(60, 64, 82);
+    title = al_map_rgb(245, 226, 170);
+    text = al_map_rgb(210, 220, 230);
+    muted = al_map_rgb(130, 135, 150);
+    line_height = al_get_font_line_height(font);
+    char_width = al_get_text_width(font, "M");
+    if (char_width <= 0)
+	char_width = 12;
+    max_chars = (panel_w - 36) / char_width;
+    if (max_chars < 8)
+	max_chars = 8;
+    max_lines = (display_height() - 96) / (line_height + 2);
+    if (max_lines < 1)
+	max_lines = 1;
+
+    al_draw_filled_rectangle(x, 0, display_width(), display_height(), bg);
+    al_draw_line(x, 0, x, display_height(), border, 1);
+    al_draw_text(font, title, x + 18, 18, 0, "Log");
+    al_draw_line(x + 16, 56, display_width() - 16, 56, border, 1);
+
+    first = message_log_count - max_lines;
+    if (first < 0)
+	first = 0;
+    y = 72;
+    for (i = first; i < message_log_count; i++)
+    {
+	snprintf(visible, sizeof(visible), "%s", message_log[i]);
+	if ((int) strlen(visible) > max_chars)
+	{
+	    visible[max_chars - 1] = '.';
+	    visible[max_chars - 2] = '.';
+	    visible[max_chars - 3] = '.';
+	    visible[max_chars] = '\0';
+	}
+	al_draw_text(font, text, x + 18, y, 0, visible);
+	y += line_height + 2;
+    }
+
+    if (message_log_count == 0)
+	al_draw_text(font, muted, x + 18, y, 0, "No messages yet");
 }
 
 static void
@@ -881,6 +1130,9 @@ rogue_allegro_start(bool smoke)
     if (started)
 	return TRUE;
 
+    init_settings_path();
+    load_settings();
+
     if (!al_init())
     {
 	allegro_start_error("Allegro initialization failed.");
@@ -958,7 +1210,7 @@ rogue_allegro_render(void)
     cols = view_cols();
     left = camera_left(cols);
     top = camera_top(rows);
-    render_origin_x = (display_width() - cols * ROGUE_TILE_DRAW_SIZE) / 2;
+    render_origin_x = (play_area_width() - cols * ROGUE_TILE_DRAW_SIZE) / 2;
     if (render_origin_x < 0)
 	render_origin_x = 0;
     render_origin_y = ((display_height() - ROGUE_STATUS_HEIGHT)
@@ -994,6 +1246,7 @@ rogue_allegro_render(void)
     al_hold_bitmap_drawing(FALSE);
 
     draw_status();
+    draw_side_panel();
     draw_text_overlay();
     draw_death_overlay();
     al_flip_display();
@@ -1057,6 +1310,13 @@ rogue_allegro_readchar(void)
 
 	if (event.type == ALLEGRO_EVENT_KEY_DOWN)
 	{
+	    if (event.keyboard.keycode == ALLEGRO_KEY_F12)
+	    {
+		show_settings_menu();
+		suppress_key_char_keycode = event.keyboard.keycode;
+		rogue_allegro_render();
+		continue;
+	    }
 	    if (event.keyboard.keycode == ALLEGRO_KEY_F10)
 	    {
 		show_tilepack_menu();
@@ -1138,6 +1398,27 @@ rogue_allegro_clear_prompt(void)
     prompt_active = FALSE;
     prompt_text[0] = '\0';
     rogue_allegro_render();
+}
+
+void
+rogue_allegro_record_message(const char *message)
+{
+    int i;
+
+    if (message == NULL || *message == '\0')
+	return;
+
+    if (message_log_count >= ROGUE_MESSAGE_LOG_LINES)
+    {
+	for (i = 1; i < ROGUE_MESSAGE_LOG_LINES; i++)
+	    snprintf(message_log[i - 1], sizeof(message_log[i - 1]), "%s",
+		     message_log[i]);
+	message_log_count = ROGUE_MESSAGE_LOG_LINES - 1;
+    }
+
+    snprintf(message_log[message_log_count],
+	     sizeof(message_log[message_log_count]), "%s", message);
+    message_log_count++;
 }
 
 void
@@ -1621,4 +1902,5 @@ rogue_allegro_shutdown(void)
     death_overlay_active = FALSE;
     text_overlay_active = FALSE;
     text_overlay_line_count = 0;
+    message_log_count = 0;
 }

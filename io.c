@@ -106,6 +106,7 @@ endmsg()
      */
     if (islower(msgbuf[0]) && !lower_msg && msgbuf[1] != ')')
 	msgbuf[0] = (char) toupper(msgbuf[0]);
+    rogue_frontend_record_message(msgbuf);
     mvaddstr(0, 0, msgbuf);
     clrtoeol();
     mpos = newpos;

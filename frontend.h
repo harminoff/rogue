@@ -18,6 +18,7 @@ void rogue_frontend_render(void);
 char rogue_frontend_readchar(void);
 void rogue_frontend_show_prompt(const char *prompt);
 void rogue_frontend_clear_prompt(void);
+void rogue_frontend_record_message(const char *message);
 void rogue_frontend_show_death(const char *killer, int gold, bool has_amulet);
 void rogue_frontend_wait_for_return(const char *prompt);
 void rogue_frontend_text_overlay_begin(const char *title);
