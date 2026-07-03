@@ -29,6 +29,11 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("Damage dealt: %d", allegro_c)
         self.assertIn("Damage taken: %d", allegro_c)
         self.assertIn("Enemy HP: %d/%d", allegro_c)
+        self.assertIn("draw_combat_log_entry", allegro_c)
+        self.assertLess(
+            allegro_c.index("Damage dealt: %d"),
+            allegro_c.index("Damage taken: %d"),
+        )
         record_message = allegro_c[
             allegro_c.index("rogue_allegro_record_message"):
             allegro_c.index("rogue_allegro_record_damage")

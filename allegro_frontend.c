@@ -1237,7 +1237,7 @@ draw_wrapped_log_message(const char *message, int x, int *y,
 }
 
 static void
-draw_log_damage_lines(int index, int x, int *y, int line_height)
+draw_damage_dealt_line(int index, int x, int *y, int line_height)
 {
     char line[64];
 
@@ -1248,6 +1248,13 @@ draw_log_damage_lines(int index, int x, int *y, int line_height)
 	al_draw_text(font, al_map_rgb(238, 122, 102), x, *y, 0, line);
 	*y += line_height + 1;
     }
+}
+
+static void
+draw_damage_taken_line(int index, int x, int *y, int line_height)
+{
+    char line[64];
+
     if (message_damage_taken[index] > 0)
     {
 	snprintf(line, sizeof(line), "Damage taken: %d",
@@ -1255,6 +1262,13 @@ draw_log_damage_lines(int index, int x, int *y, int line_height)
 	al_draw_text(font, al_map_rgb(238, 82, 82), x, *y, 0, line);
 	*y += line_height + 1;
     }
+}
+
+static void
+draw_enemy_hp_line(int index, int x, int *y, int line_height)
+{
+    char line[64];
+
     if (message_enemy_max_hp[index] > 0)
     {
 	snprintf(line, sizeof(line), "Enemy HP: %d/%d",
@@ -1262,6 +1276,75 @@ draw_log_damage_lines(int index, int x, int *y, int line_height)
 	al_draw_text(font, al_map_rgb(214, 190, 124), x, *y, 0, line);
 	*y += line_height + 1;
     }
+}
+
+static void
+draw_log_damage_lines(int index, int x, int *y, int line_height)
+{
+    draw_damage_dealt_line(index, x, y, line_height);
+    draw_enemy_hp_line(index, x, y, line_height);
+    draw_damage_taken_line(index, x, y, line_height);
+}
+
+static void
+draw_wrapped_log_segment(const char *message, int start, int len,
+			 int x, int *y, int max_chars, int line_height,
+			 ALLEGRO_COLOR text)
+{
+    char segment[ROGUE_OVERLAY_LINE_LEN];
+
+    if (len <= 0)
+	return;
+    if (len >= (int) sizeof(segment))
+	len = (int) sizeof(segment) - 1;
+    memcpy(segment, message + start, (size_t) len);
+    segment[len] = '\0';
+    draw_wrapped_log_message(segment, x, y, max_chars, line_height, text);
+}
+
+static void
+draw_combat_log_entry(int index, int x, int *y, int max_chars,
+		      int line_height)
+{
+    const char *message;
+    const char *split;
+    int first_len;
+    int second_start;
+    int message_len;
+    ALLEGRO_COLOR color;
+
+    message = message_log[index];
+    color = log_message_color(message);
+    if (message_damage_dealt[index] <= 0 || message_damage_taken[index] <= 0)
+    {
+	draw_wrapped_log_message(message, x, y, max_chars, line_height, color);
+	draw_log_damage_lines(index, x, y, line_height);
+	return;
+    }
+
+    split = strchr(message, '.');
+    if (split == NULL || split[1] == '\0')
+    {
+	draw_wrapped_log_message(message, x, y, max_chars, line_height, color);
+	draw_log_damage_lines(index, x, y, line_height);
+	return;
+    }
+
+    first_len = (int) (split - message) + 1;
+    draw_wrapped_log_segment(message, 0, first_len, x, y, max_chars,
+			     line_height, color);
+    draw_damage_dealt_line(index, x, y, line_height);
+    draw_enemy_hp_line(index, x, y, line_height);
+
+    second_start = first_len;
+    message_len = (int) strlen(message);
+    while (second_start < message_len
+	   && isspace((unsigned char) message[second_start]))
+	second_start++;
+    draw_wrapped_log_segment(message, second_start,
+			     message_len - second_start, x, y, max_chars,
+			     line_height, color);
+    draw_damage_taken_line(index, x, y, line_height);
 }
 
 static void
@@ -1335,9 +1418,7 @@ draw_side_panel(void)
 			 divider, 1);
 	    y += 9;
 	}
-	draw_wrapped_log_message(message_log[i], x + 18, &y, max_chars,
-				 line_height, log_message_color(message_log[i]));
-	draw_log_damage_lines(i, x + 18, &y, line_height);
+	draw_combat_log_entry(i, x + 18, &y, max_chars, line_height);
 	y += 4;
 	if (y > max_text_y)
 	    break;
