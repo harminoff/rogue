@@ -36,6 +36,7 @@ typedef struct rogue_tile_cell {
 } ROGUE_TILE_CELL;
 
 void rogue_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
+void rogue52_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
 const char *rogue_tile_layer_name(ROGUE_TILE_LAYER layer);
 
 #endif

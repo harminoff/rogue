@@ -25,11 +25,26 @@ class TilePickerGenerationTests(unittest.TestCase):
                 "terrain.floor": {"index": 3, "name": "custom_floor"},
                 "actor.player": {"index": 4, "name": "custom_player"},
                 "monster.H": {"index": 5, "name": "custom_hobgoblin"},
+                "monster.rogue52.M": {"index": 6, "name": "custom_mimic"},
             },
         }
 
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
+            assets = root / "assets" / "rltiles"
+            assets.mkdir(parents=True)
+            (assets / "rogue-rltiles-map.json").write_text(
+                json.dumps(
+                    {
+                        "variantMonsters": {
+                            "rogue52": {
+                                "M": {"name": "mimic", "atlas": "small_mimic"}
+                            }
+                        }
+                    }
+                ),
+                encoding="utf-8",
+            )
             (root / "tile_picker" / "data").mkdir(parents=True)
             profile_path = root / "tile_picker" / "data" / "profile.json"
             profile_path.write_text(json.dumps(profile), encoding="utf-8")
@@ -45,7 +60,11 @@ class TilePickerGenerationTests(unittest.TestCase):
             self.assertIn("return 24;", source)
             self.assertIn("{ FLOOR, ROGUE_TILE_TERRAIN", source)
             self.assertIn('"custom_floor"', source)
-            self.assertIn("{ 'H', \"custom_hobgoblin\", 5, \"hobgoblin\" }", source)
+            self.assertIn("{ 'H', \"monster.H\", \"custom_hobgoblin\", 5, \"hobgoblin\" }", source)
+            self.assertIn(
+                '{ "rogue52", \'M\', "monster.rogue52.M", "custom_mimic", 6, "mimic" }',
+                source,
+            )
 
     def test_picker_data_contains_rogue_roles_and_rltiles_catalog(self):
         atlas = {

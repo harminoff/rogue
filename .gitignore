@@ -3,6 +3,7 @@ native-build/
 native-build-tests/
 build/
 dist/
+variants/*/build/
 __pycache__/
 *.pyc
 rogue54.scr

@@ -14,6 +14,7 @@ typedef enum rogue_frontend_kind {
 
 bool rogue_frontend_init(int *argc, char **argv);
 bool rogue_frontend_start(void);
+bool rogue_frontend_choose_variant(void);
 void rogue_frontend_render(void);
 char rogue_frontend_readchar(void);
 void rogue_frontend_show_prompt(const char *prompt);
@@ -32,6 +33,7 @@ bool rogue_frontend_text_input(const char *title, const char *prompt,
 			       const char *initial, char *out, int out_size);
 bool rogue_frontend_confirm(const char *title, const char *prompt);
 bool rogue_frontend_notice(const char *title, const char *message);
+void rogue_frontend_request_launcher_restart(void);
 void rogue_frontend_shutdown(void);
 bool rogue_frontend_is_tiles(void);
 bool rogue_frontend_smoke_requested(void);

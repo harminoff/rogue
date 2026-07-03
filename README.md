@@ -10,8 +10,20 @@ Original Rogue was created by Michael Toy, Ken Arnold, and Glenn Wichman. This f
 2. Download `RogueTiles-windows-x64.zip`.
 3. Extract the zip.
 4. Run `RogueTiles.exe`.
+5. Pick a Rogue version from the startup menu.
 
-The release zip includes the game executable, required DLLs, RL Tiles assets, runtime tile packs, and `TilePicker.exe`.
+The release zip includes the game executable, required DLLs, RL Tiles assets, runtime tile packs, variant license/provenance files, and `TilePicker.exe`.
+
+## Rogue Versions
+
+`RogueTiles.exe` includes a startup version picker.
+
+- **Rogue 5.4.4**: the default RogueTiles ruleset with full tile rendering, in-window ASCII mode, custom tile packs, settings, shaders, and visual effects.
+- **Rogue 5.2.1**: bundled from the BSD-style restoration source archive. This first adapter runs from the same executable and uses the shared tile frontend for the dungeon, status bar, camera, and input path.
+
+The picker shows each version's era, lineage, license/distribution status, tile support, and feature notes before you start.
+
+Developer note: new engine variants should follow the checklist in `docs/variant-porting-checklist.md`, including variant-specific monster tile mappings and GUI menu coverage.
 
 ## Controls
 
@@ -34,6 +46,7 @@ Core Rogue controls still work:
 
 Tile frontend controls:
 
+- `F1`: read bundled manuals and guides
 - `F10`: choose tile set or switch to in-window ASCII glyph mode
 - `F11`: toggle fullscreen
 - `+` / `-`: zoom map in or out
@@ -73,6 +86,7 @@ The picker lets you:
 - Append more than one tile set.
 - Hide blank tiles while browsing.
 - Assign tiles to Rogue terrain, items, player, and monsters.
+- Assign variant-specific monster tiles when a Rogue version uses a different A-Z monster table.
 - Save tile packs that `RogueTiles.exe` can use at runtime.
 
 After saving a tile pack, run the game and press `F10` to select it.
@@ -90,6 +104,7 @@ RogueTiles/
   assets/
   tilepacks/
   tile_picker/
+  variants/
   *.dll
 ```
 
@@ -166,6 +181,10 @@ powershell -ExecutionPolicy Bypass -File scripts\build-windows-native.ps1 -Tiles
 ## License And Attribution
 
 Rogue is licensed under a BSD-style license. See `LICENSE.TXT`.
+
+Bundled in-game manuals and guides, including `A Guide to the Dungeons of
+Doom`, are taken from the Rogue source distribution and covered by the same
+BSD-style redistribution terms.
 
 Original Rogue copyright:
 

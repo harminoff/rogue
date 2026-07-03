@@ -11,14 +11,17 @@
 #endif
 #include "rogue.h"
 #include "frontend.h"
+#include "variant.h"
 
 static ROGUE_FRONTEND_KIND frontend_kind = ROGUE_FRONTEND_CURSES;
 static bool tiles_requested = FALSE;
 static bool smoke_requested = FALSE;
 static bool shader_smoke_requested = FALSE;
+static bool launcher_restart_requested = FALSE;
 
 #ifdef ROGUE_ENABLE_ALLEGRO
 bool rogue_allegro_start(bool smoke);
+const char *rogue_allegro_choose_variant(void);
 void rogue_allegro_enable_shader_smoke(void);
 void rogue_allegro_render(void);
 char rogue_allegro_readchar(void);
@@ -79,6 +82,35 @@ path_basename(const char *path)
 	    base = p + 1;
 
     return base;
+}
+
+static void
+launch_tiles_launcher(void)
+{
+#ifdef _WIN32
+    char exe_path[MAX_PATH];
+    char command_line[MAX_PATH + 32];
+    STARTUPINFOA startup;
+    PROCESS_INFORMATION process;
+
+    if (GetModuleFileNameA(NULL, exe_path, sizeof(exe_path)) == 0)
+	return;
+    exe_path[sizeof(exe_path) - 1] = '\0';
+    snprintf(command_line, sizeof(command_line), "\"%s\"%s", exe_path,
+	     rogue_frontend_default_tiles_for_executable(exe_path)
+	     ? "" : " --tiles");
+    command_line[sizeof(command_line) - 1] = '\0';
+
+    memset(&startup, 0, sizeof(startup));
+    memset(&process, 0, sizeof(process));
+    startup.cb = sizeof(startup);
+    if (CreateProcessA(NULL, command_line, NULL, NULL, FALSE, 0,
+		       NULL, NULL, &startup, &process))
+    {
+	CloseHandle(process.hThread);
+	CloseHandle(process.hProcess);
+    }
+#endif
 }
 
 bool
@@ -151,6 +183,26 @@ rogue_frontend_start(void)
 	if (shader_smoke_requested)
 	    rogue_allegro_enable_shader_smoke();
 	return rogue_allegro_start(smoke_requested);
+    }
+#endif
+
+    return TRUE;
+}
+
+bool
+rogue_frontend_choose_variant(void)
+{
+#ifdef ROGUE_ENABLE_ALLEGRO
+    const char *id;
+
+    if (frontend_kind == ROGUE_FRONTEND_ALLEGRO)
+    {
+	if (smoke_requested)
+	    return TRUE;
+	id = rogue_allegro_choose_variant();
+	if (id == NULL)
+	    return FALSE;
+	return rogue_variant_select(id);
     }
 #endif
 
@@ -352,11 +404,25 @@ rogue_frontend_notice(const char *title, const char *message)
 }
 
 void
+rogue_frontend_request_launcher_restart(void)
+{
+    if (frontend_kind == ROGUE_FRONTEND_ALLEGRO)
+	launcher_restart_requested = TRUE;
+}
+
+void
 rogue_frontend_shutdown(void)
 {
 #ifdef ROGUE_ENABLE_ALLEGRO
     if (frontend_kind == ROGUE_FRONTEND_ALLEGRO)
+    {
 	rogue_allegro_shutdown();
+	if (launcher_restart_requested)
+	{
+	    launcher_restart_requested = FALSE;
+	    launch_tiles_launcher();
+	}
+    }
 #endif
 }
 

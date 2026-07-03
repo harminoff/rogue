@@ -328,7 +328,11 @@ death(char monst)
     }
     score(purse, amulet ? 3 : 0, monst);
     if (rogue_frontend_is_tiles())
-	rogue_frontend_wait_for_return("Press Enter to exit");
+    {
+	rogue_frontend_wait_for_return(
+	    "Press Enter to return to game select");
+	rogue_frontend_request_launcher_restart();
+    }
     else
     {
 	printf("[Press return to continue]");

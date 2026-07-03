@@ -1,0 +1,219 @@
+import pathlib
+import unittest
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+
+
+class VariantMetadataTest(unittest.TestCase):
+    def test_rogue54_and_rogue52_are_registered(self):
+        text = (ROOT / "variant.c").read_text(encoding="utf-8")
+
+        self.assertIn('"rogue54"', text)
+        self.assertIn('"Rogue 5.4.4"', text)
+        self.assertIn('"rogue52"', text)
+        self.assertIn('"Rogue 5.2.1"', text)
+        self.assertIn('"BSD-style"', text)
+        self.assertIn('"Bundled"', text)
+
+    def test_rogue54_is_default_variant(self):
+        text = (ROOT / "variant.c").read_text(encoding="utf-8")
+
+        self.assertIn("static const ROGUE_VARIANT_INFO *current_variant = &variants[0];", text)
+        self.assertLess(text.index('"rogue54"'), text.index('"rogue52"'))
+
+    def test_rogue52_license_is_preserved(self):
+        license_text = (ROOT / "variants" / "rogue52" / "LICENSE.TXT").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Redistribution and use in source and binary forms", license_text)
+        self.assertIn("Michael Toy, Ken Arnold and Glenn Wichman", license_text)
+        self.assertIn("Nicholas J. Kisseberth", license_text)
+        self.assertIn("David Burren", license_text)
+
+    def test_variants_include_manual_and_guide_references(self):
+        header_text = (ROOT / "variant.h").read_text(encoding="utf-8")
+        variant_text = (ROOT / "variant.c").read_text(encoding="utf-8")
+        frontend_text = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("ROGUE_VARIANT_MANUAL_REF", header_text)
+        self.assertIn("readable_path", header_text)
+        self.assertIn("manuals[ROGUE_VARIANT_MAX_MANUALS]", header_text)
+        self.assertIn("A Guide to the Dungeons of Doom", variant_text)
+        self.assertIn("Bundled guide", variant_text)
+        self.assertIn("BSD-style source distribution", variant_text)
+        self.assertNotIn("Epyx IBM PC manual", variant_text)
+        self.assertNotIn("britzl.github.io/roguearchive", variant_text)
+        self.assertIn("rogue54.6", variant_text)
+        self.assertIn("rogue54.doc", variant_text)
+        self.assertIn("variants/rogue52/rogue.6", variant_text)
+        package_text = (ROOT / "scripts" / "package-windows.ps1").read_text(encoding="utf-8")
+        self.assertIn("rogue54.6", package_text)
+        self.assertIn("rogue54.doc", package_text)
+        self.assertIn("$nativeDir $manual", package_text)
+        self.assertIn("show_manuals_menu", frontend_text)
+        self.assertIn("show_manual_reader", frontend_text)
+        self.assertIn("load_manual_text_overlay", frontend_text)
+        self.assertIn("manual_line_is_artifact", frontend_text)
+        self.assertIn("flush_manual_paragraph", frontend_text)
+        self.assertIn("rogue_allegro_text_overlay_pick", frontend_text)
+        self.assertIn("ALLEGRO_KEY_F1", frontend_text)
+        self.assertIn("current->manuals", frontend_text)
+        self.assertIn("show_manuals_menu_for_variant(selected_variant)", frontend_text)
+
+    def test_rogue52_help_uses_gui_overlay_in_tile_mode(self):
+        command_text = (ROOT / "variants" / "rogue52" / "command.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("format_help_line", command_text)
+        self.assertIn("rogue_frontend_is_tiles()", command_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Command Help")', command_text)
+        self.assertIn("rogue_frontend_text_overlay_add(line)", command_text)
+        self.assertIn("rogue_frontend_text_overlay_show", command_text)
+
+    def test_rogue52_identify_uses_gui_picker_in_tile_mode(self):
+        command_text = (ROOT / "variants" / "rogue52" / "command.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("ident_list[]", command_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Identify")', command_text)
+        self.assertIn("rogue_frontend_text_overlay_pick", command_text)
+        self.assertIn("for (ch = 'A'; ch <= 'Z'; ch++)", command_text)
+        self.assertIn("monsters[ch - 'A'].m_name", command_text)
+
+    def test_rogue52_pack_item_selection_uses_gui_picker_in_tile_mode(self):
+        pack_text = (ROOT / "variants" / "rogue52" / "pack.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("tile_pick_pack_letter", pack_text)
+        self.assertIn("pack_type_matches", pack_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Inventory")', pack_text)
+        self.assertIn("rogue_frontend_text_overlay_pick(prompt)", pack_text)
+        self.assertIn("if (rogue_frontend_is_tiles())", pack_text)
+        self.assertIn("ch = tile_pick_pack_letter(purpose, type)", pack_text)
+        self.assertIn("for (obj = pack, och = 'a';", pack_text)
+
+    def test_rogue52_inventory_lists_use_gui_overlay_in_tile_mode(self):
+        things_text = (ROOT / "variants" / "rogue52" / "things.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("#include \"../../frontend.h\"", things_text)
+        self.assertIn("rogue_frontend_text_overlay_begin", things_text)
+        self.assertIn("rogue_frontend_text_overlay_add(tile_line)", things_text)
+        self.assertIn("rogue_frontend_text_overlay_show", things_text)
+        self.assertIn("rogue_frontend_text_overlay_clear", things_text)
+
+    def test_rogue52_discovered_items_uses_gui_type_picker_in_tile_mode(self):
+        things_text = (ROOT / "variants" / "rogue52" / "things.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("tile_pick_discovery_type", things_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Discoveries")', things_text)
+        self.assertIn("!) Potions", things_text)
+        self.assertIn("?) Scrolls", things_text)
+        self.assertIn("=) Rings", things_text)
+        self.assertIn("/) Sticks", things_text)
+        self.assertIn("*) All discovered items", things_text)
+        self.assertIn("ch = tile_pick_discovery_type()", things_text)
+
+    def test_rogue52_options_use_gui_menu_in_tile_mode(self):
+        options_text = (ROOT / "variants" / "rogue52" / "options.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("#include \"../../frontend.h\"", options_text)
+        self.assertIn("tile_option()", options_text)
+        self.assertIn("tile_option_line", options_text)
+        self.assertIn("tile_change_option", options_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Options")', options_text)
+        self.assertIn("rogue_frontend_text_overlay_pick", options_text)
+        self.assertIn("rogue_frontend_text_input", options_text)
+        self.assertIn("if (rogue_frontend_is_tiles())", options_text)
+
+    def test_rogue52_genocide_uses_gui_monster_picker_in_tile_mode(self):
+        monsters_text = (ROOT / "variants" / "rogue52" / "monsters.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("#include \"../../frontend.h\"", monsters_text)
+        self.assertIn("tile_pick_genocide_monster", monsters_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Genocide")', monsters_text)
+        self.assertIn("monsters[i].m_name", monsters_text)
+        self.assertIn("rogue_frontend_text_overlay_pick", monsters_text)
+        self.assertIn("if (rogue_frontend_is_tiles())", monsters_text)
+
+    def test_rogue52_quit_uses_gui_confirmation_in_tile_mode(self):
+        main_text = (ROOT / "variants" / "rogue52" / "main.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("#include \"../../frontend.h\"", main_text)
+        self.assertIn("rogue_frontend_confirm(\"Quit\"", main_text)
+        self.assertIn("if (rogue_frontend_is_tiles())", main_text)
+
+    def test_rogue52_shell_escape_uses_gui_notice_in_tile_mode(self):
+        main_text = (ROOT / "variants" / "rogue52" / "main.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("shell escape is not available in tile mode", main_text)
+        self.assertIn("rogue_frontend_notice(\"Shell Escape\"", main_text)
+        self.assertIn("return;", main_text)
+
+    def test_rogue52_save_restore_uses_gui_prompts_and_notices_in_tile_mode(self):
+        save_text = (ROOT / "variants" / "rogue52" / "save.c").read_text(
+            encoding="utf-8"
+        )
+        options_text = (ROOT / "variants" / "rogue52" / "options.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("#include \"../../frontend.h\"", save_text)
+        self.assertIn("restore_error", save_text)
+        self.assertIn("rogue_frontend_confirm(\"Save Game\"", save_text)
+        self.assertIn("rogue_frontend_confirm", save_text)
+        self.assertIn("\"Overwrite Save\"", save_text)
+        self.assertIn("rogue_frontend_notice(\"Restore Failed\"", save_text)
+        self.assertIn("rogue_frontend_start()", save_text)
+        self.assertIn("rogue_frontend_text_input(\"Input\"", options_text)
+
+    def test_rogue52_score_death_and_win_use_gui_overlays_in_tile_mode(self):
+        rip_text = (ROOT / "variants" / "rogue52" / "rip.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("#include \"../../frontend.h\"", rip_text)
+        self.assertIn("tile_score_pause_shown", rip_text)
+        self.assertIn("rogue_frontend_show_death", rip_text)
+        self.assertIn("rogue_frontend_wait_for_return", rip_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Scores")', rip_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("You Made It!")', rip_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Spoils")', rip_text)
+        self.assertIn("rogue_frontend_text_overlay_show", rip_text)
+
+    def test_tile_death_returns_to_variant_picker_launcher(self):
+        frontend_header = (ROOT / "frontend.h").read_text(encoding="utf-8")
+        frontend_text = (ROOT / "frontend.c").read_text(encoding="utf-8")
+        rip54_text = (ROOT / "rip.c").read_text(encoding="utf-8")
+        rip52_text = (ROOT / "variants" / "rogue52" / "rip.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("rogue_frontend_request_launcher_restart", frontend_header)
+        self.assertIn("launcher_restart_requested", frontend_text)
+        self.assertIn("CreateProcessA", frontend_text)
+        self.assertIn(" --tiles", frontend_text)
+        self.assertIn("Press Enter to return to game select", rip54_text)
+        self.assertIn("rogue_frontend_request_launcher_restart()", rip54_text)
+        self.assertIn("Press Enter to return to game select", rip52_text)
+        self.assertIn("rogue_frontend_request_launcher_restart()", rip52_text)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -176,6 +176,110 @@
     "monster.Z": {
       "index": 520,
       "name": "human_zombie"
+    },
+    "monster.rogue52.A": {
+      "index": 218,
+      "name": "giant_ant"
+    },
+    "monster.rogue52.B": {
+      "index": 434,
+      "name": "bat"
+    },
+    "monster.rogue52.C": {
+      "index": 229,
+      "name": "plains_centaur"
+    },
+    "monster.rogue52.D": {
+      "index": 108,
+      "name": "green_dragon"
+    },
+    "monster.rogue52.E": {
+      "index": 132,
+      "name": "floating_eye"
+    },
+    "monster.rogue52.F": {
+      "index": 462,
+      "name": "violet_fungus"
+    },
+    "monster.rogue52.G": {
+      "index": 463,
+      "name": "gnome"
+    },
+    "monster.rogue52.H": {
+      "index": 386,
+      "name": "hobgoblin"
+    },
+    "monster.rogue52.I": {
+      "index": 455,
+      "name": "stalker"
+    },
+    "monster.rogue52.J": {
+      "index": 268,
+      "name": "jackal"
+    },
+    "monster.rogue52.K": {
+      "index": 153,
+      "name": "kobold"
+    },
+    "monster.rogue52.L": {
+      "index": 378,
+      "name": "leprechaun"
+    },
+    "monster.rogue52.M": {
+      "index": 379,
+      "name": "small_mimic"
+    },
+    "monster.rogue52.N": {
+      "index": 382,
+      "name": "wood_nymph"
+    },
+    "monster.rogue52.O": {
+      "index": 387,
+      "name": "orc"
+    },
+    "monster.rogue52.P": {
+      "index": 424,
+      "name": "purple_worm"
+    },
+    "monster.rogue52.Q": {
+      "index": 300,
+      "name": "quasit"
+    },
+    "monster.rogue52.R": {
+      "index": 497,
+      "name": "rust_monster"
+    },
+    "monster.rogue52.S": {
+      "index": 183,
+      "name": "snake"
+    },
+    "monster.rogue52.T": {
+      "index": 189,
+      "name": "troll"
+    },
+    "monster.rogue52.U": {
+      "index": 505,
+      "name": "umber_hulk"
+    },
+    "monster.rogue52.V": {
+      "index": 194,
+      "name": "vampire"
+    },
+    "monster.rogue52.W": {
+      "index": 202,
+      "name": "wraith"
+    },
+    "monster.rogue52.X": {
+      "index": 509,
+      "name": "xorn"
+    },
+    "monster.rogue52.Y": {
+      "index": 513,
+      "name": "yeti"
+    },
+    "monster.rogue52.Z": {
+      "index": 520,
+      "name": "human_zombie"
     }
   }
 }

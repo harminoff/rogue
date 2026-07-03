@@ -15,6 +15,9 @@
 #include <curses.h>
 #include "rogue.h"
 #include "frontend.h"
+#include "variant.h"
+
+int rogue52_main(int argc, char **argv, char **envp);
 
 /*
  * main:
@@ -27,8 +30,25 @@ main(int argc, char **argv, char **envp)
     int lowtime;
 
     md_init();
+    if (!rogue_variant_init_args(&argc, argv))
+    {
+	fprintf(stderr, "%s\n", rogue_variant_error());
+	my_exit(1);
+    }
     if (!rogue_frontend_init(&argc, argv))
 	my_exit(1);
+    if (rogue_frontend_is_tiles() && !rogue_variant_was_explicit())
+    {
+	if (!rogue_frontend_start())
+	    my_exit(1);
+	if (!rogue_frontend_choose_variant())
+	    my_exit(1);
+    }
+
+    if (rogue_variant_is_current("rogue52"))
+    {
+	return rogue52_main(argc, argv, envp);
+    }
 
 #ifdef MASTER
     /*

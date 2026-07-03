@@ -18,15 +18,27 @@ typedef struct rogue_generated_tile_mapping {
 
 typedef struct rogue_generated_monster_mapping {
     char glyph;
+    const char *role;
     const char *atlas_key;
     int atlas_index;
     const char *name;
 } ROGUE_GENERATED_MONSTER_MAPPING;
 
+typedef struct rogue_generated_variant_monster_mapping {
+    const char *variant_id;
+    char glyph;
+    const char *role;
+    const char *atlas_key;
+    int atlas_index;
+    const char *name;
+} ROGUE_GENERATED_VARIANT_MONSTER_MAPPING;
+
 extern const ROGUE_GENERATED_TILE_MAPPING rogue_tile_glyph_mappings[];
 extern const int rogue_tile_glyph_mapping_count;
 extern const ROGUE_GENERATED_MONSTER_MAPPING rogue_tile_monster_mappings[];
 extern const int rogue_tile_monster_mapping_count;
+extern const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mappings[];
+extern const int rogue_tile_variant_monster_mapping_count;
 
 const char *rogue_tile_atlas_path(void);
 int rogue_tile_atlas_columns(void);

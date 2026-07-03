@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .role_catalog import MONSTER_NAMES, Role, all_roles, role_by_id
+from .role_catalog import MONSTER_NAMES, Role, all_roles, role_by_id, variant_monster_roles
 
 
 DEFAULT_ACTIVE_SOURCE = Path("tile_picker/data/active_tile_source.json")
@@ -41,7 +41,10 @@ def c_string(value: Any) -> str:
 
 
 def role_atlas_from_mapping(mapping: dict[str, Any], role: Role) -> str | None:
-    if role.role.startswith("monster."):
+    if role.role.startswith("monster.") and role.key.count(".") == 1:
+        variant_id, glyph = role.key.split(".", 1)
+        entry = mapping.get("variantMonsters", {}).get(variant_id, {}).get(glyph, {})
+    elif role.role.startswith("monster."):
         entry = mapping.get("monsters", {}).get(role.key, {})
     else:
         entry = mapping.get(role.group, {}).get(role.key, {})
@@ -96,7 +99,7 @@ def rltiles_profile(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     mapping = read_json(root / "assets" / "rltiles" / "rogue-rltiles-map.json")
     lookup = atlas_lookup(root)
     profile: dict[str, Any] = {"tiles": {}}
-    for role in all_roles():
+    for role in all_roles() + variant_monster_roles(mapping):
         atlas = role_atlas_from_mapping(mapping, role)
         if atlas is None:
             continue
@@ -108,6 +111,13 @@ def rltiles_profile(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
         "tileHeight": 32,
     }
     return profile, source
+
+
+def configured_variant_monster_roles(root: Path) -> list[Role]:
+    mapping_path = root / "assets" / "rltiles" / "rogue-rltiles-map.json"
+    if not mapping_path.exists():
+        return []
+    return variant_monster_roles(read_json(mapping_path))
 
 
 def active_custom_profile(root: Path) -> Path | None:
@@ -129,9 +139,11 @@ def write_generated(root: Path, profile: dict[str, Any], source: dict[str, Any],
     source_path = out_dir / SOURCE_NAME
     roles = all_roles()
     monsters = [(glyph, MONSTER_NAMES[glyph]) for glyph in sorted(MONSTER_NAMES)]
+    variant_monsters = configured_variant_monster_roles(root)
 
     glyph_rows = []
     monster_rows = []
+    variant_monster_rows = []
     by_id = role_by_id()
     for role in roles:
         if role.role.startswith("monster."):
@@ -145,10 +157,23 @@ def write_generated(root: Path, profile: dict[str, Any], source: dict[str, Any],
         role = by_id[f"monster.{glyph}"]
         atlas_key, atlas_index = selection_for_role(profile, role)
         monster_rows.append(
-            f"    {{ '{glyph}', {c_string(atlas_key)}, {atlas_index}, {c_string(monster_name)} }}"
+            f"    {{ '{glyph}', {c_string(role.role)}, {c_string(atlas_key)}, "
+            f"{atlas_index}, {c_string(monster_name)} }}"
+        )
+    for role in variant_monsters:
+        variant_id, glyph = role.key.split(".", 1)
+        atlas_key, atlas_index = selection_for_role(profile, role)
+        variant_monster_rows.append(
+            f"    {{ {c_string(variant_id)}, '{glyph}', {c_string(role.role)}, "
+            f"{c_string(atlas_key)}, {atlas_index}, {c_string(role.name)} }}"
         )
     glyph_table = ",\n".join(glyph_rows)
     monster_table = ",\n".join(monster_rows)
+    if variant_monster_rows:
+        variant_monster_table = ",\n".join(variant_monster_rows)
+    else:
+        variant_monster_table = "    { NULL, '\\0', NULL, NULL, -1, NULL }"
+    variant_monster_count = len(variant_monster_rows)
 
     header_path.write_text(
         """/*
@@ -171,15 +196,27 @@ typedef struct rogue_generated_tile_mapping {
 
 typedef struct rogue_generated_monster_mapping {
     char glyph;
+    const char *role;
     const char *atlas_key;
     int atlas_index;
     const char *name;
 } ROGUE_GENERATED_MONSTER_MAPPING;
 
+typedef struct rogue_generated_variant_monster_mapping {
+    const char *variant_id;
+    char glyph;
+    const char *role;
+    const char *atlas_key;
+    int atlas_index;
+    const char *name;
+} ROGUE_GENERATED_VARIANT_MONSTER_MAPPING;
+
 extern const ROGUE_GENERATED_TILE_MAPPING rogue_tile_glyph_mappings[];
 extern const int rogue_tile_glyph_mapping_count;
 extern const ROGUE_GENERATED_MONSTER_MAPPING rogue_tile_monster_mappings[];
 extern const int rogue_tile_monster_mapping_count;
+extern const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mappings[];
+extern const int rogue_tile_variant_monster_mapping_count;
 
 const char *rogue_tile_atlas_path(void);
 int rogue_tile_atlas_columns(void);
@@ -215,6 +252,12 @@ const ROGUE_GENERATED_MONSTER_MAPPING rogue_tile_monster_mappings[] = {{
 
 const int rogue_tile_monster_mapping_count =
     sizeof(rogue_tile_monster_mappings) / sizeof(rogue_tile_monster_mappings[0]);
+
+const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mappings[] = {{
+{variant_monster_table}
+}};
+
+const int rogue_tile_variant_monster_mapping_count = {variant_monster_count};
 
 const char *
 rogue_tile_atlas_path(void)

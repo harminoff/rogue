@@ -17,6 +17,24 @@ function Invoke-Native {
     }
 }
 
+function Copy-OverlayDirectory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Source,
+        [Parameter(Mandatory = $true)]
+        [string]$Destination
+    )
+
+    if (-not (Test-Path $Source)) {
+        return
+    }
+
+    New-Item -ItemType Directory -Force $Destination | Out-Null
+    Get-ChildItem -LiteralPath $Source -Force | ForEach-Object {
+        Copy-Item -LiteralPath $_.FullName -Destination $Destination -Recurse -Force
+    }
+}
+
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $buildDir = Join-Path $repoRoot "native-build"
 $archive = Join-Path $buildDir "rogue-src.tar"
@@ -131,6 +149,8 @@ try {
         "frontend.h",
         "overlay_picker.c",
         "overlay_picker.h",
+        "variant.c",
+        "variant.h",
         "allegro_frontend.c"
     )) {
         $source = Join-Path $repoRoot $path
@@ -140,19 +160,16 @@ try {
     }
 
     $assetSource = Join-Path $repoRoot "assets"
-    if (Test-Path $assetSource) {
-        Copy-Item -LiteralPath $assetSource -Destination (Join-Path $buildDir "assets") -Recurse -Force
-    }
+    Copy-OverlayDirectory -Source $assetSource -Destination (Join-Path $buildDir "assets")
 
     $generatedSource = Join-Path $repoRoot "generated"
-    if (Test-Path $generatedSource) {
-        Copy-Item -LiteralPath $generatedSource -Destination (Join-Path $buildDir "generated") -Recurse -Force
-    }
+    Copy-OverlayDirectory -Source $generatedSource -Destination (Join-Path $buildDir "generated")
 
     $tilepackSource = Join-Path $repoRoot "tilepacks"
-    if (Test-Path $tilepackSource) {
-        Copy-Item -LiteralPath $tilepackSource -Destination (Join-Path $buildDir "tilepacks") -Recurse -Force
-    }
+    Copy-OverlayDirectory -Source $tilepackSource -Destination (Join-Path $buildDir "tilepacks")
+
+    $variantSource = Join-Path $repoRoot "variants"
+    Copy-OverlayDirectory -Source $variantSource -Destination (Join-Path $buildDir "variants")
 }
 finally {
     Pop-Location
@@ -183,7 +200,7 @@ Copy-Item -LiteralPath $ncursesHeaders -Destination (Join-Path $includeDir "ncur
 
 $env:PATH = "$mingwBin;$msysUsrBin;$env:PATH"
 $cppflags = "-Iinclude"
-$libs = "$ncursesImport"
+$libs = "$ncursesImport -lws2_32"
 $allegroObjs = ""
 
 if ($Tiles) {

@@ -51,6 +51,16 @@ Copy-Item -LiteralPath (Join-Path $nativeDir "rogue54.exe") -Destination (Join-P
 Copy-Item -LiteralPath (Join-Path $repoRoot "LICENSE.TXT") -Destination $packageDir -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "README.md") -Destination $packageDir -Force
 
+foreach ($manual in @("rogue54.6", "rogue54.doc", "rogue54.html")) {
+    $manualPath = Join-Path $nativeDir $manual
+    if (-not (Test-Path $manualPath)) {
+        $manualPath = Join-Path $repoRoot $manual
+    }
+    if (Test-Path $manualPath) {
+        Copy-Item -LiteralPath $manualPath -Destination (Join-Path $packageDir $manual) -Force
+    }
+}
+
 foreach ($dll in Get-ChildItem -LiteralPath $nativeDir -Filter "*.dll") {
     Copy-Item -LiteralPath $dll.FullName -Destination (Join-Path $packageDir $dll.Name) -Force
 }
@@ -58,6 +68,7 @@ foreach ($dll in Get-ChildItem -LiteralPath $nativeDir -Filter "*.dll") {
 Copy-Item -LiteralPath (Join-Path $repoRoot "assets") -Destination (Join-Path $packageDir "assets") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "tilepacks") -Destination (Join-Path $packageDir "tilepacks") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "tile_picker") -Destination (Join-Path $packageDir "tile_picker") -Recurse -Force
+Copy-Item -LiteralPath (Join-Path $repoRoot "variants") -Destination (Join-Path $packageDir "variants") -Recurse -Force
 
 $tilePickerExe = Join-Path $repoRoot "dist\picker-build\TilePicker.exe"
 if (Test-Path $tilePickerExe) {

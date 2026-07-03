@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from .role_catalog import Role, all_roles
+from .role_catalog import Role, all_roles, variant_monster_roles
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -20,7 +20,10 @@ def read_json(path: Path) -> dict[str, Any]:
 
 
 def role_entry(mapping: dict[str, Any], lookup: dict[str, int], role: Role) -> dict[str, Any]:
-    if role.role.startswith("monster."):
+    if role.role.startswith("monster.") and role.key.count(".") == 1:
+        variant_id, glyph = role.key.split(".", 1)
+        raw = mapping.get("variantMonsters", {}).get(variant_id, {}).get(glyph, {})
+    elif role.role.startswith("monster."):
         raw = mapping.get("monsters", {}).get(role.key, {})
     else:
         raw = mapping.get(role.group, {}).get(role.key, {})
@@ -29,8 +32,8 @@ def role_entry(mapping: dict[str, Any], lookup: dict[str, int], role: Role) -> d
     return {
         "role": role.role,
         "group": "monsters" if role.role.startswith("monster.") else role.group,
-        "key": role.key,
-        "glyph": raw.get("glyph", role.glyph.strip("'")),
+            "key": role.key,
+            "glyph": raw.get("glyph", role.glyph.strip("'")),
         "label": role.label,
         "name": raw.get("name", role.name),
         "currentRltilesName": atlas,
@@ -48,6 +51,8 @@ def build_data(root: Path) -> dict[str, Any]:
     columns = int(atlas.get("width", 30))
     tile_size = int(atlas.get("tileSize", 32))
 
+    roles = all_roles() + variant_monster_roles(mapping)
+
     return {
         "version": 1,
         "generatedFrom": {
@@ -55,7 +60,7 @@ def build_data(root: Path) -> dict[str, Any]:
             "currentMapping": "assets/rltiles/rogue-rltiles-map.json",
         },
         "rogue": {
-            "roles": [role_entry(mapping, lookup, role) for role in all_roles()],
+            "roles": [role_entry(mapping, lookup, role) for role in roles],
         },
         "rltiles": {
             "atlas": {

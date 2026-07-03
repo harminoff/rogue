@@ -63,6 +63,8 @@ class TilePackWriterTests(unittest.TestCase):
             "tiles": {
                 "terrain.floor": {"index": 3, "name": "custom floor"},
                 "actor.player": {"index": 4, "name": "custom player"},
+                "monster.M": {"index": 5, "name": "custom medusa"},
+                "monster.rogue52.M": {"index": 6, "name": "custom mimic"},
             },
         }
 
@@ -78,6 +80,9 @@ class TilePackWriterTests(unittest.TestCase):
             self.assertEqual(tilepack["tileHeight"], 24)
             self.assertEqual(tilepack["columns"], 4)
             self.assertEqual(mapping["roles"]["actor.player"]["index"], 4)
+            self.assertEqual(mapping["roles"]["monster.M"]["index"], 5)
+            self.assertEqual(mapping["roles"]["monster.rogue52.M"]["index"], 6)
+            self.assertEqual(mapping["roles"]["monster.rogue52.M"]["name"], "custom mimic")
             self.assertTrue((root / "tilepacks" / "active" / "tiles.png").exists())
 
     def test_custom_pack_rejects_missing_source(self):

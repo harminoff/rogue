@@ -50,7 +50,7 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("if (!settings.side_panel_log_enabled)", draw_status)
         self.assertLess(
             draw_status.index("if (!settings.side_panel_log_enabled)"),
-            draw_status.index("huh"),
+            draw_status.index("status.message"),
         )
 
     def test_bottom_bar_stylized_setting_is_available(self):
@@ -76,16 +76,7 @@ class CombatDamageLogTests(unittest.TestCase):
             allegro_c.index("blood_tile_is_walkable"):
             allegro_c.index("clear_blood_splats")
         ]
-        self.assertIn("case ' '", walkable)
-        self.assertIn("case '|'", walkable)
-        self.assertIn("case '-'", walkable)
-        self.assertIn("return FALSE", walkable)
-        self.assertIn("case FLOOR", walkable)
-        self.assertIn("case PASSAGE", walkable)
-        self.assertIn("case DOOR", walkable)
-        self.assertIn("case TRAP", walkable)
-        self.assertIn("case STAIRS", walkable)
-        self.assertIn("default:", walkable)
+        self.assertIn("rogue_variant_cell_walkable(y, x)", walkable)
         self.assertNotIn("isupper", walkable)
 
         add_splat = allegro_c[
@@ -204,7 +195,11 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("shader_smoke_requested", frontend_c)
         self.assertIn("rogue_allegro_enable_shader_smoke", frontend_c)
         self.assertIn("shader_smoke_mode", allegro_c)
+        self.assertIn("settings.pixel_sharpen_enabled = TRUE", allegro_c)
+        self.assertIn("settings.posterize_enabled = TRUE", allegro_c)
         self.assertIn("rogue_scene_before_shader.png", allegro_c)
+        self.assertIn("rogue_scene_source_shader.png", allegro_c)
+        self.assertIn("rogue_scene_after_postprocess.png", allegro_c)
         self.assertIn("rogue_scene_after_shader.png", allegro_c)
         self.assertIn("al_save_bitmap", allegro_c)
 
@@ -249,17 +244,30 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("Pixel Sharpen", allegro_c)
         self.assertIn("Posterize", allegro_c)
 
-        self.assertIn("postprocess_shader", allegro_c)
-        self.assertIn("ensure_postprocess_shader", allegro_c)
         self.assertIn("draw_scene_with_postprocess_shader", allegro_c)
-        self.assertIn("postprocess_vertex_shader_source", allegro_c)
         self.assertIn("postprocess_pixel_shader_source", allegro_c)
         self.assertIn("u_pixel_sharpen_enabled", allegro_c)
         self.assertIn("u_posterize_enabled", allegro_c)
+        self.assertIn("u_scene_texture", allegro_c)
         self.assertIn("u_scene_texel_size", allegro_c)
         self.assertIn('scene_source_bitmap', allegro_c)
-        self.assertIn("varying_texcoord", allegro_c)
-        self.assertIn("al_draw_bitmap(scene_source_bitmap, 0, 0, 0)", allegro_c)
+        self.assertIn("channel_clamp", allegro_c)
+        self.assertIn("posterize_channel", allegro_c)
+        postprocess_shader_source = allegro_c[
+            allegro_c.index("postprocess_pixel_shader_source"):
+            allegro_c.index("gloom_pixel_shader_source")
+        ]
+        postprocess_draw = allegro_c[
+            allegro_c.index("draw_scene_with_postprocess_shader"):
+            allegro_c.index("draw_scene_with_gloom_shader")
+        ]
+        self.assertIn("gl_FragCoord", postprocess_shader_source)
+        self.assertIn("al_lock_bitmap(scene_source_bitmap", postprocess_draw)
+        self.assertIn("ALLEGRO_PIXEL_FORMAT_ABGR_8888_LE", postprocess_draw)
+        self.assertIn("read_locked_rgba", postprocess_draw)
+        self.assertIn("write_locked_rgba", postprocess_draw)
+        self.assertIn("al_draw_bitmap(scene_bitmap", postprocess_draw)
+        self.assertNotIn("al_use_shader(postprocess_shader)", postprocess_draw)
 
         render = allegro_c[
             allegro_c.index("void\nrogue_allegro_render(void)"):
@@ -267,7 +275,7 @@ class CombatDamageLogTests(unittest.TestCase):
         ]
         postprocess_enabled = allegro_c[
             allegro_c.index("postprocess_enabled"):
-            allegro_c.index("postprocess_vertex_shader_source")
+            allegro_c.index("postprocess_pixel_shader_source")
         ]
         self.assertIn("settings.pixel_sharpen_enabled", postprocess_enabled)
         self.assertIn("settings.posterize_enabled", postprocess_enabled)
@@ -277,6 +285,18 @@ class CombatDamageLogTests(unittest.TestCase):
             render.index("save_shader_smoke_bitmap"),
             render.index("draw_scene_with_gloom_shader();"),
         )
+
+    def test_postprocess_shader_uses_allegro_default_vertex_shader(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+        postprocess = allegro_c[
+            allegro_c.index("ensure_postprocess_shader"):
+            allegro_c.index("draw_scene_with_postprocess_shader")
+        ]
+
+        self.assertIn("al_get_shader_platform", postprocess)
+        self.assertIn("al_get_default_shader_source", postprocess)
+        self.assertIn("ALLEGRO_VERTEX_SHADER", postprocess)
+        self.assertNotIn("postprocess_vertex_shader_source", allegro_c)
 
     def test_optional_enemy_health_overlay_uses_visible_monster_stats(self):
         allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")

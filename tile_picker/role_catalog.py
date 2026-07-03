@@ -70,10 +70,42 @@ MONSTER_NAMES: dict[str, str] = {
 }
 
 
+def monster_role(glyph: str, name: str, variant_id: str | None = None) -> Role:
+    if variant_id:
+        role_id = f"monster.{variant_id}.{glyph}"
+        group = "monsters"
+        key = f"{variant_id}.{glyph}"
+        label = f"{variant_id} {glyph}: {name.title()}"
+    else:
+        role_id = f"monster.{glyph}"
+        group = "monsters"
+        key = glyph
+        label = name.title()
+    return Role(role_id, group, key, f"'{glyph}'", "actor", "ROGUE_TILE_ACTOR", label, name)
+
+
 def all_roles() -> list[Role]:
     roles = list(ROLES)
     for glyph, name in MONSTER_NAMES.items():
-        roles.append(Role(f"monster.{glyph}", "monsters", glyph, f"'{glyph}'", "actor", "ROGUE_TILE_ACTOR", name.title(), name))
+        roles.append(monster_role(glyph, name))
+    return roles
+
+
+def variant_monster_roles(mapping: dict) -> list[Role]:
+    roles: list[Role] = []
+    variants = mapping.get("variantMonsters", {})
+    if not isinstance(variants, dict):
+        return roles
+    for variant_id in sorted(variants):
+        monsters = variants.get(variant_id, {})
+        if not isinstance(monsters, dict):
+            continue
+        for glyph in sorted(monsters):
+            entry = monsters[glyph]
+            if not isinstance(entry, dict):
+                continue
+            name = str(entry.get("name") or MONSTER_NAMES.get(glyph, "monster"))
+            roles.append(monster_role(str(glyph), name, str(variant_id)))
     return roles
 
 

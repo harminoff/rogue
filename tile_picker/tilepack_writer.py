@@ -10,7 +10,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from .role_catalog import Role, all_roles
+from .role_catalog import Role, all_roles, variant_monster_roles
 
 
 class TilePackError(ValueError):
@@ -33,7 +33,10 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def role_atlas_from_mapping(mapping: dict[str, Any], role: Role) -> str | None:
-    if role.role.startswith("monster."):
+    if role.role.startswith("monster.") and role.key.count(".") == 1:
+        variant_id, glyph = role.key.split(".", 1)
+        entry = mapping.get("variantMonsters", {}).get(variant_id, {}).get(glyph, {})
+    elif role.role.startswith("monster."):
         entry = mapping.get("monsters", {}).get(role.key, {})
     else:
         entry = mapping.get(role.group, {}).get(role.key, {})
@@ -91,7 +94,7 @@ def write_default_pack(root: Path, pack_name: str = "default") -> dict[str, Any]
     lookup = atlas_lookup(root)
     roles: dict[str, dict[str, Any]] = {}
 
-    for role in all_roles():
+    for role in all_roles() + variant_monster_roles(mapping):
         atlas_name = role_atlas_from_mapping(mapping, role)
         if atlas_name is None:
             continue

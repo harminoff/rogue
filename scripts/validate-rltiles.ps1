@@ -125,6 +125,24 @@ if ($monsterKeys.Count -ne 26) {
     throw "Expected 26 monster mappings, found $($monsterKeys.Count)"
 }
 
+$variantMonsterCount = 0
+if ($mapping.PSObject.Properties.Name -contains "variantMonsters" -and $null -ne $mapping.variantMonsters) {
+    foreach ($variant in $mapping.variantMonsters.PSObject.Properties) {
+        $variantId = $variant.Name
+        $variantKeys = [string[]]($variant.Value.PSObject.Properties.Name)
+        foreach ($letter in [char[]]"ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
+            $key = [string]$letter
+            if ($variantKeys -notcontains $key) {
+                throw "Missing required variant monster mapping: variantMonsters.$variantId.$key"
+            }
+        }
+        if ($variantKeys.Count -ne 26) {
+            throw "Expected 26 monster mappings for variant '$variantId', found $($variantKeys.Count)"
+        }
+        $variantMonsterCount += $variantKeys.Count
+    }
+}
+
 $trapIds = @{}
 foreach ($trap in $mapping.traps.PSObject.Properties) {
     $trapIds[[int]$trap.Value.id] = $trap.Name
@@ -137,4 +155,4 @@ for ($id = 0; $id -lt 8; $id++) {
 }
 
 $objectCount = @($mapping.objects.PSObject.Properties).Count
-Write-Host "Validated rltiles atlas references: $($atlas.tiles.Count) atlas keys, 26 monsters, $objectCount object categories."
+Write-Host "Validated rltiles atlas references: $($atlas.tiles.Count) atlas keys, 26 base monsters, $variantMonsterCount variant monsters, $objectCount object categories."
