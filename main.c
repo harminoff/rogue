@@ -18,6 +18,7 @@
 #include "variant.h"
 
 int rogue52_main(int argc, char **argv, char **envp);
+int rogue36_main(int argc, char **argv, char **envp);
 
 /*
  * main:
@@ -48,6 +49,10 @@ main(int argc, char **argv, char **envp)
     if (rogue_variant_is_current("rogue52"))
     {
 	return rogue52_main(argc, argv, envp);
+    }
+    if (rogue_variant_is_current("rogue36"))
+    {
+	return rogue36_main(argc, argv, envp);
     }
 
 #ifdef MASTER

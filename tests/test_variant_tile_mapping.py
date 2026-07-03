@@ -39,6 +39,9 @@ def write_fixture(root: Path) -> None:
             "M": {"name": "medusa", "atlas": "medusa"},
         },
         "variantMonsters": {
+            "rogue36": {
+                "M": {"name": "mimic", "atlas": "small_mimic"},
+            },
             "rogue52": {
                 "A": {"name": "giant ant", "atlas": "giant_ant"},
                 "E": {"name": "floating eye", "atlas": "floating_eye"},
@@ -61,6 +64,7 @@ class VariantTileMappingTests(unittest.TestCase):
 
             roles = {role["role"]: role for role in data["rogue"]["roles"]}
             self.assertEqual(roles["monster.M"]["name"], "medusa")
+            self.assertEqual(roles["monster.rogue36.M"]["name"], "mimic")
             self.assertEqual(roles["monster.rogue52.M"]["name"], "mimic")
             self.assertEqual(roles["monster.rogue52.M"]["currentRltilesIndex"], 1)
 
@@ -76,6 +80,7 @@ class VariantTileMappingTests(unittest.TestCase):
             self.assertIn("ROGUE_GENERATED_VARIANT_MONSTER_MAPPING", header)
             self.assertIn("rogue_tile_variant_monster_mappings", source)
             self.assertIn('{ \'M\', "monster.M", "medusa", 0, "medusa" }', source)
+            self.assertIn('{ "rogue36", \'M\', "monster.rogue36.M", "small_mimic", 1, "mimic" }', source)
             self.assertIn('{ "rogue52", \'M\', "monster.rogue52.M", "small_mimic", 1, "mimic" }', source)
 
     def test_default_tilepack_includes_variant_monster_roles(self):
@@ -87,6 +92,7 @@ class VariantTileMappingTests(unittest.TestCase):
 
             mapping = json.loads((root / "tilepacks" / "default" / "mapping.json").read_text(encoding="utf-8"))
             self.assertEqual(mapping["roles"]["monster.M"]["index"], 0)
+            self.assertEqual(mapping["roles"]["monster.rogue36.M"]["index"], 1)
             self.assertEqual(mapping["roles"]["monster.rogue52.M"]["index"], 1)
 
 

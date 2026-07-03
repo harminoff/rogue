@@ -26,6 +26,16 @@ ROGUE52_CFILES = vers.c extern.c armor.c chase.c command.c daemon.c \
 ROGUE52_OBJS = $(ROGUE52_CFILES:%.c=$(ROGUE52_BUILD)/%.o)
 ROGUE52_REDEF = $(ROGUE52_DIR)/rogue52_symbols.redef
 ROGUE52_REDEF_EXPANDED = $(ROGUE52_BUILD)/rogue52_symbols.expanded.redef
+ROGUE36_DIR = variants/rogue36
+ROGUE36_BUILD = variants/rogue36/build
+ROGUE36_CFILES = vers.c armor.c chase.c command.c daemon.c \
+	   daemons.c fight.c init.c io.c list.c main.c misc.c \
+	   monsters.c move.c newlevel.c options.c pack.c passages.c \
+	   potions.c rings.c rip.c rooms.c save.c scrolls.c state.c \
+	   sticks.c things.c weapons.c wizard.c xcrypt.c rogue36_port.c
+ROGUE36_OBJS = $(ROGUE36_CFILES:%.c=$(ROGUE36_BUILD)/%.o)
+ROGUE36_REDEF = $(ROGUE36_DIR)/rogue36_symbols.redef
+ROGUE36_REDEF_EXPANDED = $(ROGUE36_BUILD)/rogue36_symbols.expanded.redef
 OBJS1    = vers.$(O) extern.$(O) armor.$(O) chase.$(O) command.$(O) \
            daemon.$(O) daemons.$(O) fight.$(O) init.$(O) io.$(O) list.$(O) \
 	   mach_dep.$(O) main.$(O) mdport.$(O) misc.$(O) monsters.$(O) \
@@ -36,7 +46,7 @@ OBJS2    = options.$(O) pack.$(O) passages.$(O) potions.$(O) rings.$(O) \
 	   variant.$(O) \
 	   generated/rogue_tile_mapping.$(O) \
 	   $(ALLEGRO_OBJS) weapons.$(O) \
-	   wizard.$(O) xcrypt.$(O) $(ROGUE52_OBJS)
+	   wizard.$(O) xcrypt.$(O) $(ROGUE52_OBJS) $(ROGUE36_OBJS)
 OBJS     = $(OBJS1) $(OBJS2)
 CFILES   = vers.c extern.c armor.c chase.c command.c daemon.c \
 	   daemons.c fight.c init.c io.c list.c mach_dep.c \
@@ -88,6 +98,15 @@ $(ROGUE52_BUILD)/%.o: $(ROGUE52_DIR)/%.c $(ROGUE52_REDEF_EXPANDED) $(ROGUE52_DIR
 	mkdir -p $(ROGUE52_BUILD)
 	$(CC) $(CFLAGS) -fcommon -I$(ROGUE52_DIR)/port -I$(ROGUE52_DIR) $(CPPFLAGS) -include $(ROGUE52_DIR)/rogue52_port.h -DSCOREFILE=\"rogue52.scr\" -DLOCKFILE=\"rogue52.lck\" -c $(ROGUE52_DIR)/$*.c -o $@
 	$(OBJCOPY) --redefine-syms $(ROGUE52_REDEF_EXPANDED) $@
+
+$(ROGUE36_REDEF_EXPANDED): $(ROGUE36_REDEF)
+	mkdir -p $(ROGUE36_BUILD)
+	cp $(ROGUE36_REDEF) $@
+
+$(ROGUE36_BUILD)/%.o: $(ROGUE36_DIR)/%.c $(ROGUE36_REDEF_EXPANDED) $(ROGUE36_DIR)/rogue36_port.h $(ROGUE36_DIR)/port/pwd.h $(ROGUE36_DIR)/port/termios.h
+	mkdir -p $(ROGUE36_BUILD)
+	$(CC) $(CFLAGS) -fcommon -I$(ROGUE36_DIR)/port -I$(ROGUE36_DIR) $(CPPFLAGS) -include $(ROGUE36_DIR)/rogue36_port.h -DSCOREFILE=\"rogue36.scr\" -DLOCKFILE=\"rogue36.lck\" -c $(ROGUE36_DIR)/$*.c -o $@
+	$(OBJCOPY) --redefine-syms $(ROGUE36_REDEF_EXPANDED) $@
     
 $(PROGRAM): $(HDRS) $(OBJS) fixdocs
 	$(CC) $(LDFLAGS) $(OBJS) $(LIBS) $(OUTFLAG)$@$(EXE)
@@ -97,6 +116,8 @@ clean:
 	$(RM) $(OBJS2)
 	$(RM) $(ROGUE52_OBJS)
 	$(RM) $(ROGUE52_REDEF_EXPANDED)
+	$(RM) $(ROGUE36_OBJS)
+	$(RM) $(ROGUE36_REDEF_EXPANDED)
 	$(RM) core a.exe a.out a.exe.stackdump $(PROGRAM) $(PROGRAM).exe $(PROGRAM).lck
 	$(RM) $(PROGRAM).tar $(PROGRAM).tar.gz $(PROGRAM).zip 
 	$(RM) $(DISTNAME)/*

@@ -66,6 +66,32 @@ const int rogue_tile_monster_mapping_count =
     sizeof(rogue_tile_monster_mappings) / sizeof(rogue_tile_monster_mappings[0]);
 
 const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mappings[] = {
+    { "rogue36", 'A', "monster.rogue36.A", "giant_ant", 218, "giant ant" },
+    { "rogue36", 'B', "monster.rogue36.B", "bat", 434, "bat" },
+    { "rogue36", 'C', "monster.rogue36.C", "plains_centaur", 229, "centaur" },
+    { "rogue36", 'D', "monster.rogue36.D", "green_dragon", 108, "dragon" },
+    { "rogue36", 'E', "monster.rogue36.E", "floating_eye", 132, "floating eye" },
+    { "rogue36", 'F', "monster.rogue36.F", "violet_fungus", 462, "violet fungi" },
+    { "rogue36", 'G', "monster.rogue36.G", "gnome", 463, "gnome" },
+    { "rogue36", 'H', "monster.rogue36.H", "hobgoblin", 386, "hobgoblin" },
+    { "rogue36", 'I', "monster.rogue36.I", "stalker", 455, "invisible stalker" },
+    { "rogue36", 'J', "monster.rogue36.J", "jackal", 268, "jackal" },
+    { "rogue36", 'K', "monster.rogue36.K", "kobold", 153, "kobold" },
+    { "rogue36", 'L', "monster.rogue36.L", "leprechaun", 378, "leprechaun" },
+    { "rogue36", 'M', "monster.rogue36.M", "small_mimic", 379, "mimic" },
+    { "rogue36", 'N', "monster.rogue36.N", "wood_nymph", 382, "nymph" },
+    { "rogue36", 'O', "monster.rogue36.O", "orc", 387, "orc" },
+    { "rogue36", 'P', "monster.rogue36.P", "purple_worm", 424, "purple worm" },
+    { "rogue36", 'Q', "monster.rogue36.Q", "quasit", 300, "quasit" },
+    { "rogue36", 'R', "monster.rogue36.R", "rust_monster", 497, "rust monster" },
+    { "rogue36", 'S', "monster.rogue36.S", "snake", 183, "snake" },
+    { "rogue36", 'T', "monster.rogue36.T", "troll", 189, "troll" },
+    { "rogue36", 'U', "monster.rogue36.U", "umber_hulk", 505, "umber hulk" },
+    { "rogue36", 'V', "monster.rogue36.V", "vampire", 194, "vampire" },
+    { "rogue36", 'W', "monster.rogue36.W", "wraith", 202, "wraith" },
+    { "rogue36", 'X', "monster.rogue36.X", "xorn", 509, "xorn" },
+    { "rogue36", 'Y', "monster.rogue36.Y", "yeti", 513, "yeti" },
+    { "rogue36", 'Z', "monster.rogue36.Z", "human_zombie", 520, "zombie" },
     { "rogue52", 'A', "monster.rogue52.A", "giant_ant", 218, "giant ant" },
     { "rogue52", 'B', "monster.rogue52.B", "bat", 434, "bat" },
     { "rogue52", 'C', "monster.rogue52.C", "plains_centaur", 229, "centaur" },
@@ -94,7 +120,7 @@ const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mapping
     { "rogue52", 'Z', "monster.rogue52.Z", "human_zombie", 520, "zombie" }
 };
 
-const int rogue_tile_variant_monster_mapping_count = 26;
+const int rogue_tile_variant_monster_mapping_count = 52;
 
 const char *
 rogue_tile_atlas_path(void)

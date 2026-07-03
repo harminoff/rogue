@@ -14,6 +14,12 @@ int rogue52_variant_level_number(void);
 int rogue52_variant_map_rows(void);
 int rogue52_variant_map_cols(void);
 bool rogue52_variant_cell_walkable(int y, int x);
+void rogue36_variant_status(ROGUE_VARIANT_STATUS *status);
+void rogue36_variant_hero_position(int *y, int *x);
+int rogue36_variant_level_number(void);
+int rogue36_variant_map_rows(void);
+int rogue36_variant_map_cols(void);
+bool rogue36_variant_cell_walkable(int y, int x);
 
 static const ROGUE_VARIANT_INFO variants[] = {
     {
@@ -51,6 +57,45 @@ static const ROGUE_VARIANT_INFO variants[] = {
 		"rogue54.doc",
 		"BSD-style source distribution",
 		"Long-form Unix Rogue guide included with the Rogue 5.4.4 source distribution."
+	    },
+	    { NULL, NULL, NULL, NULL, NULL, NULL }
+	}
+    },
+    {
+	"rogue36",
+	"Rogue 3.6.2",
+	1981,
+	"1981 BSD Rogue 3.6 release line",
+	"Early BSD Rogue 3.6 lineage",
+	"BSD-style",
+	"Bundled",
+	"First widely released Rogue line",
+	"An early Rogue ruleset from the 3.6 line, close to the original public Unix experience. Compared with the later 5.x games, it has older room/window handling, the classic early monster alphabet, a smaller command surface, and older item and score behavior.",
+	{
+	    "Monster roster uses the early alphabet: giant ant, bat, centaur, dragon, floating eye, violet fungi, gnome, hobgoblin, invisible stalker, mimic, umber hulk, xorn, and others.",
+	    "M is the mimic and U is the umber hulk, matching the older pre-5.4 danger alphabet.",
+	    "The visible dungeon is driven directly by the early curses windows rather than the later 5.x map arrays.",
+	    "Commands include shell escape, save, help, identify, item use, stairs, and classic vi movement; later discovery-list conveniences are not part of this branch.",
+	    "Status displays classic strength with optional exceptional strength instead of the later simplified presentation.",
+	    "The bundled long guide is the original nroff-style Rogue guide from the 3.6.2 source archive.",
+	    NULL
+	},
+	{
+	    {
+		"Bundled Rogue 3.6.2 man page",
+		"Bundled manual",
+		"variants/rogue36/rogue.6",
+		"variants/rogue36/rogue.6",
+		"BSD-style source distribution",
+		"Short command-line and gameplay overview shipped with the Rogue 3.6.2 source."
+	    },
+	    {
+		"Rogue 3.6.2 guide",
+		"Bundled guide",
+		"variants/rogue36/rogue.r",
+		"variants/rogue36/rogue.r",
+		"BSD-style source distribution",
+		"Long-form nroff guide shipped with the Rogue 3.6.2 source archive."
 	    },
 	    { NULL, NULL, NULL, NULL, NULL, NULL }
 	}
@@ -225,6 +270,11 @@ rogue_variant_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
 	rogue52_tile_describe_cell(y, x, cell);
 	return;
     }
+    if (rogue_variant_is_current("rogue36"))
+    {
+	rogue36_tile_describe_cell(y, x, cell);
+	return;
+    }
 
     rogue_tile_describe_cell(y, x, cell);
 }
@@ -238,6 +288,11 @@ rogue_variant_status(ROGUE_VARIANT_STATUS *status)
     if (rogue_variant_is_current("rogue52"))
     {
 	rogue52_variant_status(status);
+	return;
+    }
+    if (rogue_variant_is_current("rogue36"))
+    {
+	rogue36_variant_status(status);
 	return;
     }
 
@@ -261,6 +316,11 @@ rogue_variant_hero_position(int *y, int *x)
 	rogue52_variant_hero_position(y, x);
 	return;
     }
+    if (rogue_variant_is_current("rogue36"))
+    {
+	rogue36_variant_hero_position(y, x);
+	return;
+    }
 
     if (y != NULL)
 	*y = hero.y;
@@ -273,6 +333,8 @@ rogue_variant_level_number(void)
 {
     if (rogue_variant_is_current("rogue52"))
 	return rogue52_variant_level_number();
+    if (rogue_variant_is_current("rogue36"))
+	return rogue36_variant_level_number();
     return level;
 }
 
@@ -281,6 +343,8 @@ rogue_variant_map_rows(void)
 {
     if (rogue_variant_is_current("rogue52"))
 	return rogue52_variant_map_rows();
+    if (rogue_variant_is_current("rogue36"))
+	return rogue36_variant_map_rows();
     return NUMLINES;
 }
 
@@ -289,6 +353,8 @@ rogue_variant_map_cols(void)
 {
     if (rogue_variant_is_current("rogue52"))
 	return rogue52_variant_map_cols();
+    if (rogue_variant_is_current("rogue36"))
+	return rogue36_variant_map_cols();
     return NUMCOLS;
 }
 
@@ -299,6 +365,8 @@ rogue_variant_cell_walkable(int y, int x)
 
     if (rogue_variant_is_current("rogue52"))
 	return rogue52_variant_cell_walkable(y, x);
+    if (rogue_variant_is_current("rogue36"))
+	return rogue36_variant_cell_walkable(y, x);
 
     if (y <= 0 || y >= NUMLINES - 1 || x < 0 || x >= NUMCOLS)
 	return FALSE;

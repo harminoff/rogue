@@ -6,11 +6,13 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 class VariantMetadataTest(unittest.TestCase):
-    def test_rogue54_and_rogue52_are_registered(self):
+    def test_rogue54_rogue36_and_rogue52_are_registered(self):
         text = (ROOT / "variant.c").read_text(encoding="utf-8")
 
         self.assertIn('"rogue54"', text)
         self.assertIn('"Rogue 5.4.4"', text)
+        self.assertIn('"rogue36"', text)
+        self.assertIn('"Rogue 3.6.2"', text)
         self.assertIn('"rogue52"', text)
         self.assertIn('"Rogue 5.2.1"', text)
         self.assertIn('"BSD-style"', text)
@@ -20,7 +22,21 @@ class VariantMetadataTest(unittest.TestCase):
         text = (ROOT / "variant.c").read_text(encoding="utf-8")
 
         self.assertIn("static const ROGUE_VARIANT_INFO *current_variant = &variants[0];", text)
+        self.assertLess(text.index('"rogue54"'), text.index('"rogue36"'))
         self.assertLess(text.index('"rogue54"'), text.index('"rogue52"'))
+
+    def test_rogue36_license_is_preserved(self):
+        license_text = (ROOT / "variants" / "rogue36" / "LICENSE.TXT").read_text(
+            encoding="utf-8"
+        )
+        readme_text = (ROOT / "variants" / "rogue36" / "README-RogueTiles.txt").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("Redistribution and use in source and binary forms", license_text)
+        self.assertIn("Michael Toy and Glenn Wichman", license_text)
+        self.assertIn("rogue3.6.2-src.tar.gz", readme_text)
+        self.assertIn("A378B23B19F65C245CFBEEF53AA7292D5DA5BEB1302BE5332948DFF78908F68E", readme_text)
 
     def test_rogue52_license_is_preserved(self):
         license_text = (ROOT / "variants" / "rogue52" / "LICENSE.TXT").read_text(
@@ -47,6 +63,8 @@ class VariantMetadataTest(unittest.TestCase):
         self.assertNotIn("britzl.github.io/roguearchive", variant_text)
         self.assertIn("rogue54.6", variant_text)
         self.assertIn("rogue54.doc", variant_text)
+        self.assertIn("variants/rogue36/rogue.6", variant_text)
+        self.assertIn("variants/rogue36/rogue.r", variant_text)
         self.assertIn("variants/rogue52/rogue.6", variant_text)
         package_text = (ROOT / "scripts" / "package-windows.ps1").read_text(encoding="utf-8")
         self.assertIn("rogue54.6", package_text)
@@ -61,6 +79,68 @@ class VariantMetadataTest(unittest.TestCase):
         self.assertIn("ALLEGRO_KEY_F1", frontend_text)
         self.assertIn("current->manuals", frontend_text)
         self.assertIn("show_manuals_menu_for_variant(selected_variant)", frontend_text)
+
+    def test_rogue36_runtime_bridge_is_registered(self):
+        variant_text = (ROOT / "variant.c").read_text(encoding="utf-8")
+        tiles_text = (ROOT / "tiles.c").read_text(encoding="utf-8")
+        makefile_text = (ROOT / "Makefile.std").read_text(encoding="utf-8")
+        main_text = (ROOT / "main.c").read_text(encoding="utf-8")
+
+        self.assertIn("rogue36_variant_status", variant_text)
+        self.assertIn("rogue36_tile_describe_cell", variant_text)
+        self.assertIn("rogue36_tile_describe_cell", tiles_text)
+        self.assertIn('apply_variant_monster_mapping("rogue36"', tiles_text)
+        self.assertIn("ROGUE36_CFILES", makefile_text)
+        self.assertIn("rogue36_port.c", makefile_text)
+        self.assertIn("rogue36_main", main_text)
+
+    def test_rogue36_core_menus_use_gui_overlays_in_tile_mode(self):
+        command_text = (ROOT / "variants" / "rogue36" / "command.c").read_text(
+            encoding="utf-8"
+        )
+        pack_text = (ROOT / "variants" / "rogue36" / "pack.c").read_text(
+            encoding="utf-8"
+        )
+        options_text = (ROOT / "variants" / "rogue36" / "options.c").read_text(
+            encoding="utf-8"
+        )
+        monsters_text = (ROOT / "variants" / "rogue36" / "monsters.c").read_text(
+            encoding="utf-8"
+        )
+        io_text = (ROOT / "variants" / "rogue36" / "io.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn('rogue_frontend_text_overlay_begin("Command Help")', command_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Identify")', command_text)
+        self.assertIn("tile_pick_pack_letter", pack_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Inventory")', pack_text)
+        self.assertIn("tile_option()", options_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Options")', options_text)
+        self.assertIn("rogue_frontend_text_input", options_text)
+        self.assertIn("tile_pick_genocide_monster", monsters_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Genocide")', monsters_text)
+        self.assertIn("rogue_frontend_text_overlay_begin(message)", io_text)
+
+    def test_rogue36_save_score_death_and_win_use_gui_overlays_in_tile_mode(self):
+        save_text = (ROOT / "variants" / "rogue36" / "save.c").read_text(
+            encoding="utf-8"
+        )
+        rip_text = (ROOT / "variants" / "rogue36" / "rip.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("#include \"../../frontend.h\"", save_text)
+        self.assertIn("restore_error", save_text)
+        self.assertIn("rogue_frontend_confirm(\"Save Game\"", save_text)
+        self.assertIn("rogue_frontend_notice(\"Restore Failed\"", save_text)
+        self.assertIn("rogue_frontend_start()", save_text)
+        self.assertIn("tile_score_pause_shown", rip_text)
+        self.assertIn("rogue_frontend_show_death", rip_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Scores")', rip_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("You Made It!")', rip_text)
+        self.assertIn('rogue_frontend_text_overlay_begin("Spoils")', rip_text)
+        self.assertIn("rogue_frontend_request_launcher_restart()", rip_text)
 
     def test_rogue52_help_uses_gui_overlay_in_tile_mode(self):
         command_text = (ROOT / "variants" / "rogue52" / "command.c").read_text(
@@ -204,6 +284,9 @@ class VariantMetadataTest(unittest.TestCase):
         rip52_text = (ROOT / "variants" / "rogue52" / "rip.c").read_text(
             encoding="utf-8"
         )
+        rip36_text = (ROOT / "variants" / "rogue36" / "rip.c").read_text(
+            encoding="utf-8"
+        )
 
         self.assertIn("rogue_frontend_request_launcher_restart", frontend_header)
         self.assertIn("launcher_restart_requested", frontend_text)
@@ -213,6 +296,8 @@ class VariantMetadataTest(unittest.TestCase):
         self.assertIn("rogue_frontend_request_launcher_restart()", rip54_text)
         self.assertIn("Press Enter to return to game select", rip52_text)
         self.assertIn("rogue_frontend_request_launcher_restart()", rip52_text)
+        self.assertIn("Press Enter to return to game select", rip36_text)
+        self.assertIn("rogue_frontend_request_launcher_restart()", rip36_text)
 
 
 if __name__ == "__main__":
