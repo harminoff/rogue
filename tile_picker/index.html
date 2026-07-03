@@ -545,7 +545,7 @@
       const tileHeight = Number(document.getElementById("customTileH").value) || tileWidth;
       const columns = customColumnsTouched ? Number(document.getElementById("customCols").value) : undefined;
       const names = document.getElementById("customNames").value.split(/\r?\n/).map(line => line.trim());
-      const catalog = RogueCustomCatalog.buildCustomCatalog(
+      let catalog = RogueCustomCatalog.buildCustomCatalog(
         customImage.naturalWidth,
         customImage.naturalHeight,
         tileWidth,
@@ -553,12 +553,45 @@
         columns,
         names
       );
+      const blankIndexes = detectBlankTileIndexes(catalog);
+      catalog = RogueCustomCatalog.hideBlankTiles(catalog, blankIndexes);
       customSource.atlas = catalog.atlas;
       customSource.tiles = catalog.tiles;
       document.getElementById("customCols").value = catalog.atlas.columns;
       page = 0;
-      statusEl.textContent = `Custom tilemap loaded: ${catalog.atlas.columns} x ${Math.floor(customImage.naturalHeight / catalog.atlas.tileHeight)} tiles`;
+      statusEl.textContent = `Custom tilemap loaded: ${catalog.tiles.length} tiles (${blankIndexes.size} blank hidden)`;
       renderAll();
+    }
+
+    function detectBlankTileIndexes(catalog) {
+      const blankIndexes = new Set();
+      const canvas = document.createElement("canvas");
+      canvas.width = catalog.atlas.tileWidth;
+      canvas.height = catalog.atlas.tileHeight;
+      const ctx = canvas.getContext("2d", {willReadFrequently: true});
+      if (!ctx) return blankIndexes;
+
+      for (const tile of catalog.tiles) {
+        const sx = (tile.index % catalog.atlas.columns) * catalog.atlas.tileWidth;
+        const sy = Math.floor(tile.index / catalog.atlas.columns) * catalog.atlas.tileHeight;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(
+          customImage,
+          sx,
+          sy,
+          catalog.atlas.tileWidth,
+          catalog.atlas.tileHeight,
+          0,
+          0,
+          catalog.atlas.tileWidth,
+          catalog.atlas.tileHeight
+        );
+        if (RogueCustomCatalog.isBlankTilePixels(ctx.getImageData(0, 0, canvas.width, canvas.height).data)) {
+          blankIndexes.add(tile.index);
+        }
+      }
+
+      return blankIndexes;
     }
 
     rlImage.onload = renderAll;

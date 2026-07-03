@@ -19,4 +19,19 @@ assert.strictEqual(renderable.image, image);
 assert.strictEqual(renderable.tiles.length, 442);
 assert.strictEqual(renderable.atlas.columns, 17);
 
+assert.strictEqual(catalog.isBlankTilePixels(new Uint8ClampedArray([
+  0, 0, 0, 0,
+  255, 255, 255, 0,
+])), true);
+assert.strictEqual(catalog.isBlankTilePixels(new Uint8ClampedArray([
+  0, 0, 0, 0,
+  255, 255, 255, 255,
+])), false);
+
+const filtered = catalog.hideBlankTiles(result, new Set([0, 441]));
+assert.strictEqual(filtered.tiles.length, 440);
+assert.strictEqual(filtered.tiles[0].index, 1);
+assert.strictEqual(filtered.tiles[filtered.tiles.length - 1].index, 440);
+assert.strictEqual(filtered.atlas.columns, 17);
+
 console.log("custom catalog tests passed");

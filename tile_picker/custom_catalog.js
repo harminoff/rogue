@@ -41,10 +41,28 @@
     };
   }
 
+  function isBlankTilePixels(data) {
+    if (!data || !data.length) return true;
+    for (let index = 3; index < data.length; index += 4) {
+      if (data[index] !== 0) return false;
+    }
+    return true;
+  }
+
+  function hideBlankTiles(source, blankIndexes) {
+    const blanks = blankIndexes instanceof Set ? blankIndexes : new Set(blankIndexes || []);
+    return {
+      ...source,
+      tiles: source.tiles.filter(tile => !blanks.has(tile.index)),
+    };
+  }
+
   root.RogueCustomCatalog = {
     inferColumns,
     buildCustomCatalog,
     withImage,
+    isBlankTilePixels,
+    hideBlankTiles,
   };
 
   if (typeof module !== "undefined") {
