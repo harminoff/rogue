@@ -172,7 +172,7 @@ class CombatDamageLogTests(unittest.TestCase):
             render.index("draw_status();"),
         )
 
-    def test_shader_settings_are_per_effect_and_bind_sampler(self):
+    def test_shader_settings_are_per_effect_and_draw_overlay(self):
         allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
 
         self.assertIn("dungeon_gloom_enabled", allegro_c)
@@ -187,7 +187,26 @@ class CombatDamageLogTests(unittest.TestCase):
             allegro_c.index("show_shader_settings_menu")
         ]
         self.assertIn("settings.dungeon_gloom_enabled", draw_shader)
-        self.assertIn('al_set_shader_sampler("al_tex", scene_bitmap, 0)', draw_shader)
+        self.assertIn("u_screen_size", draw_shader)
+        self.assertIn("al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA", draw_shader)
+        self.assertIn("al_draw_filled_rectangle", draw_shader)
+        self.assertIn("shader_uniforms_ready", draw_shader)
+        self.assertLess(
+            draw_shader.index("al_draw_bitmap(scene_bitmap, 0, 0, 0);"),
+            draw_shader.index("if (settings.dungeon_gloom_enabled"),
+        )
+
+    def test_shader_diagnostic_smoke_saves_render_targets(self):
+        frontend_c = (ROOT / "frontend.c").read_text(encoding="utf-8")
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("--tiles-shader-smoke", frontend_c)
+        self.assertIn("shader_smoke_requested", frontend_c)
+        self.assertIn("rogue_allegro_enable_shader_smoke", frontend_c)
+        self.assertIn("shader_smoke_mode", allegro_c)
+        self.assertIn("rogue_scene_before_shader.png", allegro_c)
+        self.assertIn("rogue_scene_after_shader.png", allegro_c)
+        self.assertIn("al_save_bitmap", allegro_c)
 
 
 if __name__ == "__main__":

@@ -99,6 +99,7 @@ static ALLEGRO_SHADER *gloom_shader = NULL;
 static ALLEGRO_FONT *font = NULL;
 static bool started = FALSE;
 static bool smoke_mode = FALSE;
+static bool shader_smoke_mode = FALSE;
 static bool gloom_shader_failed = FALSE;
 static int scene_bitmap_width = 0;
 static int scene_bitmap_height = 0;
@@ -144,6 +145,12 @@ char rogue_allegro_text_overlay_pick(const char *prompt);
 void rogue_allegro_text_overlay_clear(void);
 bool rogue_allegro_notice(const char *title, const char *message);
 void rogue_allegro_render(void);
+
+void
+rogue_allegro_enable_shader_smoke(void)
+{
+    shader_smoke_mode = TRUE;
+}
 
 static void
 allegro_start_error(const char *message)
@@ -581,19 +588,17 @@ static const char *gloom_pixel_shader_source =
     "#ifdef GL_ES\n"
     "precision mediump float;\n"
     "#endif\n"
-    "uniform sampler2D al_tex;\n"
     "uniform float u_gloom_strength;\n"
     "uniform float u_gloom_radius;\n"
-    "varying vec4 varying_color;\n"
-    "varying vec2 varying_texcoord;\n"
+    "uniform vec2 u_screen_size;\n"
     "void main()\n"
     "{\n"
-    "    vec4 color = varying_color * texture2D(al_tex, varying_texcoord);\n"
-    "    vec2 p = varying_texcoord - vec2(0.5, 0.5);\n"
+    "    vec2 uv = gl_FragCoord.xy / u_screen_size;\n"
+    "    vec2 p = uv - vec2(0.5, 0.5);\n"
+    "    p.x *= u_screen_size.x / u_screen_size.y;\n"
     "    float dist = length(p);\n"
     "    float gloom = smoothstep(u_gloom_radius, 0.78, dist);\n"
-    "    color.rgb *= 1.0 - gloom * u_gloom_strength;\n"
-    "    gl_FragColor = color;\n"
+    "    gl_FragColor = vec4(0.0, 0.0, 0.0, gloom * u_gloom_strength);\n"
     "}\n";
 
 static bool
@@ -628,6 +633,42 @@ ensure_scene_bitmap(void)
     scene_bitmap_width = w;
     scene_bitmap_height = h;
     return TRUE;
+}
+
+static void
+shader_smoke_path(char *out, size_t out_size, const char *filename)
+{
+    char base[512];
+    char *slash;
+
+    if (out_size == 0)
+	return;
+
+    snprintf(base, sizeof(base), "%s", settings_path);
+    slash = strrchr(base, '\\');
+    if (slash == NULL)
+	slash = strrchr(base, '/');
+    if (slash != NULL)
+    {
+	*slash = '\0';
+	snprintf(out, out_size, "%s\\%s", base, filename);
+	return;
+    }
+
+    snprintf(out, out_size, "%s", filename);
+}
+
+static void
+save_shader_smoke_bitmap(const char *filename, ALLEGRO_BITMAP *bitmap)
+{
+    char path[512];
+
+    if (!shader_smoke_mode || bitmap == NULL)
+	return;
+
+    shader_smoke_path(path, sizeof(path), filename);
+    if (!al_save_bitmap(path, bitmap))
+	fprintf(stderr, "Could not save shader smoke bitmap: %s\n", path);
 }
 
 static bool
@@ -675,26 +716,55 @@ ensure_gloom_shader(void)
 static void
 draw_scene_with_gloom_shader(void)
 {
+    bool shader_uniforms_ready;
+    float screen_size[2];
+    int old_blender_op;
+    int old_blender_src;
+    int old_blender_dst;
+
     if (scene_bitmap == NULL)
 	return;
 
     al_set_target_backbuffer(display);
     al_clear_to_color(al_map_rgb(0, 0, 0));
+    al_draw_bitmap(scene_bitmap, 0, 0, 0);
 
     if (settings.dungeon_gloom_enabled && ensure_gloom_shader())
     {
 	if (al_use_shader(gloom_shader))
 	{
-	    al_set_shader_float("u_gloom_strength", ROGUE_GLOOM_STRENGTH);
-	    al_set_shader_float("u_gloom_radius", ROGUE_GLOOM_RADIUS);
-	    al_set_shader_sampler("al_tex", scene_bitmap, 0);
-	    al_draw_bitmap(scene_bitmap, 0, 0, 0);
+	    screen_size[0] = (float)display_width();
+	    screen_size[1] = (float)display_height();
+	    shader_uniforms_ready =
+		(bool)(al_set_shader_float("u_gloom_strength",
+					   ROGUE_GLOOM_STRENGTH)
+		       && al_set_shader_float("u_gloom_radius",
+					      ROGUE_GLOOM_RADIUS)
+		       && al_set_shader_float_vector("u_screen_size", 2,
+						     screen_size, 1));
+	    if (shader_uniforms_ready)
+	    {
+		al_get_blender(&old_blender_op, &old_blender_src,
+			       &old_blender_dst);
+		al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA,
+			       ALLEGRO_INVERSE_ALPHA);
+		al_draw_filled_rectangle(0, 0, (float)display_width(),
+					 (float)display_height(),
+					 al_map_rgba_f(1, 1, 1, 1));
+		al_set_blender(old_blender_op, old_blender_src,
+			       old_blender_dst);
+		al_use_shader(NULL);
+		save_shader_smoke_bitmap("rogue_scene_after_shader.png",
+					 al_get_backbuffer(display));
+		return;
+	    }
+
 	    al_use_shader(NULL);
-	    return;
 	}
     }
 
-    al_draw_bitmap(scene_bitmap, 0, 0, 0);
+    save_shader_smoke_bitmap("rogue_scene_after_shader.png",
+			     al_get_backbuffer(display));
 }
 
 static void
@@ -2068,6 +2138,8 @@ rogue_allegro_start(bool smoke)
 
     init_settings_path();
     load_settings();
+    if (shader_smoke_mode)
+	settings.dungeon_gloom_enabled = TRUE;
 
     if (!al_init())
     {
@@ -2194,6 +2266,9 @@ rogue_allegro_render(void)
 	for (screen_x = 0; screen_x < cols; screen_x++)
 	    draw_actor_foreground_cell(screen_x, screen_y,
 				       &view[screen_y][screen_x]);
+    if (render_to_scene)
+	save_shader_smoke_bitmap("rogue_scene_before_shader.png",
+				 scene_bitmap);
     if (render_to_scene)
 	draw_scene_with_gloom_shader();
     else
@@ -2895,6 +2970,7 @@ rogue_allegro_shutdown(void)
     held_movement = '\0';
     held_movement_next_time = 0.0;
     gloom_shader_failed = FALSE;
+    shader_smoke_mode = FALSE;
     scene_bitmap_width = 0;
     scene_bitmap_height = 0;
     prompt_active = FALSE;

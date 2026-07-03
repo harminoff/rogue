@@ -15,9 +15,11 @@
 static ROGUE_FRONTEND_KIND frontend_kind = ROGUE_FRONTEND_CURSES;
 static bool tiles_requested = FALSE;
 static bool smoke_requested = FALSE;
+static bool shader_smoke_requested = FALSE;
 
 #ifdef ROGUE_ENABLE_ALLEGRO
 bool rogue_allegro_start(bool smoke);
+void rogue_allegro_enable_shader_smoke(void);
 void rogue_allegro_render(void);
 char rogue_allegro_readchar(void);
 void rogue_allegro_show_prompt(const char *prompt);
@@ -108,6 +110,12 @@ rogue_frontend_init(int *argc, char **argv)
 	    tiles_requested = TRUE;
 	    smoke_requested = TRUE;
 	}
+	else if (strcmp(argv[read_idx], "--tiles-shader-smoke") == 0)
+	{
+	    tiles_requested = TRUE;
+	    smoke_requested = TRUE;
+	    shader_smoke_requested = TRUE;
+	}
 	else
 	    argv[write_idx++] = argv[read_idx];
     }
@@ -139,7 +147,11 @@ rogue_frontend_start(void)
 {
 #ifdef ROGUE_ENABLE_ALLEGRO
     if (frontend_kind == ROGUE_FRONTEND_ALLEGRO)
+    {
+	if (shader_smoke_requested)
+	    rogue_allegro_enable_shader_smoke();
 	return rogue_allegro_start(smoke_requested);
+    }
 #endif
 
     return TRUE;
