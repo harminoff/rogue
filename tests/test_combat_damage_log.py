@@ -66,6 +66,40 @@ class CombatDamageLogTests(unittest.TestCase):
         ]
         self.assertIn("if (settings.stylized_bottom_bar_enabled)", draw_status)
 
+    def test_blood_splatter_is_limited_to_walkable_tiles(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("blood_tile_is_walkable", allegro_c)
+        self.assertIn("find_blood_splat_cell", allegro_c)
+
+        walkable = allegro_c[
+            allegro_c.index("blood_tile_is_walkable"):
+            allegro_c.index("clear_blood_splats")
+        ]
+        self.assertIn("case ' '", walkable)
+        self.assertIn("case '|'", walkable)
+        self.assertIn("case '-'", walkable)
+        self.assertIn("return FALSE", walkable)
+        self.assertIn("case FLOOR", walkable)
+        self.assertIn("case PASSAGE", walkable)
+        self.assertIn("case DOOR", walkable)
+        self.assertIn("case TRAP", walkable)
+        self.assertIn("case STAIRS", walkable)
+        self.assertIn("default:", walkable)
+        self.assertNotIn("isupper", walkable)
+
+        add_splat = allegro_c[
+            allegro_c.index("add_blood_splat"):
+            allegro_c.index("spawn_blood_spatter")
+        ]
+        self.assertIn("blood_tile_is_walkable(y, x)", add_splat)
+
+        spawn_splat = allegro_c[
+            allegro_c.index("spawn_blood_spatter"):
+            allegro_c.index("draw_blood_splats")
+        ]
+        self.assertIn("find_blood_splat_cell(&y, &x)", spawn_splat)
+
 
 if __name__ == "__main__":
     unittest.main()

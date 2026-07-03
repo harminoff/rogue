@@ -1111,6 +1111,73 @@ message_is_blood_trigger(const char *message)
 	|| contains_text(message, "wounded");
 }
 
+static bool
+blood_tile_is_walkable(int y, int x)
+{
+    char ch;
+
+    if (y <= 0 || y >= NUMLINES - 1 || x < 0 || x >= NUMCOLS)
+	return FALSE;
+
+    ch = chat(y, x);
+    switch (ch)
+    {
+	case ' ':
+	case '|':
+	case '-':
+	    return FALSE;
+	case FLOOR:
+	case PASSAGE:
+	case DOOR:
+	case TRAP:
+	case STAIRS:
+	case GOLD:
+	case POTION:
+	case SCROLL:
+	case MAGIC:
+	case FOOD:
+	case WEAPON:
+	case ARMOR:
+	case AMULET:
+	case RING:
+	case STICK:
+	    return TRUE;
+	default:
+	    return FALSE;
+    }
+}
+
+static bool
+find_blood_splat_cell(int *out_y, int *out_x)
+{
+    int attempt;
+    int radius;
+    int y;
+    int x;
+
+    for (attempt = 0; attempt < 16; attempt++)
+    {
+	radius = (attempt < 8) ? 1 : 2;
+	y = hero.y + blood_random(radius * 2 + 1) - radius;
+	x = hero.x + blood_random(radius * 2 + 1) - radius;
+	if (!blood_tile_is_walkable(y, x))
+	    continue;
+
+	*out_y = y;
+	*out_x = x;
+	return TRUE;
+    }
+
+    if (blood_tile_is_walkable(hero.y, hero.x))
+    {
+	*out_y = hero.y;
+	*out_x = hero.x;
+	return TRUE;
+    }
+
+    return FALSE;
+}
+
 static void
 clear_blood_splats(void)
 {
@@ -1123,14 +1190,17 @@ add_blood_splat(int y, int x)
     ROGUE_BLOOD_SPLAT *splat;
     int slot;
 
+    if (!blood_tile_is_walkable(y, x))
+	return;
+
     if (blood_splat_count < ROGUE_BLOOD_SPLATS)
 	slot = blood_splat_count++;
     else
 	slot = blood_random(ROGUE_BLOOD_SPLATS);
 
     splat = &blood_splats[slot];
-    splat->x = clamp_int(x, 0, NUMCOLS - 1);
-    splat->y = clamp_int(y, 0, ROGUE_MAX_VIEW_ROWS - 1);
+    splat->x = x;
+    splat->y = y;
     splat->level = level;
     splat->radius = 2 + blood_random(4);
     splat->alpha = 130 + blood_random(86);
@@ -1146,11 +1216,8 @@ spawn_blood_spatter(void)
     int x;
 
     for (i = 0; i < ROGUE_BLOOD_DROPS_PER_HIT; i++)
-    {
-	y = hero.y + blood_random(3) - 1;
-	x = hero.x + blood_random(3) - 1;
-	add_blood_splat(y, x);
-    }
+	if (find_blood_splat_cell(&y, &x))
+	    add_blood_splat(y, x);
 }
 
 static void
