@@ -1227,7 +1227,6 @@ draw_side_panel(void)
     int max_text_y;
     int entry_lines;
     int used_lines;
-    int entry_top;
     ALLEGRO_COLOR bg, border, title, text, muted, divider;
 
     panel_w = side_panel_width();
@@ -1284,11 +1283,6 @@ draw_side_panel(void)
 			 divider, 1);
 	    y += 9;
 	}
-	entry_top = y;
-	if (settings.stylized_log_enabled)
-	    al_draw_filled_rectangle(x + 11, entry_top + 5, x + 13,
-				     entry_top + line_height - 3,
-				     log_message_color(message_log[i]));
 	draw_wrapped_log_message(message_log[i], x + 18, &y, max_chars,
 				 line_height, log_message_color(message_log[i]));
 	y += 4;
