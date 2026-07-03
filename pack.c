@@ -10,10 +10,14 @@
  * See the file LICENSE.TXT for full copyright and licensing information.
  */
 
+#include <stdio.h>
 #include <string.h>
 #include <curses.h>
 #include <ctype.h>
 #include "rogue.h"
+#include "frontend.h"
+
+static char inventory_selected_ch = '\0';
 
 /*
  * add_pack:
@@ -248,8 +252,10 @@ bool
 inventory(THING *list, int type)
 {
     static char inv_temp[MAXSTR];
+    char answer;
 
     n_objs = 0;
+    inventory_selected_ch = '\0';
     for (; list != NULL; list = next(list))
     {
 	if (type && type != list->o_type && !(type == CALLABLE &&
@@ -264,10 +270,17 @@ inventory(THING *list, int type)
 #endif
 	    sprintf(inv_temp, "%c) %%s", list->o_packch);
 	msg_esc = TRUE;
-	if (add_line(inv_temp, inv_name(list, FALSE)) == ESCAPE)
+	answer = add_line(inv_temp, inv_name(list, FALSE));
+	if (answer == ESCAPE)
 	{
 	    msg_esc = FALSE;
 	    msg("");
+	    return TRUE;
+	}
+	if (answer != (char) ~ESCAPE)
+	{
+	    inventory_selected_ch = answer;
+	    msg_esc = FALSE;
 	    return TRUE;
 	}
 	msg_esc = FALSE;
@@ -282,8 +295,67 @@ inventory(THING *list, int type)
 			    "you don't have anything appropriate");
 	return FALSE;
     }
-    end_line();
+    answer = end_line();
+    if (answer != ESCAPE && answer != (char) ~ESCAPE)
+	inventory_selected_ch = answer;
     return TRUE;
+}
+
+static bool
+pack_type_matches(THING *obj, int type)
+{
+    if (obj == NULL)
+	return FALSE;
+    if (type == 0 || type == obj->o_type)
+	return TRUE;
+    if (type == CALLABLE && obj->o_type != FOOD && obj->o_type != AMULET)
+	return TRUE;
+    if (type == R_OR_S && (obj->o_type == RING || obj->o_type == STICK))
+	return TRUE;
+
+    return FALSE;
+}
+
+static char
+tile_pick_pack_letter(char *purpose, int type)
+{
+    THING *obj;
+    int matches;
+    char tile_line[2 * MAXSTR];
+    char prompt[MAXSTR];
+    char chosen;
+
+    matches = 0;
+    rogue_frontend_text_overlay_begin("Inventory");
+    for (obj = pack; obj != NULL; obj = next(obj))
+    {
+	if (!pack_type_matches(obj, type))
+	    continue;
+	snprintf(tile_line, sizeof(tile_line), "%c) %s",
+		 obj->o_packch, inv_name(obj, FALSE));
+	rogue_frontend_text_overlay_add(tile_line);
+	matches++;
+    }
+
+    if (matches == 0)
+    {
+	rogue_frontend_text_overlay_clear();
+	if (terse)
+	    msg("nothing appropriate");
+	else
+	    msg("you don't have anything appropriate");
+	return '\0';
+    }
+
+    if (purpose == NULL || *purpose == '\0')
+	purpose = "choose";
+    snprintf(prompt, sizeof(prompt),
+	     "Letters select, arrows move, Enter to %s, Esc cancels",
+	     purpose);
+    chosen = rogue_frontend_text_overlay_pick(prompt);
+    rogue_frontend_text_overlay_clear();
+
+    return chosen;
 }
 
 /*
@@ -353,9 +425,35 @@ picky_inven()
 {
     THING *obj;
     char mch;
+    char tile_line[2 * MAXSTR];
 
     if (pack == NULL)
 	msg("you aren't carrying anything");
+    else if (rogue_frontend_is_tiles())
+    {
+	rogue_frontend_text_overlay_begin("Inventory");
+	for (obj = pack; obj != NULL; obj = next(obj))
+	{
+	    snprintf(tile_line, sizeof(tile_line), "%c) %s",
+		     obj->o_packch, inv_name(obj, FALSE));
+	    rogue_frontend_text_overlay_add(tile_line);
+	}
+	mch = rogue_frontend_text_overlay_pick(
+	    "Letters select, arrows move, Enter inspects, Esc cancels");
+	rogue_frontend_text_overlay_clear();
+	if (mch == ESCAPE || mch == '\0')
+	{
+	    msg("");
+	    return;
+	}
+	for (obj = pack; obj != NULL; obj = next(obj))
+	    if (mch == obj->o_packch)
+	    {
+		msg("%c) %s", mch, inv_name(obj, FALSE));
+		return;
+	    }
+	msg("'%s' not in pack", unctrl(mch));
+    }
     else if (next(pack) == NULL)
 	msg("a) %s", inv_name(pack, FALSE));
     else
@@ -398,18 +496,24 @@ get_item(char *purpose, int type)
     {
 	for (;;)
 	{
-	    if (!terse)
-		addmsg("which object do you want to ");
-	    addmsg(purpose);
-	    if (terse)
-		addmsg(" what");
-	    msg("? (* for list): ");
-	    ch = readchar();
+	    if (rogue_frontend_is_tiles())
+		ch = tile_pick_pack_letter(purpose, type);
+	    else
+	    {
+		if (!terse)
+		    addmsg("which object do you want to ");
+		addmsg(purpose);
+		if (terse)
+		    addmsg(" what");
+		msg("? (* for list): ");
+		ch = readchar();
+	    }
 	    mpos = 0;
 	    /*
 	     * Give the poor player a chance to abort the command
 	     */
-	    if (ch == ESCAPE)
+	    if (ch == ESCAPE || ch == '\0' || ch == 'Q'
+		|| ch == ' ' || ch == '\n' || ch == '\r')
 	    {
 		reset_last();
 		after = FALSE;
@@ -420,12 +524,22 @@ get_item(char *purpose, int type)
 	    if (ch == '*')
 	    {
 		mpos = 0;
+		if (rogue_frontend_is_tiles())
+		    set_tile_inventory_pick_mode(TRUE);
 		if (inventory(pack, type) == 0)
 		{
+		    if (rogue_frontend_is_tiles())
+			set_tile_inventory_pick_mode(FALSE);
 		    after = FALSE;
 		    return NULL;
 		}
-		continue;
+		if (rogue_frontend_is_tiles())
+		    set_tile_inventory_pick_mode(FALSE);
+		if (inventory_selected_ch == '\0'
+		    || inventory_selected_ch == ESCAPE
+		    || inventory_selected_ch == ' ')
+		    continue;
+		ch = inventory_selected_ch;
 	    }
 	    for (obj = pack; obj != NULL; obj = next(obj))
 		if (obj->o_packch == ch)

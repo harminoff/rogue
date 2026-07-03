@@ -1,0 +1,9 @@
+native-build/
+.native-build/
+native-build-tests/
+build/
+dist/
+__pycache__/
+*.pyc
+rogue54.scr
+rogue54.lck

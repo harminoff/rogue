@@ -11,10 +11,12 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <curses.h>
 #include <ctype.h>
 #include "rogue.h"
+#include "frontend.h"
 
 /*
  * command:
@@ -238,7 +240,10 @@ over:
 			runch = ch = dir_ch;
 			goto over;
 		    }
-		when 't':
+#ifndef MASTER
+		when '+':
+#endif
+		case 't':
 		    if (!get_dir())
 			after = FALSE;
 		    else
@@ -278,7 +283,8 @@ over:
 		when '?': after = FALSE; help();
 		when '/': after = FALSE; identify();
 		when 's': search();
-		when 'z':
+		when '-':
+		case 'z':
 		    if (get_dir())
 			do_zap();
 		    else
@@ -530,6 +536,40 @@ foundone:
 	look(FALSE);
 }
 
+static void
+format_help_line(struct h_list *strp, char *line, int line_size)
+{
+    char key[32];
+    char desc[MAXSTR];
+    const char *src;
+    char *dst;
+    int remaining;
+
+    if (strp->h_ch)
+	snprintf(key, sizeof(key), "%s", unctrl(strp->h_ch));
+    else
+	key[0] = '\0';
+
+    src = (strp->h_desc == NULL) ? "" : strp->h_desc;
+    while (*src != '\0' && isspace((unsigned char) *src))
+	src++;
+
+    dst = desc;
+    remaining = (int) sizeof(desc) - 1;
+    while (*src != '\0' && remaining > 0)
+    {
+	*dst++ = (*src == '\t') ? ' ' : *src;
+	src++;
+	remaining--;
+    }
+    *dst = '\0';
+
+    if (key[0] != '\0')
+	snprintf(line, line_size, "%-8s %s", key, desc);
+    else
+	snprintf(line, line_size, "%s", desc);
+}
+
 /*
  * help:
  *	Give single character help, or the whole mess if he wants it
@@ -540,6 +580,8 @@ help()
     register struct h_list *strp;
     register char helpch;
     register int numprint, cnt;
+    char line[MAXSTR];
+
     msg("character you want help for (* for all): ");
     helpch = readchar();
     mpos = 0;
@@ -554,11 +596,32 @@ help()
 	    if (strp->h_ch == helpch)
 	    {
 		lower_msg = TRUE;
-		msg("%s%s", unctrl(strp->h_ch), strp->h_desc);
+		if (rogue_frontend_is_tiles())
+		{
+		    format_help_line(strp, line, sizeof(line));
+		    msg("%s", line);
+		}
+		else
+		    msg("%s%s", unctrl(strp->h_ch), strp->h_desc);
 		lower_msg = FALSE;
 		return;
 	    }
 	msg("unknown character '%s'", unctrl(helpch));
+	return;
+    }
+    if (rogue_frontend_is_tiles())
+    {
+	rogue_frontend_text_overlay_begin("Command Help");
+	for (strp = helpstr; strp->h_desc != NULL; strp++)
+	    if (strp->h_print)
+	    {
+		format_help_line(strp, line, sizeof(line));
+		rogue_frontend_text_overlay_add(line);
+	    }
+	rogue_frontend_text_overlay_show(
+	    "Arrows/Page scroll, Space closes");
+	rogue_frontend_text_overlay_clear();
+	msg("");
 	return;
     }
     /*
@@ -610,6 +673,7 @@ identify()
     register int ch;
     register struct h_list *hp;
     register char *str;
+    char line[MAXSTR];
     static struct h_list ident_list[] = {
 	{'|',		"wall of a room",		FALSE},
 	{'-',		"wall of a room",		FALSE},
@@ -632,8 +696,30 @@ identify()
 	{'\0'}
     };
 
-    msg("what do you want identified? ");
-    ch = readchar();
+    if (rogue_frontend_is_tiles())
+    {
+	rogue_frontend_text_overlay_begin("Identify");
+	for (hp = ident_list; hp->h_ch != '\0'; hp++)
+	{
+	    snprintf(line, sizeof(line), "%s) %s", unctrl(hp->h_ch),
+		     hp->h_desc);
+	    rogue_frontend_text_overlay_add(line);
+	}
+	for (ch = 'A'; ch <= 'Z'; ch++)
+	{
+	    snprintf(line, sizeof(line), "%c) %s", ch,
+		     monsters[ch - 'A'].m_name);
+	    rogue_frontend_text_overlay_add(line);
+	}
+	ch = rogue_frontend_text_overlay_pick(
+	    "Type/select a symbol, arrows move, Enter selects, Esc cancels");
+	rogue_frontend_text_overlay_clear();
+    }
+    else
+    {
+	msg("what do you want identified? ");
+	ch = readchar();
+    }
     mpos = 0;
     if (ch == ESCAPE)
     {

@@ -11,6 +11,7 @@
  */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
@@ -18,6 +19,7 @@
 #include <string.h>
 #include <curses.h>
 #include "rogue.h"
+#include "frontend.h"
 #include "score.h"
 
 typedef struct stat STAT;
@@ -25,6 +27,14 @@ typedef struct stat STAT;
 extern char version[], encstr[];
 
 static STAT sbuf;
+
+static bool
+restore_error(char *message)
+{
+    if (!rogue_frontend_notice("Restore Failed", message))
+	printf("%s\n", message);
+    return FALSE;
+}
 
 /*
  * save_game:
@@ -47,23 +57,35 @@ over:
     {
 	for (;;)
 	{
-	    msg("save file (%s)? ", file_name);
-	    c = readchar();
-	    mpos = 0;
-	    if (c == ESCAPE)
+	    if (rogue_frontend_is_tiles())
 	    {
-		msg("");
-		return;
-	    }
-	    else if (c == 'n' || c == 'N' || c == 'y' || c == 'Y')
+		snprintf(buf, sizeof(buf), "Save file (%s)?", file_name);
+		c = rogue_frontend_confirm("Save Game", buf) ? 'y' : 'n';
 		break;
+	    }
 	    else
-		msg("please answer Y or N");
+	    {
+		msg("save file (%s)? ", file_name);
+		c = readchar();
+		mpos = 0;
+		if (c == ESCAPE)
+		{
+		    msg("");
+		    return;
+		}
+		else if (c == 'n' || c == 'N' || c == 'y' || c == 'Y')
+		    break;
+		else
+		    msg("please answer Y or N");
+	    }
 	}
 	if (c == 'y' || c == 'Y')
 	{
-	    addstr("Yes\n");
-	    refresh();
+	    if (!rogue_frontend_is_tiles())
+	    {
+		addstr("Yes\n");
+		refresh();
+	    }
 	    strcpy(buf, file_name);
 	    goto gotfile;
 	}
@@ -89,17 +111,30 @@ gotfile:
 	{
 	    for (;;)
 	    {
-		msg("File exists.  Do you wish to overwrite it?");
-		mpos = 0;
-		if ((c = readchar()) == ESCAPE)
-		    goto quit_it;
-		if (c == 'y' || c == 'Y')
+		if (rogue_frontend_is_tiles())
+		{
+		    c = rogue_frontend_confirm(
+			"Overwrite Save",
+			"File exists. Do you wish to overwrite it?")
+			? 'y' : 'n';
 		    break;
-		else if (c == 'n' || c == 'N')
-		    goto over;
+		}
 		else
-		    msg("Please answer Y or N");
+		{
+		    msg("File exists.  Do you wish to overwrite it?");
+		    mpos = 0;
+		    if ((c = readchar()) == ESCAPE)
+			goto quit_it;
+		    if (c == 'y' || c == 'Y')
+			break;
+		    else if (c == 'n' || c == 'N')
+			goto over;
+		    else
+			msg("Please answer Y or N");
+		}
 	    }
+	    if (c == 'n' || c == 'N')
+		goto over;
 	    msg("file name: %s", buf);
 	    md_unlink(file_name);
 	}
@@ -176,8 +211,8 @@ restore(char *file, char **envp)
 
 	if ((inf = fopen(file,"r")) == NULL)
     {
-	perror(file);
-	return FALSE;
+	snprintf(buf, sizeof(buf), "%s: %s", file, strerror(errno));
+	return restore_error(buf);
     }
     stat(file, &sbuf2);
     syml = is_symlink(file);
@@ -186,8 +221,7 @@ restore(char *file, char **envp)
     encread(buf, (unsigned) strlen(version) + 1, inf);
     if (strcmp(buf, version) != 0)
     {
-	printf("Sorry, saved game is out of date.\n");
-	return FALSE;
+	return restore_error("Sorry, saved game is out of date.");
     }
     encread(buf,80,inf);
     sscanf(buf,"%d x %d\n", &lines, &cols);
@@ -198,16 +232,18 @@ restore(char *file, char **envp)
     if (lines > LINES)
     {
         endwin();
-        printf("Sorry, original game was played on a screen with %d lines.\n",lines);
-        printf("Current screen only has %d lines. Unable to restore game\n",LINES);
-        return(FALSE);
+	snprintf(buf, sizeof(buf),
+		 "Saved game needs %d screen lines; current screen has %d.",
+		 lines, LINES);
+        return restore_error(buf);
     }
     if (cols > COLS)
     {
         endwin();
-        printf("Sorry, original game was played on a screen with %d columns.\n",cols);
-        printf("Current screen only has %d columns. Unable to restore game\n",COLS);
-        return(FALSE);
+	snprintf(buf, sizeof(buf),
+		 "Saved game needs %d screen columns; current screen has %d.",
+		 cols, COLS);
+        return restore_error(buf);
     }
 
     hw = newwin(LINES, COLS, 0, 0);
@@ -225,8 +261,7 @@ restore(char *file, char **envp)
 #endif
         md_unlink_open_file(file, inf) < 0)
     {
-	printf("Cannot unlink file\n");
-	return FALSE;
+	return restore_error("Cannot unlink file.");
     }
     mpos = 0;
 /*    printw(0, 0, "%s: %s", file, ctime(&sbuf2.st_mtime)); */
@@ -243,15 +278,13 @@ restore(char *file, char **envp)
 	if (sbuf2.st_nlink != 1 || syml)
 	{
 	    endwin();
-	    printf("\nCannot restore from a linked file\n");
-	    return FALSE;
+	    return restore_error("Cannot restore from a linked file.");
 	}
 
     if (pstats.s_hpt <= 0)
     {
 	endwin();
-	printf("\n\"He's dead, Jim\"\n");
-	return FALSE;
+	return restore_error("\"He's dead, Jim\"");
     }
 
 	md_tstpresume();
@@ -261,6 +294,14 @@ restore(char *file, char **envp)
     clearok(curscr, TRUE);
     srand(md_getpid());
     msg("file name: %s", file);
+    if (!rogue_frontend_start())
+    {
+	endwin();
+	return restore_error("Could not start tile frontend.");
+    }
+    rogue_frontend_render();
+    if (rogue_frontend_smoke_requested())
+	my_exit(0);
     playit();
     /*NOTREACHED*/
     return(0);

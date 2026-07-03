@@ -9,6 +9,8 @@
 #include <ctype.h>
 #include <string.h>
 #include "rogue.h"
+#include "frontend.h"
+#include "overlay_picker.h"
 
 /*
  * msg:
@@ -77,18 +79,25 @@ endmsg()
 	mvaddstr(0, mpos, "--More--");
 	refresh();
 	if (!msg_esc)
+	{
+	    rogue_frontend_show_prompt("--More-- Press Space");
 	    wait_for(' ');
+	    rogue_frontend_clear_prompt();
+	}
 	else
 	{
+	    rogue_frontend_show_prompt("--More-- Space continues, Esc cancels");
 	    while ((ch = readchar()) != ' ')
 		if (ch == ESCAPE)
 		{
+		    rogue_frontend_clear_prompt();
 		    msgbuf[0] = '\0';
 		    mpos = 0;
 		    newpos = 0;
 		    msgbuf[0] = '\0';
 		    return ESCAPE;
 		}
+	    rogue_frontend_clear_prompt();
 	}
     }
     /*
@@ -97,6 +106,7 @@ endmsg()
      */
     if (islower(msgbuf[0]) && !lower_msg && msgbuf[1] != ')')
 	msgbuf[0] = (char) toupper(msgbuf[0]);
+    rogue_frontend_record_message(msgbuf);
     mvaddstr(0, 0, msgbuf);
     clrtoeol();
     mpos = newpos;
@@ -152,7 +162,7 @@ readchar()
 {
     char ch;
 
-    ch = (char) md_readchar();
+    ch = rogue_frontend_readchar();
 
     if (ch == 3)
     {
@@ -264,6 +274,41 @@ void
 show_win(char *message)
 {
     WINDOW *win;
+    char rows[NUMLINES][NUMCOLS + 1];
+    const char *row_ptrs[NUMLINES];
+    char line[NUMCOLS + 1];
+    int y, x;
+    int top, bottom, left, right;
+
+    if (rogue_frontend_is_tiles())
+    {
+	rogue_frontend_text_overlay_begin("Rogue");
+	for (y = 0; y < NUMLINES; y++)
+	{
+	    row_ptrs[y] = rows[y];
+	    for (x = 0; x < NUMCOLS; x++)
+		rows[y][x] = (char) CCHAR(mvwinch(hw, y, x));
+	    rows[y][NUMCOLS] = '\0';
+	}
+	rogue_overlay_find_bounds(row_ptrs, NUMLINES, NUMCOLS,
+				  &top, &bottom, &left, &right);
+	if (top >= 0)
+	{
+	    for (y = top; y <= bottom; y++)
+	    {
+		rogue_overlay_copy_span(rows[y], left, right,
+					line, sizeof(line));
+		rogue_frontend_text_overlay_add(line);
+	    }
+	    rogue_frontend_text_overlay_add("");
+	}
+	rogue_frontend_text_overlay_add(message);
+	rogue_frontend_text_overlay_show("Space closes");
+	rogue_frontend_text_overlay_clear();
+	clearok(curscr, TRUE);
+	touchwin(stdscr);
+	return;
+    }
 
     win = hw;
     wmove(win, 0, 0);

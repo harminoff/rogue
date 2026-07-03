@@ -1,0 +1,12 @@
+Monogram font
+
+Source: https://datagoblin.itch.io/monogram
+Author: datagoblin
+Version: 1.1.0
+Vendored file: monogram.ttf
+
+License: Creative Commons Zero v1.0 Universal (CC0)
+License URL: https://creativecommons.org/publicdomain/zero/1.0/
+
+The Monogram itch.io page describes the font as a free monospace bitmap
+font and lists the asset license as Creative Commons Zero v1.0 Universal.

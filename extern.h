@@ -129,7 +129,7 @@ extern FILE	*scoreboard;
 void    auto_save(int);
 void	come_down();
 void	doctor();
-void	end_line();
+char	end_line();
 void    endit(int sig);
 void	fatal();
 void	getltchars();
@@ -154,6 +154,7 @@ void	unsee();
 void	visuals();
 
 char	add_line(char *fmt, char *arg);
+void	set_tile_inventory_pick_mode(bool enabled);
 
 char	*killname(char monst, bool doart);
 char	*nothing(char type);

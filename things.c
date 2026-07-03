@@ -15,6 +15,23 @@
 #include <string.h>
 #include <ctype.h>
 #include "rogue.h"
+#include "frontend.h"
+
+static bool tile_inventory_pick_mode = FALSE;
+
+void
+set_tile_inventory_pick_mode(bool enabled)
+{
+    tile_inventory_pick_mode = enabled;
+}
+
+static bool
+tile_overlay_answer_is_selection(char answer)
+{
+    return (bool)(answer != '\0' && answer != ESCAPE && answer != ' '
+		  && answer != '\n' && answer != '\r'
+		  && answer != 'Q' && answer != (char) ~ESCAPE);
+}
 
 /*
  * inv_name:
@@ -474,6 +491,9 @@ add_line(char *fmt, char *arg)
 {
     WINDOW *tw, *sw;
     int x, y;
+    bool tile_shown;
+    char tile_line[2 * MAXSTR];
+    char tile_answer;
     char *prompt = "--Press space to continue--";
     static int maxlen = -1;
 
@@ -482,6 +502,8 @@ add_line(char *fmt, char *arg)
 	    wclear(hw);
 	    if (inv_type == INV_SLOW)
 		mpos = 0;
+	    else if (rogue_frontend_is_tiles())
+		rogue_frontend_text_overlay_begin("Inventory");
     }
     if (inv_type == INV_SLOW)
     {
@@ -496,7 +518,19 @@ add_line(char *fmt, char *arg)
 	    maxlen = (int) strlen(prompt);
 	if (line_cnt >= LINES - 1 || fmt == NULL)
 	{
-	    if (inv_type == INV_OVER && fmt == NULL && !newpage)
+	    tile_shown = FALSE;
+	    if (rogue_frontend_is_tiles())
+	    {
+		tile_answer = rogue_frontend_text_overlay_pick(
+		    "Letters select, arrows move, Enter selects, Space closes");
+		rogue_frontend_text_overlay_clear();
+		if (tile_answer == ESCAPE)
+		    return ESCAPE;
+		if (tile_overlay_answer_is_selection(tile_answer))
+		    return tile_answer;
+		tile_shown = TRUE;
+	    }
+	    if (!tile_shown && inv_type == INV_OVER && fmt == NULL && !newpage)
 	    {
 		msg("");
 		refresh();
@@ -532,7 +566,7 @@ add_line(char *fmt, char *arg)
 		delwin(tw);
 		touchwin(stdscr);
 	    }
-	    else
+	    else if (!tile_shown)
 	    {
 		wmove(hw, LINES - 1, 0);
 		waddstr(hw, prompt);
@@ -549,6 +583,14 @@ add_line(char *fmt, char *arg)
 	if (fmt != NULL && !(line_cnt == 0 && *fmt == '\0'))
 	{
 	    mvwprintw(hw, line_cnt++, 0, fmt, arg);
+	    if (rogue_frontend_is_tiles())
+	    {
+		if (arg != NULL)
+		    snprintf(tile_line, sizeof(tile_line), fmt, arg);
+		else
+		    snprintf(tile_line, sizeof(tile_line), "%s", fmt);
+		rogue_frontend_text_overlay_add(tile_line);
+	    }
 	    getyx(hw, y, x);
 	    if (maxlen < x)
 		maxlen = x;
@@ -564,21 +606,27 @@ add_line(char *fmt, char *arg)
  *	End the list of lines
  */
 
-void
+char
 end_line()
 {
+    char answer;
+
+    answer = (char) ~ESCAPE;
     if (inv_type != INV_SLOW)
     {
-	if (line_cnt == 1 && !newpage)
+	if (rogue_frontend_is_tiles() && line_cnt > 0 && !newpage)
+	    answer = add_line((char *) NULL, NULL);
+	else if (line_cnt == 1 && !newpage)
 	{
 	    mpos = 0;
 	    msg(lastfmt, lastarg);
 	}
 	else
-	    add_line((char *) NULL, NULL);
+	    answer = add_line((char *) NULL, NULL);
     }
     line_cnt = 0;
     newpage = FALSE;
+    return answer;
 }
 
 /*
