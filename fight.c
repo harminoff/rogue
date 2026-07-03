@@ -15,6 +15,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "rogue.h"
+#include "frontend.h"
 
 #define	EQSTR(a, b)	(strcmp(a, b) == 0)
 
@@ -66,6 +67,8 @@ fight(coord *mp, THING *weap, bool thrown)
     register THING *tp;
     register bool did_hit = TRUE;
     register char *mname, ch;
+    register int oldhp;
+    register int damage_done;
 
     /*
      * Find the monster we want to fight
@@ -102,8 +105,12 @@ fight(coord *mp, THING *weap, bool thrown)
     mname = set_mname(tp);
     did_hit = FALSE;
     has_hit = (terse && !to_death);
+    oldhp = tp->t_stats.s_hpt;
     if (roll_em(&player, tp, weap, thrown))
     {
+	damage_done = oldhp - tp->t_stats.s_hpt;
+	if (damage_done > 0)
+	    rogue_frontend_record_damage(damage_done, 0);
 	did_hit = FALSE;
 	if (thrown)
 	    thunk(weap, mname, terse);
@@ -141,6 +148,7 @@ attack(THING *mp)
 {
     register char *mname;
     register int oldhp;
+    register int damage_taken;
 
     /*
      * Since this is an attack, stop running and any healing that was
@@ -164,6 +172,9 @@ attack(THING *mp)
     oldhp = pstats.s_hpt;
     if (roll_em(mp, &player, (THING *) NULL, FALSE))
     {
+	damage_taken = oldhp - pstats.s_hpt;
+	if (damage_taken > 0)
+	    rogue_frontend_record_damage(0, damage_taken);
 	if (mp->t_type != 'I')
 	{
 	    if (has_hit)

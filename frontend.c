@@ -23,6 +23,7 @@ char rogue_allegro_readchar(void);
 void rogue_allegro_show_prompt(const char *prompt);
 void rogue_allegro_clear_prompt(void);
 void rogue_allegro_record_message(const char *message);
+void rogue_allegro_record_damage(int dealt, int taken);
 void rogue_allegro_show_death(const char *killer, int gold, bool has_amulet);
 void rogue_allegro_wait_for_return(const char *prompt);
 void rogue_allegro_text_overlay_begin(const char *title);
@@ -190,6 +191,18 @@ rogue_frontend_record_message(const char *message)
 #endif
 
     (void) message;
+}
+
+void
+rogue_frontend_record_damage(int dealt, int taken)
+{
+#ifdef ROGUE_ENABLE_ALLEGRO
+    if (frontend_kind == ROGUE_FRONTEND_ALLEGRO)
+	rogue_allegro_record_damage(dealt, taken);
+#endif
+
+    (void) dealt;
+    (void) taken;
 }
 
 void

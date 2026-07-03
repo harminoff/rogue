@@ -92,7 +92,11 @@ static double held_movement_next_time = 0.0;
 static int render_origin_x = 0;
 static int render_origin_y = 0;
 static char message_log[ROGUE_MESSAGE_LOG_LINES][ROGUE_OVERLAY_LINE_LEN];
+static int message_damage_dealt[ROGUE_MESSAGE_LOG_LINES];
+static int message_damage_taken[ROGUE_MESSAGE_LOG_LINES];
 static int message_log_count = 0;
+static int pending_damage_dealt = 0;
+static int pending_damage_taken = 0;
 static ROGUE_BLOOD_SPLAT blood_splats[ROGUE_BLOOD_SPLATS];
 static int blood_splat_count = 0;
 static unsigned int blood_rng = 0x6d2b79f5u;
@@ -1178,6 +1182,20 @@ count_wrapped_lines(const char *text, int max_chars)
     return lines > 0 ? lines : 1;
 }
 
+static int
+count_log_entry_lines(int index, int max_chars)
+{
+    int lines;
+
+    lines = count_wrapped_lines(message_log[index], max_chars);
+    if (message_damage_dealt[index] > 0)
+	lines++;
+    if (message_damage_taken[index] > 0)
+	lines++;
+
+    return lines;
+}
+
 static void
 draw_wrapped_log_message(const char *message, int x, int *y,
 			 int max_chars, int line_height,
@@ -1209,6 +1227,27 @@ draw_wrapped_log_message(const char *message, int x, int *y,
 	al_draw_text(font, text, x, *y, 0, line);
 	*y += line_height + 1;
 	start += len;
+    }
+}
+
+static void
+draw_log_damage_lines(int index, int x, int *y, int line_height)
+{
+    char line[64];
+
+    if (message_damage_dealt[index] > 0)
+    {
+	snprintf(line, sizeof(line), "Damage dealt: %d",
+		 message_damage_dealt[index]);
+	al_draw_text(font, al_map_rgb(238, 122, 102), x, *y, 0, line);
+	*y += line_height + 1;
+    }
+    if (message_damage_taken[index] > 0)
+    {
+	snprintf(line, sizeof(line), "Damage taken: %d",
+		 message_damage_taken[index]);
+	al_draw_text(font, al_map_rgb(238, 82, 82), x, *y, 0, line);
+	*y += line_height + 1;
     }
 }
 
@@ -1260,7 +1299,7 @@ draw_side_panel(void)
     first = message_log_count;
     for (i = message_log_count - 1; i >= 0; i--)
     {
-	entry_lines = count_wrapped_lines(message_log[i], max_chars);
+	entry_lines = count_log_entry_lines(i, max_chars);
 	if (used_lines > 0)
 	    entry_lines++;
 	if (used_lines + entry_lines > max_lines)
@@ -1285,6 +1324,7 @@ draw_side_panel(void)
 	}
 	draw_wrapped_log_message(message_log[i], x + 18, &y, max_chars,
 				 line_height, log_message_color(message_log[i]));
+	draw_log_damage_lines(i, x + 18, &y, line_height);
 	y += 4;
 	if (y > max_text_y)
 	    break;
@@ -1733,20 +1773,37 @@ rogue_allegro_record_message(const char *message)
     if (message_log_count >= ROGUE_MESSAGE_LOG_LINES)
     {
 	for (i = 1; i < ROGUE_MESSAGE_LOG_LINES; i++)
+	{
 	    snprintf(message_log[i - 1], sizeof(message_log[i - 1]), "%s",
 		     message_log[i]);
+	    message_damage_dealt[i - 1] = message_damage_dealt[i];
+	    message_damage_taken[i - 1] = message_damage_taken[i];
+	}
 	message_log_count = ROGUE_MESSAGE_LOG_LINES - 1;
     }
 
     snprintf(message_log[message_log_count],
 	     sizeof(message_log[message_log_count]), "%s", message);
+    message_damage_dealt[message_log_count] = pending_damage_dealt;
+    message_damage_taken[message_log_count] = pending_damage_taken;
     message_log_count++;
+    pending_damage_dealt = 0;
+    pending_damage_taken = 0;
 
     if (contains_text(message, "welcome to level"))
 	clear_blood_splats();
     else if (settings.blood_spatter_enabled
 	     && message_is_blood_trigger(message))
 	spawn_blood_spatter();
+}
+
+void
+rogue_allegro_record_damage(int dealt, int taken)
+{
+    if (dealt > 0)
+	pending_damage_dealt += dealt;
+    if (taken > 0)
+	pending_damage_taken += taken;
 }
 
 void
@@ -2231,5 +2288,7 @@ rogue_allegro_shutdown(void)
     text_overlay_active = FALSE;
     text_overlay_line_count = 0;
     message_log_count = 0;
+    pending_damage_dealt = 0;
+    pending_damage_taken = 0;
     blood_splat_count = 0;
 }
