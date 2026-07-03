@@ -239,6 +239,45 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("draw_low_hp_pulse_overlay", allegro_c)
         self.assertIn("low_hp_pulse_alpha", allegro_c)
 
+    def test_pixel_sharpen_and_posterize_postprocess_settings(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("pixel_sharpen_enabled", allegro_c)
+        self.assertIn("posterize_enabled", allegro_c)
+        self.assertIn('"pixelSharpen"', allegro_c)
+        self.assertIn('"posterize"', allegro_c)
+        self.assertIn("Pixel Sharpen", allegro_c)
+        self.assertIn("Posterize", allegro_c)
+
+        self.assertIn("postprocess_shader", allegro_c)
+        self.assertIn("ensure_postprocess_shader", allegro_c)
+        self.assertIn("draw_scene_with_postprocess_shader", allegro_c)
+        self.assertIn("postprocess_vertex_shader_source", allegro_c)
+        self.assertIn("postprocess_pixel_shader_source", allegro_c)
+        self.assertIn("u_pixel_sharpen_enabled", allegro_c)
+        self.assertIn("u_posterize_enabled", allegro_c)
+        self.assertIn("u_scene_texel_size", allegro_c)
+        self.assertIn('scene_source_bitmap', allegro_c)
+        self.assertIn("varying_texcoord", allegro_c)
+        self.assertIn("al_draw_bitmap(scene_source_bitmap, 0, 0, 0)", allegro_c)
+
+        render = allegro_c[
+            allegro_c.index("void\nrogue_allegro_render(void)"):
+            allegro_c.index("char\nrogue_allegro_readchar")
+        ]
+        postprocess_enabled = allegro_c[
+            allegro_c.index("postprocess_enabled"):
+            allegro_c.index("postprocess_vertex_shader_source")
+        ]
+        self.assertIn("settings.pixel_sharpen_enabled", postprocess_enabled)
+        self.assertIn("settings.posterize_enabled", postprocess_enabled)
+        self.assertIn("postprocess_enabled()", postprocess_enabled)
+        self.assertIn("scene_effects_need_bitmap()", render)
+        self.assertLess(
+            render.index("save_shader_smoke_bitmap"),
+            render.index("draw_scene_with_gloom_shader();"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

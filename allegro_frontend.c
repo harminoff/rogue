@@ -45,6 +45,8 @@
 #define ROGUE_LOW_HP_PULSE_SECONDS 1.15
 #define ROGUE_LOW_HP_PULSE_MIN_ALPHA 0.10f
 #define ROGUE_LOW_HP_PULSE_MAX_ALPHA 0.30f
+#define ROGUE_PIXEL_SHARPEN_STRENGTH 0.38f
+#define ROGUE_POSTERIZE_LEVELS 6.0f
 #define ROGUE_MIN_WALL_THICKNESS 1
 #define ROGUE_DEFAULT_WALL_THICKNESS 2
 #define ROGUE_THICK_WALL_THICKNESS 3
@@ -62,6 +64,8 @@ typedef struct rogue_allegro_settings {
     bool dungeon_gloom_enabled;
     bool damage_flash_enabled;
     bool low_hp_pulse_enabled;
+    bool pixel_sharpen_enabled;
+    bool posterize_enabled;
     bool blood_spatter_enabled;
     bool side_panel_log_enabled;
     bool stylized_log_enabled;
@@ -92,6 +96,8 @@ static ROGUE_ALLEGRO_SETTINGS settings = {
     FALSE,
     FALSE,
     FALSE,
+    FALSE,
+    FALSE,
     ROGUE_DEFAULT_WALL_THICKNESS,
     FALSE,
     ROGUE_DEFAULT_VIEW_COLS * ROGUE_DEFAULT_TILE_DRAW_SIZE,
@@ -104,12 +110,15 @@ static ALLEGRO_DISPLAY *display = NULL;
 static ALLEGRO_EVENT_QUEUE *queue = NULL;
 static ALLEGRO_BITMAP *atlas = NULL;
 static ALLEGRO_BITMAP *scene_bitmap = NULL;
+static ALLEGRO_BITMAP *scene_source_bitmap = NULL;
 static ALLEGRO_SHADER *gloom_shader = NULL;
+static ALLEGRO_SHADER *postprocess_shader = NULL;
 static ALLEGRO_FONT *font = NULL;
 static bool started = FALSE;
 static bool smoke_mode = FALSE;
 static bool shader_smoke_mode = FALSE;
 static bool gloom_shader_failed = FALSE;
+static bool postprocess_shader_failed = FALSE;
 static int scene_bitmap_width = 0;
 static int scene_bitmap_height = 0;
 static int suppress_key_char_keycode = 0;
@@ -341,6 +350,10 @@ load_settings(void)
 	text, "damageFlash", settings.damage_flash_enabled);
     settings.low_hp_pulse_enabled = json_bool_field(
 	text, "lowHpPulse", settings.low_hp_pulse_enabled);
+    settings.pixel_sharpen_enabled = json_bool_field(
+	text, "pixelSharpen", settings.pixel_sharpen_enabled);
+    settings.posterize_enabled = json_bool_field(
+	text, "posterize", settings.posterize_enabled);
     settings.wall_thickness = json_int_field(
 	text, "wallThickness", settings.wall_thickness,
 	ROGUE_MIN_WALL_THICKNESS, ROGUE_MAX_WALL_THICKNESS);
@@ -364,6 +377,8 @@ save_settings(void)
 	    "  \"dungeonGloom\": %s,\n"
 	    "  \"damageFlash\": %s,\n"
 	    "  \"lowHpPulse\": %s,\n"
+	    "  \"pixelSharpen\": %s,\n"
+	    "  \"posterize\": %s,\n"
 	    "  \"wallThickness\": %d\n"
 	    "}\n",
 	    settings.side_panel_log_enabled ? "true" : "false",
@@ -373,6 +388,8 @@ save_settings(void)
 	    settings.dungeon_gloom_enabled ? "true" : "false",
 	    settings.damage_flash_enabled ? "true" : "false",
 	    settings.low_hp_pulse_enabled ? "true" : "false",
+	    settings.pixel_sharpen_enabled ? "true" : "false",
+	    settings.posterize_enabled ? "true" : "false",
 	    settings.wall_thickness);
     fclose(file);
 }
@@ -602,6 +619,68 @@ cycle_wall_thickness(void)
 	settings.wall_thickness = ROGUE_MIN_WALL_THICKNESS;
 }
 
+static bool
+postprocess_enabled(void)
+{
+    return (bool)(settings.pixel_sharpen_enabled
+		  || settings.posterize_enabled);
+}
+
+static bool
+scene_effects_need_bitmap(void)
+{
+    return (bool)(settings.dungeon_gloom_enabled || postprocess_enabled());
+}
+
+static const char *postprocess_vertex_shader_source =
+    "attribute vec4 al_pos;\n"
+    "attribute vec4 al_color;\n"
+    "attribute vec2 al_texcoord;\n"
+    "uniform mat4 al_projview_matrix;\n"
+    "uniform mat4 al_tex_matrix;\n"
+    "uniform bool al_use_tex_matrix;\n"
+    "varying vec4 varying_color;\n"
+    "varying vec2 varying_texcoord;\n"
+    "void main()\n"
+    "{\n"
+    "    vec4 coord = vec4(al_texcoord, 0.0, 1.0);\n"
+    "    if (al_use_tex_matrix)\n"
+    "        coord = al_tex_matrix * coord;\n"
+    "    varying_color = al_color;\n"
+    "    varying_texcoord = coord.xy;\n"
+    "    gl_Position = al_projview_matrix * al_pos;\n"
+    "}\n";
+
+static const char *postprocess_pixel_shader_source =
+    "#ifdef GL_ES\n"
+    "precision mediump float;\n"
+    "#endif\n"
+    "uniform sampler2D al_tex;\n"
+    "uniform bool u_pixel_sharpen_enabled;\n"
+    "uniform bool u_posterize_enabled;\n"
+    "uniform float u_pixel_sharpen_strength;\n"
+    "uniform float u_posterize_levels;\n"
+    "uniform vec2 u_scene_texel_size;\n"
+    "varying vec4 varying_color;\n"
+    "varying vec2 varying_texcoord;\n"
+    "void main()\n"
+    "{\n"
+    "    vec2 uv = varying_texcoord;\n"
+    "    vec4 color = texture2D(al_tex, uv);\n"
+    "    if (u_pixel_sharpen_enabled)\n"
+    "    {\n"
+    "        vec3 north = texture2D(al_tex, uv + vec2(0.0, -u_scene_texel_size.y)).rgb;\n"
+    "        vec3 south = texture2D(al_tex, uv + vec2(0.0, u_scene_texel_size.y)).rgb;\n"
+    "        vec3 east = texture2D(al_tex, uv + vec2(u_scene_texel_size.x, 0.0)).rgb;\n"
+    "        vec3 west = texture2D(al_tex, uv + vec2(-u_scene_texel_size.x, 0.0)).rgb;\n"
+    "        vec3 blur = (north + south + east + west) * 0.25;\n"
+    "        color.rgb = clamp(color.rgb + (color.rgb - blur) * u_pixel_sharpen_strength, 0.0, 1.0);\n"
+    "    }\n"
+    "    if (u_posterize_enabled)\n"
+    "        color.rgb = floor(color.rgb * u_posterize_levels + 0.5) / u_posterize_levels;\n"
+    "    gl_FragColor = color;\n"
+    "}\n";
+
 static const char *gloom_pixel_shader_source =
     "#ifdef GL_ES\n"
     "precision mediump float;\n"
@@ -633,16 +712,26 @@ ensure_scene_bitmap(void)
 	return FALSE;
 
     if (scene_bitmap != NULL
+	&& scene_source_bitmap != NULL
 	&& scene_bitmap_width == w
 	&& scene_bitmap_height == h)
 	return TRUE;
 
     if (scene_bitmap != NULL)
 	al_destroy_bitmap(scene_bitmap);
+    if (scene_source_bitmap != NULL)
+	al_destroy_bitmap(scene_source_bitmap);
 
     scene_bitmap = al_create_bitmap(w, h);
-    if (scene_bitmap == NULL)
+    scene_source_bitmap = al_create_bitmap(w, h);
+    if (scene_bitmap == NULL || scene_source_bitmap == NULL)
     {
+	if (scene_bitmap != NULL)
+	    al_destroy_bitmap(scene_bitmap);
+	if (scene_source_bitmap != NULL)
+	    al_destroy_bitmap(scene_source_bitmap);
+	scene_bitmap = NULL;
+	scene_source_bitmap = NULL;
 	scene_bitmap_width = 0;
 	scene_bitmap_height = 0;
 	return FALSE;
@@ -651,6 +740,18 @@ ensure_scene_bitmap(void)
     scene_bitmap_width = w;
     scene_bitmap_height = h;
     return TRUE;
+}
+
+static void
+copy_scene_to_source_bitmap(void)
+{
+    if (scene_bitmap == NULL || scene_source_bitmap == NULL)
+	return;
+
+    al_use_shader(NULL);
+    al_set_target_bitmap(scene_source_bitmap);
+    al_clear_to_color(al_map_rgb(0, 0, 0));
+    al_draw_bitmap(scene_bitmap, 0, 0, 0);
 }
 
 static void
@@ -731,6 +832,79 @@ ensure_gloom_shader(void)
     return TRUE;
 }
 
+static bool
+ensure_postprocess_shader(void)
+{
+    ALLEGRO_SHADER *shader;
+    const char *log;
+
+    if (postprocess_shader != NULL)
+	return TRUE;
+    if (postprocess_shader_failed)
+	return FALSE;
+
+    shader = al_create_shader(ALLEGRO_SHADER_GLSL);
+    if (shader == NULL)
+    {
+	postprocess_shader_failed = TRUE;
+	return FALSE;
+    }
+
+    if (!al_attach_shader_source(shader, ALLEGRO_VERTEX_SHADER,
+				 postprocess_vertex_shader_source)
+	|| !al_attach_shader_source(shader, ALLEGRO_PIXEL_SHADER,
+				    postprocess_pixel_shader_source)
+	|| !al_build_shader(shader))
+    {
+	log = al_get_shader_log(shader);
+	if (log != NULL && *log != '\0')
+	    fprintf(stderr, "Postprocess shader disabled: %s\n", log);
+	al_destroy_shader(shader);
+	postprocess_shader_failed = TRUE;
+	return FALSE;
+    }
+
+    postprocess_shader = shader;
+    return TRUE;
+}
+
+static bool
+draw_scene_with_postprocess_shader(void)
+{
+    float texel_size[2];
+    bool shader_uniforms_ready;
+
+    if (!postprocess_enabled())
+	return FALSE;
+    if (scene_source_bitmap == NULL || !ensure_postprocess_shader())
+	return FALSE;
+    if (!al_use_shader(postprocess_shader))
+	return FALSE;
+
+    texel_size[0] = 1.0f / (float)scene_bitmap_width;
+    texel_size[1] = 1.0f / (float)scene_bitmap_height;
+    shader_uniforms_ready =
+	(bool)(al_set_shader_bool("u_pixel_sharpen_enabled",
+				     settings.pixel_sharpen_enabled)
+	       && al_set_shader_bool("u_posterize_enabled",
+				     settings.posterize_enabled)
+	       && al_set_shader_float("u_pixel_sharpen_strength",
+				      ROGUE_PIXEL_SHARPEN_STRENGTH)
+	       && al_set_shader_float("u_posterize_levels",
+				      ROGUE_POSTERIZE_LEVELS)
+	       && al_set_shader_float_vector("u_scene_texel_size", 2,
+					     texel_size, 1));
+    if (shader_uniforms_ready)
+    {
+	al_draw_bitmap(scene_source_bitmap, 0, 0, 0);
+	al_use_shader(NULL);
+	return TRUE;
+    }
+
+    al_use_shader(NULL);
+    return FALSE;
+}
+
 static void
 draw_scene_with_gloom_shader(void)
 {
@@ -745,7 +919,8 @@ draw_scene_with_gloom_shader(void)
 
     al_set_target_backbuffer(display);
     al_clear_to_color(al_map_rgb(0, 0, 0));
-    al_draw_bitmap(scene_bitmap, 0, 0, 0);
+    if (!draw_scene_with_postprocess_shader())
+	al_draw_bitmap(scene_bitmap, 0, 0, 0);
 
     if (settings.dungeon_gloom_enabled && ensure_gloom_shader())
     {
@@ -888,6 +1063,12 @@ show_shader_settings_menu(void)
 	snprintf(line, sizeof(line), "c) Low HP Pulse: %s",
 		 settings.low_hp_pulse_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "d) Pixel Sharpen: %s",
+		 settings.pixel_sharpen_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "e) Posterize: %s",
+		 settings.posterize_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
 	rogue_allegro_text_overlay_add("");
 	rogue_allegro_text_overlay_add("Shader effects are independent and visual-only.");
 
@@ -913,6 +1094,18 @@ show_shader_settings_menu(void)
 	    case 'C':
 		settings.low_hp_pulse_enabled =
 		    !settings.low_hp_pulse_enabled;
+		save_settings();
+		break;
+	    case 'd':
+	    case 'D':
+		settings.pixel_sharpen_enabled =
+		    !settings.pixel_sharpen_enabled;
+		save_settings();
+		break;
+	    case 'e':
+	    case 'E':
+		settings.posterize_enabled =
+		    !settings.posterize_enabled;
 		save_settings();
 		break;
 	    default:
@@ -2354,7 +2547,7 @@ rogue_allegro_render(void)
 				     &view[screen_y][screen_x]);
 	}
 
-    render_to_scene = (bool)(settings.dungeon_gloom_enabled
+    render_to_scene = (bool)(scene_effects_need_bitmap()
 			     && ensure_scene_bitmap());
     if (render_to_scene)
 	al_set_target_bitmap(scene_bitmap);
@@ -2388,6 +2581,8 @@ rogue_allegro_render(void)
     if (render_to_scene)
 	save_shader_smoke_bitmap("rogue_scene_before_shader.png",
 				 scene_bitmap);
+    if (render_to_scene)
+	copy_scene_to_source_bitmap();
     if (render_to_scene)
 	draw_scene_with_gloom_shader();
     else
@@ -3073,8 +3268,12 @@ rogue_allegro_shutdown(void)
 	al_destroy_font(font);
     if (gloom_shader != NULL)
 	al_destroy_shader(gloom_shader);
+    if (postprocess_shader != NULL)
+	al_destroy_shader(postprocess_shader);
     if (scene_bitmap != NULL)
 	al_destroy_bitmap(scene_bitmap);
+    if (scene_source_bitmap != NULL)
+	al_destroy_bitmap(scene_source_bitmap);
     if (atlas != NULL)
 	al_destroy_bitmap(atlas);
     if (queue != NULL)
@@ -3084,7 +3283,9 @@ rogue_allegro_shutdown(void)
 
     font = NULL;
     gloom_shader = NULL;
+    postprocess_shader = NULL;
     scene_bitmap = NULL;
+    scene_source_bitmap = NULL;
     atlas = NULL;
     queue = NULL;
     display = NULL;
@@ -3094,6 +3295,7 @@ rogue_allegro_shutdown(void)
     held_movement_next_time = 0.0;
     damage_flash_until = 0.0;
     gloom_shader_failed = FALSE;
+    postprocess_shader_failed = FALSE;
     shader_smoke_mode = FALSE;
     scene_bitmap_width = 0;
     scene_bitmap_height = 0;
