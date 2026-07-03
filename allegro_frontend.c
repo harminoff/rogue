@@ -1120,6 +1120,7 @@ next_wrap_len(const char *text, int start, int max_chars)
     int len;
     int end;
     int split;
+    int i;
 
     len = (int) strlen(text);
     while (start < len && isspace((unsigned char) text[start]))
@@ -1128,6 +1129,13 @@ next_wrap_len(const char *text, int start, int max_chars)
 	return 0;
 
     end = start + max_chars;
+    if (end > len)
+	end = len;
+
+    for (i = start; i < end; i++)
+	if (text[i] == '.')
+	    return i - start + 1;
+
     if (end >= len)
 	return len - start;
 
