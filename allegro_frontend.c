@@ -54,7 +54,7 @@ typedef enum rogue_allegro_view {
 typedef struct rogue_allegro_settings {
     int tile_draw_size;
     ROGUE_ALLEGRO_VIEW view_mode;
-    bool shader_enabled;
+    bool dungeon_gloom_enabled;
     bool blood_spatter_enabled;
     bool side_panel_log_enabled;
     bool stylized_log_enabled;
@@ -317,8 +317,9 @@ load_settings(void)
 	text, "stylizedBottomBar", settings.stylized_bottom_bar_enabled);
     settings.blood_spatter_enabled = json_bool_field(
 	text, "bloodSpatter", settings.blood_spatter_enabled);
-    settings.shader_enabled = json_bool_field(
-	text, "shaders", settings.shader_enabled);
+    settings.dungeon_gloom_enabled = json_bool_field(
+	text, "dungeonGloom",
+	json_bool_field(text, "shaders", settings.dungeon_gloom_enabled));
     settings.wall_thickness = json_int_field(
 	text, "wallThickness", settings.wall_thickness,
 	ROGUE_MIN_WALL_THICKNESS, ROGUE_MAX_WALL_THICKNESS);
@@ -339,14 +340,14 @@ save_settings(void)
 	    "  \"stylizedLog\": %s,\n"
 	    "  \"stylizedBottomBar\": %s,\n"
 	    "  \"bloodSpatter\": %s,\n"
-	    "  \"shaders\": %s,\n"
+	    "  \"dungeonGloom\": %s,\n"
 	    "  \"wallThickness\": %d\n"
 	    "}\n",
 	    settings.side_panel_log_enabled ? "true" : "false",
 	    settings.stylized_log_enabled ? "true" : "false",
 	    settings.stylized_bottom_bar_enabled ? "true" : "false",
 	    settings.blood_spatter_enabled ? "true" : "false",
-	    settings.shader_enabled ? "true" : "false",
+	    settings.dungeon_gloom_enabled ? "true" : "false",
 	    settings.wall_thickness);
     fclose(file);
 }
@@ -680,12 +681,13 @@ draw_scene_with_gloom_shader(void)
     al_set_target_backbuffer(display);
     al_clear_to_color(al_map_rgb(0, 0, 0));
 
-    if (settings.shader_enabled && ensure_gloom_shader())
+    if (settings.dungeon_gloom_enabled && ensure_gloom_shader())
     {
 	if (al_use_shader(gloom_shader))
 	{
 	    al_set_shader_float("u_gloom_strength", ROGUE_GLOOM_STRENGTH);
 	    al_set_shader_float("u_gloom_radius", ROGUE_GLOOM_RADIUS);
+	    al_set_shader_sampler("al_tex", scene_bitmap, 0);
 	    al_draw_bitmap(scene_bitmap, 0, 0, 0);
 	    al_use_shader(NULL);
 	    return;
@@ -693,6 +695,43 @@ draw_scene_with_gloom_shader(void)
     }
 
     al_draw_bitmap(scene_bitmap, 0, 0, 0);
+}
+
+static void
+show_shader_settings_menu(void)
+{
+    char line[ROGUE_OVERLAY_LINE_LEN];
+    char selected;
+    bool done;
+
+    done = FALSE;
+    while (!done)
+    {
+	rogue_allegro_text_overlay_begin("Shader Settings");
+	snprintf(line, sizeof(line), "a) Dungeon Gloom: %s",
+		 settings.dungeon_gloom_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
+	rogue_allegro_text_overlay_add("");
+	rogue_allegro_text_overlay_add("Shader effects are independent and visual-only.");
+
+	selected = rogue_allegro_text_overlay_pick(
+	    "Enter toggles, Esc closes");
+	rogue_allegro_text_overlay_clear();
+
+	switch (selected)
+	{
+	    case 'a':
+	    case 'A':
+		settings.dungeon_gloom_enabled =
+		    !settings.dungeon_gloom_enabled;
+		save_settings();
+		break;
+	    default:
+		done = TRUE;
+		break;
+	}
+	rogue_allegro_render();
+    }
 }
 
 static void
@@ -782,9 +821,7 @@ show_settings_menu(void)
 	snprintf(line, sizeof(line), "d) Blood Spatter: %s",
 		 settings.blood_spatter_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
-	snprintf(line, sizeof(line), "e) Shaders: %s",
-		 settings.shader_enabled ? "On" : "Off");
-	rogue_allegro_text_overlay_add(line);
+	rogue_allegro_text_overlay_add("e) Shader Settings...");
 	snprintf(line, sizeof(line), "f) Wall Thickness: %s",
 		 wall_thickness_name());
 	rogue_allegro_text_overlay_add(line);
@@ -823,8 +860,7 @@ show_settings_menu(void)
 		break;
 	    case 'e':
 	    case 'E':
-		settings.shader_enabled = !settings.shader_enabled;
-		save_settings();
+		show_shader_settings_menu();
 		break;
 	    case 'f':
 	    case 'F':
@@ -2127,7 +2163,8 @@ rogue_allegro_render(void)
 				     &view[screen_y][screen_x]);
 	}
 
-    render_to_scene = (bool)(settings.shader_enabled && ensure_scene_bitmap());
+    render_to_scene = (bool)(settings.dungeon_gloom_enabled
+			     && ensure_scene_bitmap());
     if (render_to_scene)
 	al_set_target_bitmap(scene_bitmap);
     else

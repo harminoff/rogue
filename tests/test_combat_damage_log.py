@@ -172,6 +172,23 @@ class CombatDamageLogTests(unittest.TestCase):
             render.index("draw_status();"),
         )
 
+    def test_shader_settings_are_per_effect_and_bind_sampler(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("dungeon_gloom_enabled", allegro_c)
+        self.assertIn('"dungeonGloom"', allegro_c)
+        self.assertIn("show_shader_settings_menu", allegro_c)
+        self.assertIn("Shader Settings", allegro_c)
+        self.assertIn("Dungeon Gloom", allegro_c)
+        self.assertNotIn("settings.shader_enabled", allegro_c)
+
+        draw_shader = allegro_c[
+            allegro_c.index("draw_scene_with_gloom_shader"):
+            allegro_c.index("show_shader_settings_menu")
+        ]
+        self.assertIn("settings.dungeon_gloom_enabled", draw_shader)
+        self.assertIn('al_set_shader_sampler("al_tex", scene_bitmap, 0)', draw_shader)
+
 
 if __name__ == "__main__":
     unittest.main()
