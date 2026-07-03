@@ -47,6 +47,7 @@ typedef struct rogue_allegro_settings {
     bool shader_enabled;
     bool blood_spatter_enabled;
     bool side_panel_log_enabled;
+    bool stylized_log_enabled;
     bool fullscreen;
     int windowed_width;
     int windowed_height;
@@ -55,6 +56,7 @@ typedef struct rogue_allegro_settings {
 static ROGUE_ALLEGRO_SETTINGS settings = {
     ROGUE_DEFAULT_TILE_DRAW_SIZE,
     ROGUE_ALLEGRO_VIEW_TILES,
+    FALSE,
     FALSE,
     FALSE,
     FALSE,
@@ -239,6 +241,8 @@ load_settings(void)
 
     settings.side_panel_log_enabled = json_bool_field(
 	text, "sidePanelLog", settings.side_panel_log_enabled);
+    settings.stylized_log_enabled = json_bool_field(
+	text, "stylizedLog", settings.stylized_log_enabled);
     settings.blood_spatter_enabled = json_bool_field(
 	text, "bloodSpatter", settings.blood_spatter_enabled);
     settings.shader_enabled = json_bool_field(
@@ -257,10 +261,12 @@ save_settings(void)
     fprintf(file,
 	    "{\n"
 	    "  \"sidePanelLog\": %s,\n"
+	    "  \"stylizedLog\": %s,\n"
 	    "  \"bloodSpatter\": %s,\n"
 	    "  \"shaders\": %s\n"
 	    "}\n",
 	    settings.side_panel_log_enabled ? "true" : "false",
+	    settings.stylized_log_enabled ? "true" : "false",
 	    settings.blood_spatter_enabled ? "true" : "false",
 	    settings.shader_enabled ? "true" : "false");
     fclose(file);
@@ -545,10 +551,13 @@ show_settings_menu(void)
 	snprintf(line, sizeof(line), "a) Side Panel Log: %s",
 		 settings.side_panel_log_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
-	snprintf(line, sizeof(line), "b) Blood Spatter: %s",
+	snprintf(line, sizeof(line), "b) Stylized Log: %s",
+		 settings.stylized_log_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "c) Blood Spatter: %s",
 		 settings.blood_spatter_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
-	snprintf(line, sizeof(line), "c) Shaders: %s",
+	snprintf(line, sizeof(line), "d) Shaders: %s",
 		 settings.shader_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
 	rogue_allegro_text_overlay_add("");
@@ -568,12 +577,18 @@ show_settings_menu(void)
 		break;
 	    case 'b':
 	    case 'B':
-		settings.blood_spatter_enabled =
-		    !settings.blood_spatter_enabled;
+		settings.stylized_log_enabled =
+		    !settings.stylized_log_enabled;
 		save_settings();
 		break;
 	    case 'c':
 	    case 'C':
+		settings.blood_spatter_enabled =
+		    !settings.blood_spatter_enabled;
+		save_settings();
+		break;
+	    case 'd':
+	    case 'D':
 		settings.shader_enabled = !settings.shader_enabled;
 		save_settings();
 		break;
@@ -910,6 +925,157 @@ draw_status(void)
 		     "F10 tiles  F11 full  F12 settings");
 }
 
+static int
+ascii_lower_char(int ch)
+{
+    if (ch >= 'A' && ch <= 'Z')
+	return ch + ('a' - 'A');
+    return ch;
+}
+
+static bool
+contains_text(const char *text, const char *needle)
+{
+    const char *p;
+    const char *n;
+
+    if (text == NULL || needle == NULL || *needle == '\0')
+	return FALSE;
+
+    for (p = text; *p != '\0'; p++)
+    {
+	n = needle;
+	while (*n != '\0'
+	       && p[n - needle] != '\0'
+	       && ascii_lower_char((unsigned char) p[n - needle])
+		  == ascii_lower_char((unsigned char) *n))
+	    n++;
+	if (*n == '\0')
+	    return TRUE;
+    }
+
+    return FALSE;
+}
+
+static ALLEGRO_COLOR
+log_message_color(const char *message)
+{
+    if (!settings.stylized_log_enabled)
+	return al_map_rgb(210, 220, 230);
+
+    if (contains_text(message, "defeated")
+	|| contains_text(message, "killed")
+	|| contains_text(message, "hit"))
+	return al_map_rgb(238, 122, 102);
+    if (contains_text(message, "miss")
+	|| contains_text(message, "nothing")
+	|| contains_text(message, "illegal"))
+	return al_map_rgb(150, 156, 166);
+    if (contains_text(message, "gold")
+	|| contains_text(message, "found")
+	|| contains_text(message, "pick"))
+	return al_map_rgb(238, 205, 112);
+    if (contains_text(message, "hungry")
+	|| contains_text(message, "weak")
+	|| contains_text(message, "faint"))
+	return al_map_rgb(228, 154, 83);
+    if (contains_text(message, "welcome")
+	|| contains_text(message, "level"))
+	return al_map_rgb(126, 176, 238);
+
+    return al_map_rgb(210, 220, 230);
+}
+
+static int
+next_wrap_len(const char *text, int start, int max_chars)
+{
+    int len;
+    int end;
+    int split;
+
+    len = (int) strlen(text);
+    while (start < len && isspace((unsigned char) text[start]))
+	start++;
+    if (start >= len)
+	return 0;
+
+    end = start + max_chars;
+    if (end >= len)
+	return len - start;
+
+    split = end;
+    while (split > start && !isspace((unsigned char) text[split]))
+	split--;
+    if (split <= start)
+	split = end;
+
+    return split - start;
+}
+
+static int
+count_wrapped_lines(const char *text, int max_chars)
+{
+    int lines;
+    int start;
+    int len;
+    int text_len;
+
+    if (text == NULL || *text == '\0')
+	return 1;
+
+    lines = 0;
+    start = 0;
+    text_len = (int) strlen(text);
+    while (start < text_len)
+    {
+	while (start < text_len && isspace((unsigned char) text[start]))
+	    start++;
+	if (start >= text_len)
+	    break;
+	len = next_wrap_len(text, start, max_chars);
+	if (len <= 0)
+	    break;
+	lines++;
+	start += len;
+    }
+
+    return lines > 0 ? lines : 1;
+}
+
+static void
+draw_wrapped_log_message(const char *message, int x, int *y,
+			 int max_chars, int line_height,
+			 ALLEGRO_COLOR text)
+{
+    int start;
+    int len;
+    int text_len;
+    char line[ROGUE_OVERLAY_LINE_LEN];
+
+    if (message == NULL || *message == '\0')
+	return;
+
+    start = 0;
+    text_len = (int) strlen(message);
+    while (start < text_len)
+    {
+	while (start < text_len && isspace((unsigned char) message[start]))
+	    start++;
+	if (start >= text_len)
+	    break;
+	len = next_wrap_len(message, start, max_chars);
+	if (len <= 0)
+	    break;
+	if (len >= (int) sizeof(line))
+	    len = (int) sizeof(line) - 1;
+	memcpy(line, message + start, (size_t) len);
+	line[len] = '\0';
+	al_draw_text(font, text, x, *y, 0, line);
+	*y += line_height + 1;
+	start += len;
+    }
+}
+
 static void
 draw_side_panel(void)
 {
@@ -922,8 +1088,11 @@ draw_side_panel(void)
     int max_lines;
     int char_width;
     int max_chars;
-    char visible[ROGUE_OVERLAY_LINE_LEN];
-    ALLEGRO_COLOR bg, border, title, text, muted;
+    int max_text_y;
+    int entry_lines;
+    int used_lines;
+    int entry_top;
+    ALLEGRO_COLOR bg, border, title, text, muted, divider;
 
     panel_w = side_panel_width();
     if (panel_w <= 0)
@@ -935,6 +1104,7 @@ draw_side_panel(void)
     title = al_map_rgb(245, 226, 170);
     text = al_map_rgb(210, 220, 230);
     muted = al_map_rgb(130, 135, 150);
+    divider = al_map_rgb(36, 40, 54);
     line_height = al_get_font_line_height(font);
     char_width = al_get_text_width(font, "M");
     if (char_width <= 0)
@@ -951,22 +1121,43 @@ draw_side_panel(void)
     al_draw_text(font, title, x + 18, 18, 0, "Log");
     al_draw_line(x + 16, 56, display_width() - 16, 56, border, 1);
 
-    first = message_log_count - max_lines;
+    used_lines = 0;
+    first = message_log_count;
+    for (i = message_log_count - 1; i >= 0; i--)
+    {
+	entry_lines = count_wrapped_lines(message_log[i], max_chars);
+	if (used_lines > 0)
+	    entry_lines++;
+	if (used_lines + entry_lines > max_lines)
+	    break;
+	used_lines += entry_lines;
+	first = i;
+    }
     if (first < 0)
 	first = 0;
+    if (first > message_log_count)
+	first = message_log_count;
+
     y = 72;
+    max_text_y = display_height() - 16;
     for (i = first; i < message_log_count; i++)
     {
-	snprintf(visible, sizeof(visible), "%s", message_log[i]);
-	if ((int) strlen(visible) > max_chars)
+	if (i > first)
 	{
-	    visible[max_chars - 1] = '.';
-	    visible[max_chars - 2] = '.';
-	    visible[max_chars - 3] = '.';
-	    visible[max_chars] = '\0';
+	    al_draw_line(x + 18, y + 2, display_width() - 18, y + 2,
+			 divider, 1);
+	    y += 9;
 	}
-	al_draw_text(font, text, x + 18, y, 0, visible);
-	y += line_height + 2;
+	entry_top = y;
+	if (settings.stylized_log_enabled)
+	    al_draw_filled_rectangle(x + 11, entry_top + 5, x + 13,
+				     entry_top + line_height - 3,
+				     log_message_color(message_log[i]));
+	draw_wrapped_log_message(message_log[i], x + 18, &y, max_chars,
+				 line_height, log_message_color(message_log[i]));
+	y += 4;
+	if (y > max_text_y)
+	    break;
     }
 
     if (message_log_count == 0)
