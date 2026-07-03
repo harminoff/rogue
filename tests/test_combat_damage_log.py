@@ -53,6 +53,19 @@ class CombatDamageLogTests(unittest.TestCase):
             draw_status.index("huh"),
         )
 
+    def test_bottom_bar_stylized_setting_is_available(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("stylized_bottom_bar_enabled", allegro_c)
+        self.assertIn('"stylizedBottomBar"', allegro_c)
+        self.assertIn("Stylized Bottom Bar", allegro_c)
+        self.assertIn("draw_stylized_status_line", allegro_c)
+        draw_status = allegro_c[
+            allegro_c.index("draw_status(void)"):
+            allegro_c.index("ascii_lower_char")
+        ]
+        self.assertIn("if (settings.stylized_bottom_bar_enabled)", draw_status)
+
 
 if __name__ == "__main__":
     unittest.main()

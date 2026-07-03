@@ -50,6 +50,7 @@ typedef struct rogue_allegro_settings {
     bool blood_spatter_enabled;
     bool side_panel_log_enabled;
     bool stylized_log_enabled;
+    bool stylized_bottom_bar_enabled;
     bool fullscreen;
     int windowed_width;
     int windowed_height;
@@ -68,6 +69,7 @@ typedef struct rogue_blood_splat {
 static ROGUE_ALLEGRO_SETTINGS settings = {
     ROGUE_DEFAULT_TILE_DRAW_SIZE,
     ROGUE_ALLEGRO_VIEW_TILES,
+    FALSE,
     FALSE,
     FALSE,
     FALSE,
@@ -266,6 +268,8 @@ load_settings(void)
 	text, "sidePanelLog", settings.side_panel_log_enabled);
     settings.stylized_log_enabled = json_bool_field(
 	text, "stylizedLog", settings.stylized_log_enabled);
+    settings.stylized_bottom_bar_enabled = json_bool_field(
+	text, "stylizedBottomBar", settings.stylized_bottom_bar_enabled);
     settings.blood_spatter_enabled = json_bool_field(
 	text, "bloodSpatter", settings.blood_spatter_enabled);
     settings.shader_enabled = json_bool_field(
@@ -285,11 +289,13 @@ save_settings(void)
 	    "{\n"
 	    "  \"sidePanelLog\": %s,\n"
 	    "  \"stylizedLog\": %s,\n"
+	    "  \"stylizedBottomBar\": %s,\n"
 	    "  \"bloodSpatter\": %s,\n"
 	    "  \"shaders\": %s\n"
 	    "}\n",
 	    settings.side_panel_log_enabled ? "true" : "false",
 	    settings.stylized_log_enabled ? "true" : "false",
+	    settings.stylized_bottom_bar_enabled ? "true" : "false",
 	    settings.blood_spatter_enabled ? "true" : "false",
 	    settings.shader_enabled ? "true" : "false");
     fclose(file);
@@ -577,10 +583,13 @@ show_settings_menu(void)
 	snprintf(line, sizeof(line), "b) Stylized Log: %s",
 		 settings.stylized_log_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
-	snprintf(line, sizeof(line), "c) Blood Spatter: %s",
+	snprintf(line, sizeof(line), "c) Stylized Bottom Bar: %s",
+		 settings.stylized_bottom_bar_enabled ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "d) Blood Spatter: %s",
 		 settings.blood_spatter_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
-	snprintf(line, sizeof(line), "d) Shaders: %s",
+	snprintf(line, sizeof(line), "e) Shaders: %s",
 		 settings.shader_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
 	rogue_allegro_text_overlay_add("");
@@ -606,12 +615,18 @@ show_settings_menu(void)
 		break;
 	    case 'c':
 	    case 'C':
-		settings.blood_spatter_enabled =
-		    !settings.blood_spatter_enabled;
+		settings.stylized_bottom_bar_enabled =
+		    !settings.stylized_bottom_bar_enabled;
 		save_settings();
 		break;
 	    case 'd':
 	    case 'D':
+		settings.blood_spatter_enabled =
+		    !settings.blood_spatter_enabled;
+		save_settings();
+		break;
+	    case 'e':
+	    case 'E':
 		settings.shader_enabled = !settings.shader_enabled;
 		save_settings();
 		break;
@@ -904,6 +919,88 @@ draw_tile_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
     draw_atlas_tile(atlas_index, dx, dy);
 }
 
+static int
+status_piece_width(const char *label, const char *value)
+{
+    return al_get_text_width(font, label)
+	   + al_get_text_width(font, value)
+	   + al_get_text_width(font, "  ");
+}
+
+static int
+draw_status_piece(const char *label, const char *value, int x, int y,
+		  ALLEGRO_COLOR value_color)
+{
+    ALLEGRO_COLOR label_color;
+
+    label_color = al_map_rgb(130, 150, 170);
+    al_draw_text(font, label_color, x, y, 0, label);
+    x += al_get_text_width(font, label);
+    al_draw_text(font, value_color, x, y, 0, value);
+    x += al_get_text_width(font, value);
+    x += al_get_text_width(font, "  ");
+    return x;
+}
+
+static void
+draw_stylized_status_line(int width, int y, int armor,
+			  const char *hungry_name, const char *fallback)
+{
+    char level_text[24];
+    char gold_text[24];
+    char hp_text[32];
+    char str_text[24];
+    char arm_text[24];
+    char exp_text[32];
+    int total_width;
+    int x;
+    ALLEGRO_COLOR hp_color;
+
+    snprintf(level_text, sizeof(level_text), "%d", level);
+    snprintf(gold_text, sizeof(gold_text), "%d", purse);
+    snprintf(hp_text, sizeof(hp_text), "%d(%d)", pstats.s_hpt, max_hp);
+    snprintf(str_text, sizeof(str_text), "%u", pstats.s_str);
+    snprintf(arm_text, sizeof(arm_text), "%d", armor);
+    snprintf(exp_text, sizeof(exp_text), "%d/%d", pstats.s_lvl, pstats.s_exp);
+
+    total_width = status_piece_width("Level ", level_text)
+		  + status_piece_width("Gold ", gold_text)
+		  + status_piece_width("HP ", hp_text)
+		  + status_piece_width("ST ", str_text)
+		  + status_piece_width("Arm ", arm_text)
+		  + status_piece_width("Exp ", exp_text);
+    if (hungry_name != NULL && hungry_name[0] != '\0')
+	total_width += status_piece_width("", hungry_name);
+
+    if (total_width > width - 24)
+    {
+	al_draw_text(font, al_map_rgb(230, 230, 220), width / 2, y,
+		     ALLEGRO_ALIGN_CENTRE, fallback);
+	return;
+    }
+
+    hp_color = al_map_rgb(116, 220, 148);
+    if (pstats.s_hpt * 4 <= max_hp)
+	hp_color = al_map_rgb(238, 82, 82);
+    else if (pstats.s_hpt * 2 <= max_hp)
+	hp_color = al_map_rgb(238, 205, 112);
+
+    x = (width - total_width) / 2;
+    x = draw_status_piece("Level ", level_text, x, y,
+			  al_map_rgb(126, 176, 238));
+    x = draw_status_piece("Gold ", gold_text, x, y,
+			  al_map_rgb(238, 205, 112));
+    x = draw_status_piece("HP ", hp_text, x, y, hp_color);
+    x = draw_status_piece("ST ", str_text, x, y,
+			  al_map_rgb(228, 154, 83));
+    x = draw_status_piece("Arm ", arm_text, x, y,
+			  al_map_rgb(174, 190, 210));
+    x = draw_status_piece("Exp ", exp_text, x, y,
+			  al_map_rgb(174, 154, 238));
+    if (hungry_name != NULL && hungry_name[0] != '\0')
+	draw_status_piece("", hungry_name, x, y, al_map_rgb(228, 154, 83));
+}
+
 static void
 draw_status(void)
 {
@@ -936,8 +1033,12 @@ draw_status(void)
 	     level, purse, pstats.s_hpt, max_hp, pstats.s_str, armor,
 	     pstats.s_lvl, pstats.s_exp, state_name[hungry_state]);
 
-    al_draw_text(font, al_map_rgb(230, 230, 220), w / 2,
-		 first_line_y, ALLEGRO_ALIGN_CENTRE, line);
+    if (settings.stylized_bottom_bar_enabled)
+	draw_stylized_status_line(w, first_line_y, armor,
+				  state_name[hungry_state], line);
+    else
+	al_draw_text(font, al_map_rgb(230, 230, 220), w / 2,
+		     first_line_y, ALLEGRO_ALIGN_CENTRE, line);
     if (!settings.side_panel_log_enabled)
 	al_draw_text(font, al_map_rgb(180, 200, 255), 8, second_line_y,
 		     0, huh);
