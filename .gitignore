@@ -1,6 +1,7 @@
 native-build/
 .native-build/
 native-build-tests/
+.worktrees/
 build/
 dist/
 variants/*/build/
