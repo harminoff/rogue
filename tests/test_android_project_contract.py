@@ -46,7 +46,9 @@ def test_android_app_excludes_tile_editor_artifacts():
         if line.strip() and not line.strip().startswith("//")
     ]
     relevant_lines.extend(
-        line for line in sync_script.splitlines() if "Copy-Item" in line
+        line
+        for line in sync_script.splitlines()
+        if not line.lstrip().startswith("#") and "Copy-Item" in line
     )
     forbidden = ["tile_picker", "TilePicker.exe", "RogueTiles-windows-x64.zip"]
     for value in forbidden:
