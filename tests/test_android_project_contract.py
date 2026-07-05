@@ -8,6 +8,14 @@ def read(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
+def strip_gradle_comment(line: str) -> str:
+    return line.split("//", 1)[0].strip()
+
+
+def strip_powershell_comment(line: str) -> str:
+    return line.split("#", 1)[0].strip()
+
+
 def test_android_project_files_exist():
     required = [
         "android/settings.gradle",
@@ -42,13 +50,15 @@ def test_android_app_excludes_tile_editor_artifacts():
     sync_script = read("scripts/sync-android-assets.ps1")
     relevant_lines = [
         line
-        for line in build_text.splitlines()
-        if line.strip() and not line.strip().startswith("//")
+        for line in (strip_gradle_comment(line) for line in build_text.splitlines())
+        if line
     ]
     relevant_lines.extend(
         line
-        for line in sync_script.splitlines()
-        if not line.lstrip().startswith("#") and "Copy-Item" in line
+        for line in (
+            strip_powershell_comment(line) for line in sync_script.splitlines()
+        )
+        if line and "Copy-Item" in line
     )
     forbidden = ["tile_picker", "TilePicker.exe", "RogueTiles-windows-x64.zip"]
     for value in forbidden:
