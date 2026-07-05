@@ -54,6 +54,16 @@
 #define ROGUE_LOW_HP_PULSE_MAX_ALPHA 0.30f
 #define ROGUE_PIXEL_SHARPEN_STRENGTH 0.38f
 #define ROGUE_POSTERIZE_LEVELS 6.0f
+#define ROGUE_CRT_SUBTLE_SCANLINE_STRENGTH 0.10f
+#define ROGUE_CRT_BALANCED_SCANLINE_STRENGTH 0.18f
+#define ROGUE_CRT_DRAMATIC_SCANLINE_STRENGTH 0.30f
+#define ROGUE_CRT_SUBTLE_VIGNETTE_STRENGTH 0.08f
+#define ROGUE_CRT_BALANCED_VIGNETTE_STRENGTH 0.16f
+#define ROGUE_CRT_DRAMATIC_VIGNETTE_STRENGTH 0.28f
+#define ROGUE_CRT_BALANCED_CURVATURE 0.035f
+#define ROGUE_CRT_DRAMATIC_CURVATURE 0.070f
+#define ROGUE_CRT_BALANCED_RGB_OFFSET 1
+#define ROGUE_CRT_DRAMATIC_RGB_OFFSET 2
 #define ROGUE_MIN_WALL_THICKNESS 1
 #define ROGUE_DEFAULT_WALL_THICKNESS 2
 #define ROGUE_THICK_WALL_THICKNESS 3
@@ -198,6 +208,11 @@ static unsigned char posterize_channel(unsigned char value);
 static void read_locked_rgba(ALLEGRO_LOCKED_REGION *region, int x, int y,
 			     unsigned char *r, unsigned char *g,
 			     unsigned char *b, unsigned char *a);
+static void crt_sample_coordinates(ROGUE_CRT_EFFECT_MODE mode, int x, int y,
+				   int *sample_x, int *sample_y);
+static float crt_scanline_factor(ROGUE_CRT_EFFECT_MODE mode, int y);
+static float crt_vignette_factor(ROGUE_CRT_EFFECT_MODE mode, int x, int y);
+static int crt_rgb_offset_pixels(ROGUE_CRT_EFFECT_MODE mode);
 static void write_locked_rgba(ALLEGRO_LOCKED_REGION *region, int x, int y,
 			      unsigned char r, unsigned char g,
 			      unsigned char b, unsigned char a);
@@ -1253,7 +1268,8 @@ static bool
 postprocess_enabled(void)
 {
     return (bool)(settings.pixel_sharpen_enabled
-		  || settings.posterize_enabled);
+		  || settings.posterize_enabled
+		  || settings.crt_effect_mode != ROGUE_CRT_OFF);
 }
 
 static bool
@@ -1269,6 +1285,11 @@ static const char *postprocess_pixel_shader_source =
     "uniform sampler2D u_scene_texture;\n"
     "uniform bool u_pixel_sharpen_enabled;\n"
     "uniform bool u_posterize_enabled;\n"
+    "uniform int u_crt_effect_mode;\n"
+    "uniform float u_crt_scanline_strength;\n"
+    "uniform float u_crt_vignette_strength;\n"
+    "uniform float u_crt_curvature;\n"
+    "uniform float u_crt_rgb_offset;\n"
     "uniform float u_pixel_sharpen_strength;\n"
     "uniform float u_posterize_levels;\n"
     "uniform vec2 u_scene_texel_size;\n"
@@ -1277,13 +1298,30 @@ static const char *postprocess_pixel_shader_source =
     "    vec2 uv = vec2(gl_FragCoord.x * u_scene_texel_size.x,\n"
     "                   1.0 - gl_FragCoord.y * u_scene_texel_size.y);\n"
     "    uv = clamp(uv, vec2(0.0, 0.0), vec2(1.0, 1.0));\n"
-    "    vec4 color = texture2D(u_scene_texture, uv);\n"
+    "    vec2 sample_uv = uv;\n"
+    "    vec2 crt_pos = (uv - vec2(0.5, 0.5)) * 2.0;\n"
+    "    if (u_crt_effect_mode > 0 && u_crt_curvature > 0.0)\n"
+    "    {\n"
+    "        float warp = 1.0 + u_crt_curvature * dot(crt_pos, crt_pos);\n"
+    "        sample_uv = clamp((crt_pos * warp + vec2(1.0, 1.0)) * 0.5, vec2(0.0, 0.0), vec2(1.0, 1.0));\n"
+    "    }\n"
+    "    vec4 color = texture2D(u_scene_texture, sample_uv);\n"
+    "    if (u_crt_effect_mode > 0)\n"
+    "    {\n"
+    "        float scanline = 1.0 - u_crt_scanline_strength * mod(floor(gl_FragCoord.y), 2.0);\n"
+    "        float vignette = 1.0 - u_crt_vignette_strength * min(dot(crt_pos, crt_pos), 1.0);\n"
+    "        vec2 red_uv = clamp(sample_uv + vec2(u_crt_rgb_offset, 0.0) * u_scene_texel_size, vec2(0.0, 0.0), vec2(1.0, 1.0));\n"
+    "        vec2 blue_uv = clamp(sample_uv - vec2(u_crt_rgb_offset, 0.0) * u_scene_texel_size, vec2(0.0, 0.0), vec2(1.0, 1.0));\n"
+    "        color.r = texture2D(u_scene_texture, red_uv).r;\n"
+    "        color.b = texture2D(u_scene_texture, blue_uv).b;\n"
+    "        color.rgb *= scanline * vignette;\n"
+    "    }\n"
     "    if (u_pixel_sharpen_enabled)\n"
     "    {\n"
-    "        vec3 north = texture2D(u_scene_texture, uv + vec2(0.0, -u_scene_texel_size.y)).rgb;\n"
-    "        vec3 south = texture2D(u_scene_texture, uv + vec2(0.0, u_scene_texel_size.y)).rgb;\n"
-    "        vec3 east = texture2D(u_scene_texture, uv + vec2(u_scene_texel_size.x, 0.0)).rgb;\n"
-    "        vec3 west = texture2D(u_scene_texture, uv + vec2(-u_scene_texel_size.x, 0.0)).rgb;\n"
+    "        vec3 north = texture2D(u_scene_texture, clamp(sample_uv + vec2(0.0, -u_scene_texel_size.y), vec2(0.0, 0.0), vec2(1.0, 1.0))).rgb;\n"
+    "        vec3 south = texture2D(u_scene_texture, clamp(sample_uv + vec2(0.0, u_scene_texel_size.y), vec2(0.0, 0.0), vec2(1.0, 1.0))).rgb;\n"
+    "        vec3 east = texture2D(u_scene_texture, clamp(sample_uv + vec2(u_scene_texel_size.x, 0.0), vec2(0.0, 0.0), vec2(1.0, 1.0))).rgb;\n"
+    "        vec3 west = texture2D(u_scene_texture, clamp(sample_uv + vec2(-u_scene_texel_size.x, 0.0), vec2(0.0, 0.0), vec2(1.0, 1.0))).rgb;\n"
     "        vec3 blur = (north + south + east + west) * 0.25;\n"
     "        color.rgb = clamp(color.rgb + (color.rgb - blur) * u_pixel_sharpen_strength, 0.0, 1.0);\n"
     "    }\n"
@@ -1487,6 +1525,138 @@ ensure_postprocess_shader(void)
     return TRUE;
 }
 
+static float
+crt_mode_scanline_strength(ROGUE_CRT_EFFECT_MODE mode)
+{
+    switch (mode)
+    {
+	case ROGUE_CRT_SUBTLE:
+	    return ROGUE_CRT_SUBTLE_SCANLINE_STRENGTH;
+	case ROGUE_CRT_BALANCED:
+	    return ROGUE_CRT_BALANCED_SCANLINE_STRENGTH;
+	case ROGUE_CRT_DRAMATIC:
+	    return ROGUE_CRT_DRAMATIC_SCANLINE_STRENGTH;
+	default:
+	    return 0.0f;
+    }
+}
+
+static float
+crt_mode_vignette_strength(ROGUE_CRT_EFFECT_MODE mode)
+{
+    switch (mode)
+    {
+	case ROGUE_CRT_SUBTLE:
+	    return ROGUE_CRT_SUBTLE_VIGNETTE_STRENGTH;
+	case ROGUE_CRT_BALANCED:
+	    return ROGUE_CRT_BALANCED_VIGNETTE_STRENGTH;
+	case ROGUE_CRT_DRAMATIC:
+	    return ROGUE_CRT_DRAMATIC_VIGNETTE_STRENGTH;
+	default:
+	    return 0.0f;
+    }
+}
+
+static float
+crt_mode_curvature(ROGUE_CRT_EFFECT_MODE mode)
+{
+    switch (mode)
+    {
+	case ROGUE_CRT_BALANCED:
+	    return ROGUE_CRT_BALANCED_CURVATURE;
+	case ROGUE_CRT_DRAMATIC:
+	    return ROGUE_CRT_DRAMATIC_CURVATURE;
+	default:
+	    return 0.0f;
+    }
+}
+
+static int
+crt_rgb_offset_pixels(ROGUE_CRT_EFFECT_MODE mode)
+{
+    switch (mode)
+    {
+	case ROGUE_CRT_BALANCED:
+	    return ROGUE_CRT_BALANCED_RGB_OFFSET;
+	case ROGUE_CRT_DRAMATIC:
+	    return ROGUE_CRT_DRAMATIC_RGB_OFFSET;
+	default:
+	    return 0;
+    }
+}
+
+static void
+crt_sample_coordinates(ROGUE_CRT_EFFECT_MODE mode, int x, int y,
+		       int *sample_x, int *sample_y)
+{
+    float curvature;
+    float nx;
+    float ny;
+    float warp;
+    int sx;
+    int sy;
+
+    curvature = crt_mode_curvature(mode);
+    if (curvature <= 0.0f || scene_bitmap_width <= 1
+	|| scene_bitmap_height <= 1)
+    {
+	*sample_x = x;
+	*sample_y = y;
+	return;
+    }
+
+    nx = ((float)x / (float)(scene_bitmap_width - 1)) * 2.0f - 1.0f;
+    ny = ((float)y / (float)(scene_bitmap_height - 1)) * 2.0f - 1.0f;
+    warp = 1.0f + curvature * (nx * nx + ny * ny);
+    sx = (int)(((nx * warp + 1.0f) * 0.5f
+		* (float)(scene_bitmap_width - 1)) + 0.5f);
+    sy = (int)(((ny * warp + 1.0f) * 0.5f
+		* (float)(scene_bitmap_height - 1)) + 0.5f);
+
+    if (sx < 0)
+	sx = 0;
+    if (sx >= scene_bitmap_width)
+	sx = scene_bitmap_width - 1;
+    if (sy < 0)
+	sy = 0;
+    if (sy >= scene_bitmap_height)
+	sy = scene_bitmap_height - 1;
+    *sample_x = sx;
+    *sample_y = sy;
+}
+
+static float
+crt_scanline_factor(ROGUE_CRT_EFFECT_MODE mode, int y)
+{
+    float strength;
+
+    strength = crt_mode_scanline_strength(mode);
+    if (strength <= 0.0f)
+	return 1.0f;
+    return (y % 2) == 0 ? 1.0f : 1.0f - strength;
+}
+
+static float
+crt_vignette_factor(ROGUE_CRT_EFFECT_MODE mode, int x, int y)
+{
+    float strength;
+    float nx;
+    float ny;
+    float dist;
+    float edge;
+
+    strength = crt_mode_vignette_strength(mode);
+    if (strength <= 0.0f || scene_bitmap_width <= 1
+	|| scene_bitmap_height <= 1)
+	return 1.0f;
+
+    nx = ((float)x / (float)(scene_bitmap_width - 1)) * 2.0f - 1.0f;
+    ny = ((float)y / (float)(scene_bitmap_height - 1)) * 2.0f - 1.0f;
+    dist = nx * nx + ny * ny;
+    edge = dist > 1.0f ? 1.0f : dist;
+    return 1.0f - strength * edge;
+}
+
 static bool
 draw_scene_with_postprocess_shader(void)
 {
@@ -1496,6 +1666,11 @@ draw_scene_with_postprocess_shader(void)
     unsigned char south_r, south_g, south_b;
     unsigned char east_r, east_g, east_b;
     unsigned char west_r, west_g, west_b;
+    unsigned char dummy_r, dummy_g, dummy_b;
+    int sample_x, sample_y;
+    int rgb_offset;
+    int red_x, blue_x;
+    float crt_factor;
     ALLEGRO_LOCKED_REGION *source_lock;
     ALLEGRO_LOCKED_REGION *target_lock;
 
@@ -1522,18 +1697,46 @@ draw_scene_with_postprocess_shader(void)
     for (y = 0; y < scene_bitmap_height; y++)
 	for (x = 0; x < scene_bitmap_width; x++)
 	{
-	    read_locked_rgba(source_lock, x, y, &r, &g, &b, &a);
+	    crt_sample_coordinates(settings.crt_effect_mode, x, y,
+				   &sample_x, &sample_y);
+	    read_locked_rgba(source_lock, sample_x, sample_y, &r, &g, &b, &a);
+	    if (settings.crt_effect_mode != ROGUE_CRT_OFF)
+	    {
+		rgb_offset = crt_rgb_offset_pixels(settings.crt_effect_mode);
+		red_x = sample_x + rgb_offset;
+		blue_x = sample_x - rgb_offset;
+		if (red_x >= scene_bitmap_width)
+		    red_x = scene_bitmap_width - 1;
+		if (blue_x < 0)
+		    blue_x = 0;
+		read_locked_rgba(source_lock, red_x, sample_y,
+				 &r, &dummy_g, &dummy_b, &ignored_a);
+		read_locked_rgba(source_lock, blue_x, sample_y,
+				 &dummy_r, &dummy_g, &b, &ignored_a);
+		crt_factor =
+		    crt_scanline_factor(settings.crt_effect_mode, y)
+		    * crt_vignette_factor(settings.crt_effect_mode, x, y);
+		r = (unsigned char)channel_clamp((float)r * crt_factor);
+		g = (unsigned char)channel_clamp((float)g * crt_factor);
+		b = (unsigned char)channel_clamp((float)b * crt_factor);
+	    }
 	    if (settings.pixel_sharpen_enabled)
 	    {
-		read_locked_rgba(source_lock, x, y > 0 ? y - 1 : y,
+		read_locked_rgba(source_lock, sample_x,
+				 sample_y > 0 ? sample_y - 1 : sample_y,
 				 &north_r, &north_g, &north_b, &ignored_a);
-		read_locked_rgba(source_lock, x,
-				 y + 1 < scene_bitmap_height ? y + 1 : y,
+		read_locked_rgba(source_lock, sample_x,
+				 sample_y + 1 < scene_bitmap_height
+				     ? sample_y + 1 : sample_y,
 				 &south_r, &south_g, &south_b, &ignored_a);
 		read_locked_rgba(source_lock,
-				 x + 1 < scene_bitmap_width ? x + 1 : x,
-				 y, &east_r, &east_g, &east_b, &ignored_a);
-		read_locked_rgba(source_lock, x > 0 ? x - 1 : x, y,
+				 sample_x + 1 < scene_bitmap_width
+				     ? sample_x + 1 : sample_x,
+				 sample_y, &east_r, &east_g, &east_b,
+				 &ignored_a);
+		read_locked_rgba(source_lock,
+				 sample_x > 0 ? sample_x - 1 : sample_x,
+				 sample_y,
 				 &west_r, &west_g, &west_b, &ignored_a);
 		r = (unsigned char)channel_clamp(
 		    (float)r + ((float)r - ((float)north_r
