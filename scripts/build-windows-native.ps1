@@ -151,6 +151,8 @@ try {
         "frontend.h",
         "overlay_picker.c",
         "overlay_picker.h",
+        "mobile_controls.c",
+        "mobile_controls.h",
         "variant.c",
         "variant.h",
         "allegro_frontend.c"
