@@ -109,27 +109,29 @@ Java_com_roguetiles_RogueTilesActivity_nativeConfigureStorage(
     JNIEnv *env, jclass clazz, jstring asset_root_jstring,
     jstring user_root_jstring)
 {
-    const char *asset_root_chars;
-    const char *user_root_chars;
+    const char *asset_root_chars = NULL;
+    const char *user_root_chars = NULL;
 
     (void) clazz;
-    asset_root_chars = asset_root_jstring == NULL
-	? NULL
-	: (*env)->GetStringUTFChars(env, asset_root_jstring, NULL);
-    user_root_chars = user_root_jstring == NULL
-	? NULL
-	: (*env)->GetStringUTFChars(env, user_root_jstring, NULL);
-
-    if ((asset_root_jstring != NULL && asset_root_chars == NULL)
-	|| (user_root_jstring != NULL && user_root_chars == NULL))
+    if (asset_root_jstring != NULL)
     {
-	if (asset_root_chars != NULL)
-	    (*env)->ReleaseStringUTFChars(env, asset_root_jstring,
-					  asset_root_chars);
-	if (user_root_chars != NULL)
-	    (*env)->ReleaseStringUTFChars(env, user_root_jstring,
-					  user_root_chars);
-	return;
+	asset_root_chars = (*env)->GetStringUTFChars(env, asset_root_jstring,
+						     NULL);
+	if (asset_root_chars == NULL)
+	    return;
+    }
+
+    if (user_root_jstring != NULL)
+    {
+	user_root_chars = (*env)->GetStringUTFChars(env, user_root_jstring,
+						   NULL);
+	if (user_root_chars == NULL)
+	{
+	    if (asset_root_chars != NULL)
+		(*env)->ReleaseStringUTFChars(env, asset_root_jstring,
+					      asset_root_chars);
+	    return;
+	}
     }
 
     rogue_platform_configure_storage(asset_root_chars, user_root_chars);
