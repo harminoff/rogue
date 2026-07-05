@@ -1,6 +1,14 @@
 #include <stdio.h>
+#include <string.h>
 
 #include "mobile_controls.h"
+
+typedef struct rogue_mobile_layout_probe {
+    ROGUE_MOBILE_LAYOUT layout;
+    int fake_w;
+    int fake_h;
+    char fake_command;
+} ROGUE_MOBILE_LAYOUT_PROBE;
 
 static int failures = 0;
 
@@ -28,6 +36,7 @@ int
 main(void)
 {
     ROGUE_MOBILE_LAYOUT layout;
+    ROGUE_MOBILE_LAYOUT_PROBE probe;
     const char expected[3][3] = {
 	{ 'y', 'k', 'u' },
 	{ 'h', '.', 'l' },
@@ -64,6 +73,15 @@ main(void)
 		rogue_mobile_command_at(&layout, 10, 30), 'h');
     expect_char("last covered pixel",
 		rogue_mobile_command_at(&layout, 40, 51), 'n');
+
+    memset(&probe, 0, sizeof(probe));
+    rogue_mobile_layout_build(&probe.layout, 10, 20, 31, 32);
+    probe.fake_w = 99;
+    probe.fake_h = 99;
+    probe.fake_command = 'X';
+    probe.layout.button_count = ROGUE_MOBILE_BUTTON_COUNT + 1;
+    expect_char("high button count ignores out of bounds slot",
+		rogue_mobile_command_at(&probe.layout, 10, 0), '\0');
 
     if (failures != 0)
     {

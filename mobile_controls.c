@@ -50,6 +50,7 @@ char
 rogue_mobile_command_at(const ROGUE_MOBILE_LAYOUT *layout, int x, int y)
 {
     const ROGUE_MOBILE_RECT *rect;
+    int count;
     int i;
 
     if (layout == 0)
@@ -57,7 +58,17 @@ rogue_mobile_command_at(const ROGUE_MOBILE_LAYOUT *layout, int x, int y)
 	return '\0';
     }
 
-    for (i = 0; i < layout->button_count; i++)
+    count = layout->button_count;
+    if (count < 0)
+    {
+	count = 0;
+    }
+    if (count > ROGUE_MOBILE_BUTTON_COUNT)
+    {
+	count = ROGUE_MOBILE_BUTTON_COUNT;
+    }
+
+    for (i = 0; i < count; i++)
     {
 	rect = &layout->buttons[i].rect;
 
