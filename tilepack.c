@@ -4,10 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curses.h>
+#include "rogue_platform.h"
 #include "tilepack.h"
 #include "generated/rogue_tile_mapping.h"
 
-#define ROGUE_TILEPACK_MAX_TEXT 262144
 #define ROGUE_TILEPACK_MAX_ENTRIES 512
 
 static ROGUE_TILEPACK_ENTRY entries[ROGUE_TILEPACK_MAX_ENTRIES];
@@ -20,38 +20,6 @@ static char status_text[256] = "built-in generated tile mapping";
 static char current_pack_id[64] = "generated";
 static bool generated_fallback_safe = TRUE;
 static bool loaded = FALSE;
-
-static char *
-read_text_file(const char *path)
-{
-    FILE *file;
-    long size;
-    char *text;
-
-    file = fopen(path, "rb");
-    if (file == NULL)
-	return NULL;
-
-    fseek(file, 0, SEEK_END);
-    size = ftell(file);
-    if (size < 0 || size > ROGUE_TILEPACK_MAX_TEXT)
-    {
-	fclose(file);
-	return NULL;
-    }
-
-    fseek(file, 0, SEEK_SET);
-    text = (char *) calloc((size_t) size + 1, 1);
-    if (text == NULL)
-    {
-	fclose(file);
-	return NULL;
-    }
-
-    fread(text, 1, (size_t) size, file);
-    fclose(file);
-    return text;
-}
 
 static const char *
 skip_ws(const char *p)
@@ -256,9 +224,14 @@ tilepack_json_summary(const char *tilepack_path, char *label,
     char *json;
     char image_name[256];
     char mapping_name[256];
+    char resolved_tilepack_path[512];
+    const char *display_path;
     int width, height, columns;
 
-    json = read_text_file(tilepack_path);
+    display_path = rogue_platform_asset_path(tilepack_path,
+					     resolved_tilepack_path,
+					     sizeof(resolved_tilepack_path));
+    json = rogue_platform_read_text_file(tilepack_path);
     if (json == NULL)
 	return FALSE;
 
@@ -277,7 +250,7 @@ tilepack_json_summary(const char *tilepack_path, char *label,
     if (!json_string_field(json, "name", label, label_size)
 	|| label[0] == '\0')
     {
-	strncpy(label, tilepack_path, label_size - 1);
+	strncpy(label, display_path, label_size - 1);
 	label[label_size - 1] = '\0';
     }
 
@@ -433,7 +406,7 @@ load_tilepack_file(const char *tilepack_path, const char *pack_id)
     char mapping_path[512];
     bool allow_generated_fallback;
 
-    tilepack_json = read_text_file(tilepack_path);
+    tilepack_json = rogue_platform_read_text_file(tilepack_path);
     if (tilepack_json == NULL)
 	return FALSE;
 
@@ -461,7 +434,7 @@ load_tilepack_file(const char *tilepack_path, const char *pack_id)
     join_path(dir, image_name, atlas_path, sizeof(atlas_path));
     join_path(dir, mapping_name, mapping_path, sizeof(mapping_path));
 
-    mapping_json = read_text_file(mapping_path);
+    mapping_json = rogue_platform_read_text_file(mapping_path);
     if (mapping_json == NULL)
     {
 	free(tilepack_json);

@@ -12,7 +12,7 @@
 DISTNAME = rogue5.4.4
 PROGRAM  = rogue54
 O        = o
-HDRS     = rogue.h extern.h score.h tiles.h tilepack.h frontend.h overlay_picker.h \
+HDRS     = rogue.h extern.h score.h tiles.h tilepack.h rogue_platform.h frontend.h overlay_picker.h \
            variant.h \
            generated/rogue_tile_mapping.h
 ALLEGRO_OBJS =
@@ -55,7 +55,7 @@ OBJS1    = vers.$(O) extern.$(O) armor.$(O) chase.$(O) command.$(O) \
 	   move.$(O) new_level.$(O)
 OBJS2    = options.$(O) pack.$(O) passages.$(O) potions.$(O) rings.$(O) \
            rip.$(O) rooms.$(O) save.$(O) scrolls.$(O) state.$(O) sticks.$(O) \
-	   things.$(O) tiles.$(O) tilepack.$(O) frontend.$(O) overlay_picker.$(O) \
+	   things.$(O) tiles.$(O) tilepack.$(O) rogue_platform.$(O) frontend.$(O) overlay_picker.$(O) \
 	   variant.$(O) \
 	   generated/rogue_tile_mapping.$(O) \
 	   $(ALLEGRO_OBJS) weapons.$(O) \
@@ -66,7 +66,7 @@ CFILES   = vers.c extern.c armor.c chase.c command.c daemon.c \
 	   daemons.c fight.c init.c io.c list.c mach_dep.c \
 	   main.c  mdport.c misc.c monsters.c move.c new_level.c \
 	   options.c pack.c passages.c potions.c rings.c rip.c \
-	   rooms.c save.c scrolls.c state.c sticks.c things.c tiles.c tilepack.c \
+	   rooms.c save.c scrolls.c state.c sticks.c things.c tiles.c tilepack.c rogue_platform.c \
 	   frontend.c overlay_picker.c variant.c generated/rogue_tile_mapping.c \
 	   allegro_frontend.c weapons.c wizard.c xcrypt.c
 MISC_C   = findpw.c scedit.c scmisc.c

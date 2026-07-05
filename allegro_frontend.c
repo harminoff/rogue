@@ -19,6 +19,7 @@
 #include "tiles.h"
 #include "overlay_picker.h"
 #include "tilepack.h"
+#include "rogue_platform.h"
 #include "variant.h"
 
 #define ROGUE_DEFAULT_TILE_DRAW_SIZE 32
@@ -397,6 +398,8 @@ json_int_field(const char *json, const char *key, int fallback,
 static void
 init_settings_path(void)
 {
+    rogue_platform_user_path("settings.json", settings_path,
+			     sizeof(settings_path));
 #ifdef _WIN32
     char exe_path[512];
     char *slash;
@@ -1178,11 +1181,14 @@ static bool
 load_current_atlas(void)
 {
     const char *atlas_path;
+    char resolved_atlas_path[512];
     char parent_atlas_path[512];
     ALLEGRO_BITMAP *loaded;
 
     atlas_path = rogue_tilepack_atlas_path();
-    loaded = al_load_bitmap(atlas_path);
+    loaded = al_load_bitmap(rogue_platform_asset_path(atlas_path,
+						      resolved_atlas_path,
+						      sizeof(resolved_atlas_path)));
     if (loaded == NULL)
     {
 	snprintf(parent_atlas_path, sizeof(parent_atlas_path), "../%s",

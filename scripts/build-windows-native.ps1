@@ -145,6 +145,8 @@ try {
         "tiles.h",
         "tilepack.c",
         "tilepack.h",
+        "rogue_platform.c",
+        "rogue_platform.h",
         "frontend.c",
         "frontend.h",
         "overlay_picker.c",
