@@ -19,7 +19,7 @@ class OverlayTextWindowTest(unittest.TestCase):
         )
         self.assertIsNotNone(add_match)
         add_body = add_match.group(1)
-        self.assertIn("next_wrap_len(line, start, TEXT_OVERLAY_WRAP_CHARS)", add_body)
+        self.assertIn("next_space_wrap_len(line, start, TEXT_OVERLAY_WRAP_CHARS)", add_body)
         self.assertIn("rogue_picker_line_key(line) != '\\0'", add_body)
 
     def test_selectable_overlays_support_page_navigation(self):
