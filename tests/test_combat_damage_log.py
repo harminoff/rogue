@@ -194,9 +194,17 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("--tiles-shader-smoke", frontend_c)
         self.assertIn("shader_smoke_requested", frontend_c)
         self.assertIn("rogue_allegro_enable_shader_smoke", frontend_c)
+        shader_smoke_block = allegro_c[
+            allegro_c.index("if (shader_smoke_mode)"):
+            allegro_c.index("if (!al_init())")
+        ]
         self.assertIn("shader_smoke_mode", allegro_c)
         self.assertIn("settings.pixel_sharpen_enabled = TRUE", allegro_c)
         self.assertIn("settings.posterize_enabled = TRUE", allegro_c)
+        self.assertIn(
+            "settings.crt_effect_mode = ROGUE_CRT_DRAMATIC",
+            shader_smoke_block,
+        )
         self.assertIn("rogue_scene_before_shader.png", allegro_c)
         self.assertIn("rogue_scene_source_shader.png", allegro_c)
         self.assertIn("rogue_scene_after_postprocess.png", allegro_c)
@@ -285,6 +293,12 @@ class CombatDamageLogTests(unittest.TestCase):
             render.index("save_shader_smoke_bitmap"),
             render.index("draw_scene_with_gloom_shader();"),
         )
+
+    def test_readme_lists_crt_effect_shader_setting(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("CRT Effect", readme)
+        self.assertIn("Off/Subtle/Balanced/Dramatic", readme)
 
     def test_crt_effect_modes_are_persisted_and_menu_driven(self):
         allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")

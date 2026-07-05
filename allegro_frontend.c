@@ -4231,6 +4231,7 @@ rogue_allegro_start(bool smoke)
 	settings.dungeon_gloom_enabled = TRUE;
 	settings.pixel_sharpen_enabled = TRUE;
 	settings.posterize_enabled = TRUE;
+	settings.crt_effect_mode = ROGUE_CRT_DRAMATIC;
     }
 
     if (!al_init())

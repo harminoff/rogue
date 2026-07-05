@@ -74,6 +74,7 @@ Shader settings:
 - Low HP Pulse: adds a low-health warning pulse.
 - Pixel Sharpen: sharpens the rendered scene.
 - Posterize: reduces color levels for a chunkier pixel-art look.
+- CRT Effect: cycles Off/Subtle/Balanced/Dramatic CRT-style scanlines, vignette, curvature, and color separation.
 
 All visual settings are optional and do not change Rogue gameplay rules.
 
