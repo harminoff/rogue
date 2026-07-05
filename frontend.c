@@ -128,6 +128,10 @@ rogue_frontend_init(int *argc, char **argv)
 {
     int read_idx, write_idx;
 
+#ifdef ROGUE_ANDROID
+    tiles_requested = TRUE;
+#endif
+
     if (argv != NULL && argv[0] != NULL
 	&& rogue_frontend_default_tiles_for_executable(argv[0]))
 	tiles_requested = TRUE;

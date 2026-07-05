@@ -60,6 +60,7 @@ main(int argc, char **argv, char **envp)
 	    my_exit(1);
     }
 
+#ifndef ROGUE_ANDROID_DEFAULT_ONLY
     if (rogue_variant_is_current("rogue52"))
     {
 	return rogue52_main(argc, argv, envp);
@@ -73,6 +74,7 @@ main(int argc, char **argv, char **envp)
     {
 	return srogue90_main(argc, argv, envp);
     }
+#endif
 
 #ifdef MASTER
     /*

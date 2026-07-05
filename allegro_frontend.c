@@ -4463,6 +4463,7 @@ rogue_allegro_readchar(void)
 		rogue_allegro_render();
 		continue;
 	    }
+#ifndef ROGUE_ANDROID
 	    if (event.keyboard.keycode == ALLEGRO_KEY_F10)
 	    {
 		show_tilepack_menu();
@@ -4470,6 +4471,7 @@ rogue_allegro_readchar(void)
 		rogue_allegro_render();
 		continue;
 	    }
+#endif
 	    if (handle_view_key(event.keyboard.keycode))
 	    {
 		suppress_key_char_keycode = event.keyboard.keycode;
