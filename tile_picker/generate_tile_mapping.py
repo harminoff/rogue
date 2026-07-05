@@ -10,7 +10,15 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .role_catalog import MONSTER_NAMES, Role, all_roles, role_by_id, variant_monster_roles
+from .role_catalog import (
+    MONSTER_NAMES,
+    Role,
+    all_roles,
+    role_by_id,
+    trap_roles,
+    variant_monster_entry,
+    variant_monster_roles,
+)
 
 
 DEFAULT_ACTIVE_SOURCE = Path("tile_picker/data/active_tile_source.json")
@@ -43,7 +51,7 @@ def c_string(value: Any) -> str:
 def role_atlas_from_mapping(mapping: dict[str, Any], role: Role) -> str | None:
     if role.role.startswith("monster.") and role.key.count(".") == 1:
         variant_id, glyph = role.key.split(".", 1)
-        entry = mapping.get("variantMonsters", {}).get(variant_id, {}).get(glyph, {})
+        entry = variant_monster_entry(mapping, variant_id, glyph)
     elif role.role.startswith("monster."):
         entry = mapping.get("monsters", {}).get(role.key, {})
     else:
@@ -99,7 +107,7 @@ def rltiles_profile(root: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     mapping = read_json(root / "assets" / "rltiles" / "rogue-rltiles-map.json")
     lookup = atlas_lookup(root)
     profile: dict[str, Any] = {"tiles": {}}
-    for role in all_roles() + variant_monster_roles(mapping):
+    for role in all_roles() + trap_roles() + variant_monster_roles(mapping):
         atlas = role_atlas_from_mapping(mapping, role)
         if atlas is None:
             continue
@@ -138,19 +146,27 @@ def write_generated(root: Path, profile: dict[str, Any], source: dict[str, Any],
     header_path = out_dir / HEADER_NAME
     source_path = out_dir / SOURCE_NAME
     roles = all_roles()
+    traps = trap_roles()
     monsters = [(glyph, MONSTER_NAMES[glyph]) for glyph in sorted(MONSTER_NAMES)]
     variant_monsters = configured_variant_monster_roles(root)
 
     glyph_rows = []
+    trap_rows = []
     monster_rows = []
     variant_monster_rows = []
-    by_id = role_by_id()
+    by_id = role_by_id(read_json(root / "assets" / "rltiles" / "rogue-rltiles-map.json"))
     for role in roles:
         if role.role.startswith("monster."):
             continue
         atlas_key, atlas_index = selection_for_role(profile, role)
         glyph_rows.append(
             f"    {{ {role.glyph}, {role.c_layer}, {c_string(role.role)}, "
+            f"{c_string(atlas_key)}, {atlas_index}, {c_string(role.name)} }}"
+        )
+    for role in traps:
+        atlas_key, atlas_index = selection_for_role(profile, role)
+        trap_rows.append(
+            f"    {{ '{role.glyph}', {c_string(role.role)}, "
             f"{c_string(atlas_key)}, {atlas_index}, {c_string(role.name)} }}"
         )
     for glyph, monster_name in monsters:
@@ -168,6 +184,7 @@ def write_generated(root: Path, profile: dict[str, Any], source: dict[str, Any],
             f"{c_string(atlas_key)}, {atlas_index}, {c_string(role.name)} }}"
         )
     glyph_table = ",\n".join(glyph_rows)
+    trap_table = ",\n".join(trap_rows)
     monster_table = ",\n".join(monster_rows)
     if variant_monster_rows:
         variant_monster_table = ",\n".join(variant_monster_rows)
@@ -202,6 +219,14 @@ typedef struct rogue_generated_monster_mapping {
     const char *name;
 } ROGUE_GENERATED_MONSTER_MAPPING;
 
+typedef struct rogue_generated_trap_mapping {
+    char trap_type;
+    const char *role;
+    const char *atlas_key;
+    int atlas_index;
+    const char *name;
+} ROGUE_GENERATED_TRAP_MAPPING;
+
 typedef struct rogue_generated_variant_monster_mapping {
     const char *variant_id;
     char glyph;
@@ -213,6 +238,8 @@ typedef struct rogue_generated_variant_monster_mapping {
 
 extern const ROGUE_GENERATED_TILE_MAPPING rogue_tile_glyph_mappings[];
 extern const int rogue_tile_glyph_mapping_count;
+extern const ROGUE_GENERATED_TRAP_MAPPING rogue_tile_trap_mappings[];
+extern const int rogue_tile_trap_mapping_count;
 extern const ROGUE_GENERATED_MONSTER_MAPPING rogue_tile_monster_mappings[];
 extern const int rogue_tile_monster_mapping_count;
 extern const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mappings[];
@@ -245,6 +272,13 @@ const ROGUE_GENERATED_TILE_MAPPING rogue_tile_glyph_mappings[] = {{
 
 const int rogue_tile_glyph_mapping_count =
     sizeof(rogue_tile_glyph_mappings) / sizeof(rogue_tile_glyph_mappings[0]);
+
+const ROGUE_GENERATED_TRAP_MAPPING rogue_tile_trap_mappings[] = {{
+{trap_table}
+}};
+
+const int rogue_tile_trap_mapping_count =
+    sizeof(rogue_tile_trap_mappings) / sizeof(rogue_tile_trap_mappings[0]);
 
 const ROGUE_GENERATED_MONSTER_MAPPING rogue_tile_monster_mappings[] = {{
 {monster_table}

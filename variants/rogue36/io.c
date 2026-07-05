@@ -62,12 +62,13 @@ endmsg()
     strcpy(huh, msgbuf);
     if (mpos)
     {
-	wmove(cw, 0, mpos);
-	waddstr(cw, "--More--");
-	draw(cw);
-	rogue_frontend_show_prompt("--More-- Press Space");
-	wait_for(' ');
-	rogue_frontend_clear_prompt();
+	if (!rogue_frontend_is_tiles())
+	{
+	    wmove(cw, 0, mpos);
+	    waddstr(cw, "--More--");
+	    draw(cw);
+	    wait_for(' ');
+	}
     }
     rogue_frontend_record_message(msgbuf);
     mvwaddstr(cw, 0, 0, msgbuf);
@@ -75,6 +76,8 @@ endmsg()
     mpos = newpos;
     newpos = 0;
     draw(cw);
+    if (rogue_frontend_is_tiles())
+	rogue_frontend_render();
 }
 
 doadd(char *fmt, va_list ap)

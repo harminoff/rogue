@@ -39,6 +39,15 @@ ROLES: tuple[Role, ...] = (
     Role("actor.player", "actors", "player", "PLAYER", "actor", "ROGUE_TILE_ACTOR", "Player", "player"),
 )
 
+TRAP_ROLES: tuple[Role, ...] = (
+    Role("trap.trapdoor", "traps", "trapdoor", ">", "terrain", "ROGUE_TILE_TERRAIN", "Trapdoor", "trapdoor"),
+    Role("trap.arrow", "traps", "arrow", "{", "terrain", "ROGUE_TILE_TERRAIN", "Arrow trap", "arrow trap"),
+    Role("trap.sleeping_gas", "traps", "sleeping_gas", "$", "terrain", "ROGUE_TILE_TERRAIN", "Sleeping gas trap", "sleeping gas trap"),
+    Role("trap.bear", "traps", "bear", "}", "terrain", "ROGUE_TILE_TERRAIN", "Bear trap", "bear trap"),
+    Role("trap.teleport", "traps", "teleport", "~", "terrain", "ROGUE_TILE_TERRAIN", "Teleport trap", "teleport trap"),
+    Role("trap.poison_dart", "traps", "poison_dart", "`", "terrain", "ROGUE_TILE_TERRAIN", "Poison dart trap", "poison dart trap"),
+)
+
 
 MONSTER_NAMES: dict[str, str] = {
     "A": "aquator",
@@ -91,23 +100,75 @@ def all_roles() -> list[Role]:
     return roles
 
 
+def trap_roles() -> list[Role]:
+    return list(TRAP_ROLES)
+
+
+def variant_monster_entries(mapping: dict, variant_id: str) -> list[tuple[str, dict]]:
+    variants = mapping.get("variantMonsters", {})
+    if not isinstance(variants, dict):
+        return []
+    monsters = variants.get(variant_id, {})
+    if isinstance(monsters, dict):
+        return [
+            (str(glyph), entry)
+            for glyph, entry in monsters.items()
+            if isinstance(entry, dict)
+        ]
+    if isinstance(monsters, list):
+        entries: list[tuple[str, dict]] = []
+        for entry in monsters:
+            if not isinstance(entry, dict):
+                continue
+            glyph = entry.get("glyph")
+            if glyph is None:
+                continue
+            entries.append((str(glyph), entry))
+        return entries
+    return []
+
+
+def variant_monster_entry(mapping: dict, variant_id: str, glyph: str) -> dict:
+    for candidate_glyph, entry in variant_monster_entries(mapping, variant_id):
+        if candidate_glyph == glyph:
+            return entry
+    return {}
+
+
+def set_variant_monster_atlas(
+    mapping: dict, variant_id: str, glyph: str, atlas_name: str | None
+) -> None:
+    variants = mapping.setdefault("variantMonsters", {})
+    monsters = variants.setdefault(variant_id, {})
+    if isinstance(monsters, list):
+        for entry in monsters:
+            if isinstance(entry, dict) and str(entry.get("glyph")) == glyph:
+                entry["atlas"] = atlas_name
+                return
+        monsters.append({"glyph": glyph, "atlas": atlas_name})
+        return
+    if not isinstance(monsters, dict):
+        monsters = {}
+        variants[variant_id] = monsters
+    entry = monsters.setdefault(glyph, {})
+    if isinstance(entry, dict):
+        entry["atlas"] = atlas_name
+
+
 def variant_monster_roles(mapping: dict) -> list[Role]:
     roles: list[Role] = []
     variants = mapping.get("variantMonsters", {})
     if not isinstance(variants, dict):
         return roles
     for variant_id in sorted(variants):
-        monsters = variants.get(variant_id, {})
-        if not isinstance(monsters, dict):
-            continue
-        for glyph in sorted(monsters):
-            entry = monsters[glyph]
-            if not isinstance(entry, dict):
-                continue
+        for glyph, entry in sorted(variant_monster_entries(mapping, str(variant_id))):
             name = str(entry.get("name") or MONSTER_NAMES.get(glyph, "monster"))
             roles.append(monster_role(str(glyph), name, str(variant_id)))
     return roles
 
 
-def role_by_id() -> dict[str, Role]:
-    return {role.role: role for role in all_roles()}
+def role_by_id(mapping: dict | None = None) -> dict[str, Role]:
+    roles = all_roles() + trap_roles()
+    if mapping is not None:
+        roles += variant_monster_roles(mapping)
+    return {role.role: role for role in roles}

@@ -170,7 +170,11 @@
           <option value="terrain">Terrain</option>
           <option value="objects">Objects</option>
           <option value="actors">Actors</option>
-          <option value="monsters">Monsters</option>
+          <option value="monsters">All Monsters</option>
+          <option value="monsters.base">Rogue 5.4.4 Monsters</option>
+          <option value="monsters.rogue36">Rogue 3.6.2 Monsters</option>
+          <option value="monsters.rogue52">Rogue 5.2.1 Monsters</option>
+          <option value="monsters.srogue90">Super-Rogue 9.0.1 Monsters</option>
           <option value="changed">Changed</option>
         </select>
       </div>
@@ -277,6 +281,20 @@
       return (rlSelections[role.role] || "") !== (original[role.role] || "");
     }
 
+    function roleMatchesGroup(role, group) {
+      if (group === "all") return true;
+      if (group === "changed") return isChanged(role);
+      if (group === "monsters") return role.group === "monsters";
+      if (group === "monsters.base") {
+        return role.role.startsWith("monster.") && !/^monster\.[^.]+\./.test(role.role);
+      }
+      if (group.startsWith("monsters.")) {
+        const variant = group.slice("monsters.".length);
+        return role.role.startsWith(`monster.${variant}.`);
+      }
+      return role.group === group;
+    }
+
     function drawTile(canvas, catalog, tile, size = 48) {
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -293,8 +311,7 @@
       const group = document.getElementById("groupFilter").value;
       roleList.replaceChildren();
       for (const role of roles) {
-        if (group !== "all" && group !== "changed" && role.group !== group) continue;
-        if (group === "changed" && !isChanged(role)) continue;
+        if (!roleMatchesGroup(role, group)) continue;
         if (query && !`${role.role} ${role.label} ${role.name}`.toLowerCase().includes(query)) continue;
         const selected = selectedTile(role);
         const button = document.createElement("button");

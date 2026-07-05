@@ -26,11 +26,16 @@ bool silent;
     {
 	from_floor = TRUE;
 	if ((item = find_obj(hero.y, hero.x)) == NULL)
+	{
+	    if (rogue_frontend_is_tiles())
+		msg("There is nothing here to pick up.");
 	    return;
+	}
     }
     else
 	from_floor = FALSE;
     obj = (struct object *) ldata(item);
+    lp = NULL;
     /*
      * Link it into the pack.  Search the pack for a object of similar type
      * if there isn't one, stuff it at the beginning, if there is, look for one
@@ -91,6 +96,11 @@ bool silent;
 	detach(lvl_obj, item);
 	mvaddch(hero.y, hero.x, (roomin(&hero) == NULL ? PASSAGE : FLOOR));
     }
+    else
+    {
+	item->l_prev = NULL;
+	item->l_next = NULL;
+    }
     /*
      * Search for an object of the same type
      */
@@ -106,6 +116,7 @@ bool silent;
 	/*
 	 * Put it at the end of the pack since it is a new type
 	 */
+	lp = NULL;
 	for (ip = pack; ip != NULL; ip = next(ip))
 	{
 	    op = (struct object *) ldata(ip);
@@ -113,12 +124,30 @@ bool silent;
 		break;
 	    lp = ip;
 	}
+	if (lp == NULL)
+	{
+	    item->l_prev = NULL;
+	    item->l_next = pack;
+	    if (pack != NULL)
+		pack->l_prev = item;
+	    pack = item;
+	}
+	else
+	{
+	    item->l_prev = lp;
+	    item->l_next = next(lp);
+	    if (next(lp) != NULL)
+		next(lp)->l_prev = item;
+	    lp->l_next = item;
+	}
+	goto picked_up;
     }
     else
     {
 	/*
 	 * Search for an object which is exactly the same
 	 */
+	lp = NULL;
 	while (ip != NULL && op->o_type == obj->o_type)
 	{
 	    if (op->o_which == obj->o_which)
@@ -138,7 +167,11 @@ bool silent;
 	 * Didn't find an exact match, just stick it here
 	 */
 	if (pack == NULL)
+	{
+	    item->l_prev = NULL;
+	    item->l_next = NULL;
 	    pack = item;
+	}
 	else
 	{
 	    lp->l_next = item;
@@ -351,6 +384,7 @@ int type;
 pick_up(ch)
 char ch;
 {
+    take = 0;
     switch(ch)
     {
 	case GOLD:
@@ -505,9 +539,11 @@ register struct object *obj;
 {
     register struct linked_list *item;
     register char c;
+    register int guard;
 
     c = 'a';
-    for (item = pack; item != NULL; item = next(item))
+    guard = 0;
+    for (item = pack; item != NULL && guard++ < MAXPACK + 5; item = next(item))
 	if ((struct object *) ldata(item) == obj)
 	    return c;
 	else

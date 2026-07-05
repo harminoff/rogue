@@ -8,7 +8,7 @@
 #include "generated/rogue_tile_mapping.h"
 
 #define ROGUE_TILEPACK_MAX_TEXT 262144
-#define ROGUE_TILEPACK_MAX_ENTRIES 128
+#define ROGUE_TILEPACK_MAX_ENTRIES 512
 
 static ROGUE_TILEPACK_ENTRY entries[ROGUE_TILEPACK_MAX_ENTRIES];
 static int entry_count = 0;
@@ -18,6 +18,7 @@ static int source_width = 32;
 static int source_height = 32;
 static char status_text[256] = "built-in generated tile mapping";
 static char current_pack_id[64] = "generated";
+static bool generated_fallback_safe = TRUE;
 static bool loaded = FALSE;
 
 static char *
@@ -126,6 +127,36 @@ json_int_field(const char *json, const char *key, int *out)
 
     *out = atoi(p);
     return TRUE;
+}
+
+static bool
+json_bool_field(const char *json, const char *key, bool *out)
+{
+    char pattern[96];
+    const char *p;
+
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    p = strstr(json, pattern);
+    if (p == NULL)
+	return FALSE;
+
+    p = strchr(p + strlen(pattern), ':');
+    if (p == NULL)
+	return FALSE;
+
+    p = skip_ws(p + 1);
+    if (strncmp(p, "true", 4) == 0)
+    {
+	*out = TRUE;
+	return TRUE;
+    }
+    if (strncmp(p, "false", 5) == 0)
+    {
+	*out = FALSE;
+	return TRUE;
+    }
+
+    return FALSE;
 }
 
 static const char *
@@ -300,6 +331,7 @@ reset_to_generated(void)
     atlas_columns = rogue_tile_atlas_columns();
     source_width = rogue_tile_atlas_source_width();
     source_height = rogue_tile_atlas_source_height();
+    generated_fallback_safe = TRUE;
     strncpy(current_pack_id, "generated", sizeof(current_pack_id) - 1);
     current_pack_id[sizeof(current_pack_id) - 1] = '\0';
 }
@@ -397,7 +429,9 @@ load_tilepack_file(const char *tilepack_path, const char *pack_id)
     char dir[512];
     char image_name[256];
     char mapping_name[256];
+    char pack_name[128];
     char mapping_path[512];
+    bool allow_generated_fallback;
 
     tilepack_json = read_text_file(tilepack_path);
     if (tilepack_json == NULL)
@@ -415,6 +449,14 @@ load_tilepack_file(const char *tilepack_path, const char *pack_id)
 	return FALSE;
     }
 
+    if (!json_string_field(tilepack_json, "name", pack_name,
+			   sizeof(pack_name)))
+	pack_name[0] = '\0';
+    if (!json_bool_field(tilepack_json, "fallbackToGenerated",
+			 &allow_generated_fallback))
+	allow_generated_fallback = (bool)(strcmp(pack_name,
+						 "Default RL Tiles") == 0);
+
     dirname_of(tilepack_path, dir, sizeof(dir));
     join_path(dir, image_name, atlas_path, sizeof(atlas_path));
     join_path(dir, mapping_name, mapping_path, sizeof(mapping_path));
@@ -428,6 +470,7 @@ load_tilepack_file(const char *tilepack_path, const char *pack_id)
 
     entry_count = 0;
     parse_mapping_roles(mapping_json);
+    generated_fallback_safe = allow_generated_fallback;
     if (pack_id != NULL && *pack_id != '\0')
     {
 	strncpy(current_pack_id, pack_id, sizeof(current_pack_id) - 1);
@@ -560,6 +603,9 @@ rogue_tilepack_lookup_index(const char *role, int fallback_index)
     for (i = 0; i < entry_count; i++)
 	if (strcmp(entries[i].role, role) == 0 && entries[i].index >= 0)
 	    return entries[i].index;
+
+    if (!generated_fallback_safe)
+	return -1;
 
     return fallback_index;
 }

@@ -120,6 +120,8 @@ char **envp;
     init_stones();			/* Set up stone settings of rings */
     init_materials();			/* Set up materials of wands */
     initscr();				/* Start up cursor package */
+    if (rogue_frontend_is_tiles())
+	resize_term(24, 80);
 
     if (COLS < 70)
     {

@@ -21,6 +21,7 @@ The release zip includes the game executable, required DLLs, RL Tiles assets, ru
 - **Rogue 5.4.4**: the default RogueTiles ruleset, based on the later classic Unix lineage with the broadest command/menu surface in this collection.
 - **Rogue 5.2.1**: bundled from the BSD-style restoration source archive. This first adapter runs from the same executable and uses the shared tile frontend for the dungeon, status bar, camera, and input path.
 - **Rogue 3.6.2**: bundled from the BSD-style early public Unix source archive. This version is much closer to the first widely released Rogue experience, with an older monster table, leaner command set, and bundled period manual/guide text.
+- **Super-Rogue 9.0.1**: bundled from the redistributable Super-Rogue source archive. This expanded variant adds a wider dungeon/status layout, extended attributes, pack volume/carry stats, extra commands such as dip, and a bundled Super-Rogue tutorial guide.
 
 The picker shows each version's era, lineage, license/distribution status, tile support, and feature notes before you start.
 
@@ -165,6 +166,13 @@ It runs on:
 - Version tags matching `v*`
 
 On a tag such as `v0.1.0-alpha`, the workflow builds and uploads `RogueTiles-windows-x64.zip` to the GitHub Release. That zip is the file to upload to itch.io.
+
+Current release highlights:
+
+- Adds Super-Rogue 9.0.1 as a selectable game variant with tile rendering, extended HUD stats, GUI menu coverage, and bundled guide text.
+- Improves in-game manual reading with a taller F1 reader, chapter selection, and cleaner formatting for nroff-style guide files.
+- Expands custom tile pack support across variants, including variant-specific monster assignments in the tile picker.
+- Fixes several tile frontend polish issues, including Super-Rogue wide-map rendering, hidden object bleed-through, missing actor fallbacks, shader rendering, blood layering, and packaged runtime assets.
 
 ## Developer Checks
 

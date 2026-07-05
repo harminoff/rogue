@@ -36,6 +36,19 @@ ROGUE36_CFILES = vers.c armor.c chase.c command.c daemon.c \
 ROGUE36_OBJS = $(ROGUE36_CFILES:%.c=$(ROGUE36_BUILD)/%.o)
 ROGUE36_REDEF = $(ROGUE36_DIR)/rogue36_symbols.redef
 ROGUE36_REDEF_EXPANDED = $(ROGUE36_BUILD)/rogue36_symbols.expanded.redef
+ROGUE36_REFSECTIONS = $(ROGUE36_BUILD)/rogue36_refptr_sections.args
+SROGUE90_DIR = variants/srogue90
+SROGUE90_BUILD = variants/srogue90/build
+SROGUE90_CFILES = vers.c armor.c chase.c command.c daemon.c daemons.c disply.c \
+	   encumb.c fight.c global.c init.c io.c list.c main.c misc.c \
+	   monsters.c move.c new_leve.c options.c pack.c passages.c \
+	   potions.c pstats.c rings.c rip.c rooms.c save.c scrolls.c \
+	   state.c sticks.c things.c trader.c weapons.c wizard.c xcrypt.c \
+	   srogue90_port.c
+SROGUE90_OBJS = $(SROGUE90_CFILES:%.c=$(SROGUE90_BUILD)/%.o)
+SROGUE90_REDEF = $(SROGUE90_DIR)/srogue90_symbols.redef
+SROGUE90_REDEF_EXPANDED = $(SROGUE90_BUILD)/srogue90_symbols.expanded.redef
+SROGUE90_REFSECTIONS = $(SROGUE90_BUILD)/srogue90_refptr_sections.args
 OBJS1    = vers.$(O) extern.$(O) armor.$(O) chase.$(O) command.$(O) \
            daemon.$(O) daemons.$(O) fight.$(O) init.$(O) io.$(O) list.$(O) \
 	   mach_dep.$(O) main.$(O) mdport.$(O) misc.$(O) monsters.$(O) \
@@ -46,7 +59,8 @@ OBJS2    = options.$(O) pack.$(O) passages.$(O) potions.$(O) rings.$(O) \
 	   variant.$(O) \
 	   generated/rogue_tile_mapping.$(O) \
 	   $(ALLEGRO_OBJS) weapons.$(O) \
-	   wizard.$(O) xcrypt.$(O) $(ROGUE52_OBJS) $(ROGUE36_OBJS)
+	   wizard.$(O) xcrypt.$(O) $(ROGUE52_OBJS) $(ROGUE36_OBJS) \
+	   $(SROGUE90_OBJS)
 OBJS     = $(OBJS1) $(OBJS2)
 CFILES   = vers.c extern.c armor.c chase.c command.c daemon.c \
 	   daemons.c fight.c init.c io.c list.c mach_dep.c \
@@ -101,12 +115,29 @@ $(ROGUE52_BUILD)/%.o: $(ROGUE52_DIR)/%.c $(ROGUE52_REDEF_EXPANDED) $(ROGUE52_DIR
 
 $(ROGUE36_REDEF_EXPANDED): $(ROGUE36_REDEF)
 	mkdir -p $(ROGUE36_BUILD)
-	cp $(ROGUE36_REDEF) $@
+	awk '{ print; if ($$1 != "" && $$1 !~ /^\\./) { print ".refptr." $$1 " rogue36_refptr_" $$1; print ".rdata$$.refptr." $$1 " .rdata$$.refptr.rogue36_" $$1 } }' $(ROGUE36_REDEF) > $@
 
-$(ROGUE36_BUILD)/%.o: $(ROGUE36_DIR)/%.c $(ROGUE36_REDEF_EXPANDED) $(ROGUE36_DIR)/rogue36_port.h $(ROGUE36_DIR)/port/pwd.h $(ROGUE36_DIR)/port/termios.h
+$(ROGUE36_REFSECTIONS): $(ROGUE36_REDEF)
+	mkdir -p $(ROGUE36_BUILD)
+	awk '{ if ($$1 != "" && $$1 !~ /^\\./) print "--rename-section .rdata$$.refptr." $$1 "=.rdata$$.refptr.rogue36_" $$1 }' $(ROGUE36_REDEF) > $@
+
+$(ROGUE36_BUILD)/%.o: $(ROGUE36_DIR)/%.c $(ROGUE36_REDEF_EXPANDED) $(ROGUE36_REFSECTIONS) $(ROGUE36_DIR)/rogue36_port.h $(ROGUE36_DIR)/port/pwd.h $(ROGUE36_DIR)/port/termios.h
 	mkdir -p $(ROGUE36_BUILD)
 	$(CC) $(CFLAGS) -fcommon -I$(ROGUE36_DIR)/port -I$(ROGUE36_DIR) $(CPPFLAGS) -include $(ROGUE36_DIR)/rogue36_port.h -DSCOREFILE=\"rogue36.scr\" -DLOCKFILE=\"rogue36.lck\" -c $(ROGUE36_DIR)/$*.c -o $@
-	$(OBJCOPY) --redefine-syms $(ROGUE36_REDEF_EXPANDED) $@
+	$(OBJCOPY) --no-change-warnings --redefine-syms $(ROGUE36_REDEF_EXPANDED) @$(ROGUE36_REFSECTIONS) $@
+
+$(SROGUE90_REDEF_EXPANDED): $(SROGUE90_REDEF)
+	mkdir -p $(SROGUE90_BUILD)
+	awk '{ print; if ($$1 != "" && $$1 !~ /^\\./) { print ".refptr." $$1 " srogue90_refptr_" $$1; print ".rdata$$.refptr." $$1 " .rdata$$.refptr.srogue90_" $$1 } }' $(SROGUE90_REDEF) > $@
+
+$(SROGUE90_REFSECTIONS): $(SROGUE90_REDEF)
+	mkdir -p $(SROGUE90_BUILD)
+	awk '{ if ($$1 != "" && $$1 !~ /^\\./) print "--rename-section .rdata$$.refptr." $$1 "=.rdata$$.refptr.srogue90_" $$1 }' $(SROGUE90_REDEF) > $@
+
+$(SROGUE90_BUILD)/%.o: $(SROGUE90_DIR)/%.c $(SROGUE90_REDEF_EXPANDED) $(SROGUE90_REFSECTIONS) $(SROGUE90_DIR)/srogue90_port.h $(SROGUE90_DIR)/port/pwd.h $(SROGUE90_DIR)/port/termios.h $(SROGUE90_DIR)/rogue.ext
+	mkdir -p $(SROGUE90_BUILD)
+	$(CC) $(CFLAGS) -fcommon -I$(SROGUE90_DIR)/port -I$(SROGUE90_DIR) $(CPPFLAGS) -include $(SROGUE90_DIR)/srogue90_port.h -DSCOREFILE=\"srogue90.scr\" -DLOCKFILE=\"srogue90.lck\" -c $(SROGUE90_DIR)/$*.c -o $@
+	$(OBJCOPY) --no-change-warnings --redefine-syms $(SROGUE90_REDEF_EXPANDED) @$(SROGUE90_REFSECTIONS) $@
     
 $(PROGRAM): $(HDRS) $(OBJS) fixdocs
 	$(CC) $(LDFLAGS) $(OBJS) $(LIBS) $(OUTFLAG)$@$(EXE)
@@ -118,6 +149,10 @@ clean:
 	$(RM) $(ROGUE52_REDEF_EXPANDED)
 	$(RM) $(ROGUE36_OBJS)
 	$(RM) $(ROGUE36_REDEF_EXPANDED)
+	$(RM) $(ROGUE36_REFSECTIONS)
+	$(RM) $(SROGUE90_OBJS)
+	$(RM) $(SROGUE90_REDEF_EXPANDED)
+	$(RM) $(SROGUE90_REFSECTIONS)
 	$(RM) core a.exe a.out a.exe.stackdump $(PROGRAM) $(PROGRAM).exe $(PROGRAM).lck
 	$(RM) $(PROGRAM).tar $(PROGRAM).tar.gz $(PROGRAM).zip 
 	$(RM) $(DISTNAME)/*

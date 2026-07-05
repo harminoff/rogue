@@ -69,6 +69,9 @@ Copy-Item -LiteralPath (Join-Path $repoRoot "assets") -Destination (Join-Path $p
 Copy-Item -LiteralPath (Join-Path $repoRoot "tilepacks") -Destination (Join-Path $packageDir "tilepacks") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "tile_picker") -Destination (Join-Path $packageDir "tile_picker") -Recurse -Force
 Copy-Item -LiteralPath (Join-Path $repoRoot "variants") -Destination (Join-Path $packageDir "variants") -Recurse -Force
+Get-ChildItem -LiteralPath (Join-Path $packageDir "variants") -Directory -Recurse |
+    Where-Object { $_.Name -eq "build" -or $_.Name -eq "build-temp" } |
+    Remove-Item -Recurse -Force
 
 $tilePickerExe = Join-Path $repoRoot "dist\picker-build\TilePicker.exe"
 if (Test-Path $tilePickerExe) {

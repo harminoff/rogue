@@ -33,6 +33,18 @@ const ROGUE_GENERATED_TILE_MAPPING rogue_tile_glyph_mappings[] = {
 const int rogue_tile_glyph_mapping_count =
     sizeof(rogue_tile_glyph_mappings) / sizeof(rogue_tile_glyph_mappings[0]);
 
+const ROGUE_GENERATED_TRAP_MAPPING rogue_tile_trap_mappings[] = {
+    { '>', "trap.trapdoor", "trap_door", 1464, "trapdoor" },
+    { '{', "trap.arrow", "arrow_trap", 1452, "arrow trap" },
+    { '$', "trap.sleeping_gas", "sleeping_gas_trap", 1458, "sleeping gas trap" },
+    { '}', "trap.bear", "bear_trap", 1456, "bear trap" },
+    { '~', "trap.teleport", "teleportation_trap", 1465, "teleport trap" },
+    { '`', "trap.poison_dart", "dart_trap", 1453, "poison dart trap" }
+};
+
+const int rogue_tile_trap_mapping_count =
+    sizeof(rogue_tile_trap_mappings) / sizeof(rogue_tile_trap_mappings[0]);
+
 const ROGUE_GENERATED_MONSTER_MAPPING rogue_tile_monster_mappings[] = {
     { 'A', "monster.A", "water_elemental", 334, "aquator" },
     { 'B', "monster.B", "bat", 434, "bat" },
@@ -66,7 +78,7 @@ const int rogue_tile_monster_mapping_count =
     sizeof(rogue_tile_monster_mappings) / sizeof(rogue_tile_monster_mappings[0]);
 
 const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mappings[] = {
-    { "rogue36", 'A', "monster.rogue36.A", "giant_ant", 218, "giant ant" },
+    { "rogue36", 'A', "monster.rogue36.A", "queen_ant", 173, "giant ant" },
     { "rogue36", 'B', "monster.rogue36.B", "bat", 434, "bat" },
     { "rogue36", 'C', "monster.rogue36.C", "plains_centaur", 229, "centaur" },
     { "rogue36", 'D', "monster.rogue36.D", "green_dragon", 108, "dragon" },
@@ -76,7 +88,7 @@ const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mapping
     { "rogue36", 'H', "monster.rogue36.H", "hobgoblin", 386, "hobgoblin" },
     { "rogue36", 'I', "monster.rogue36.I", "stalker", 455, "invisible stalker" },
     { "rogue36", 'J', "monster.rogue36.J", "jackal", 268, "jackal" },
-    { "rogue36", 'K', "monster.rogue36.K", "kobold", 153, "kobold" },
+    { "rogue36", 'K', "monster.rogue36.K", "big_kobold", 152, "kobold" },
     { "rogue36", 'L', "monster.rogue36.L", "leprechaun", 378, "leprechaun" },
     { "rogue36", 'M', "monster.rogue36.M", "small_mimic", 379, "mimic" },
     { "rogue36", 'N', "monster.rogue36.N", "wood_nymph", 382, "nymph" },
@@ -92,7 +104,7 @@ const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mapping
     { "rogue36", 'X', "monster.rogue36.X", "xorn", 509, "xorn" },
     { "rogue36", 'Y', "monster.rogue36.Y", "yeti", 513, "yeti" },
     { "rogue36", 'Z', "monster.rogue36.Z", "human_zombie", 520, "zombie" },
-    { "rogue52", 'A', "monster.rogue52.A", "giant_ant", 218, "giant ant" },
+    { "rogue52", 'A', "monster.rogue52.A", "queen_ant", 173, "giant ant" },
     { "rogue52", 'B', "monster.rogue52.B", "bat", 434, "bat" },
     { "rogue52", 'C', "monster.rogue52.C", "plains_centaur", 229, "centaur" },
     { "rogue52", 'D', "monster.rogue52.D", "green_dragon", 108, "dragon" },
@@ -102,7 +114,7 @@ const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mapping
     { "rogue52", 'H', "monster.rogue52.H", "hobgoblin", 386, "hobgoblin" },
     { "rogue52", 'I', "monster.rogue52.I", "stalker", 455, "invisible stalker" },
     { "rogue52", 'J', "monster.rogue52.J", "jackal", 268, "jackal" },
-    { "rogue52", 'K', "monster.rogue52.K", "kobold", 153, "kobold" },
+    { "rogue52", 'K', "monster.rogue52.K", "big_kobold", 152, "kobold" },
     { "rogue52", 'L', "monster.rogue52.L", "leprechaun", 378, "leprechaun" },
     { "rogue52", 'M', "monster.rogue52.M", "small_mimic", 379, "mimic" },
     { "rogue52", 'N', "monster.rogue52.N", "wood_nymph", 382, "nymph" },
@@ -117,10 +129,62 @@ const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mapping
     { "rogue52", 'W', "monster.rogue52.W", "wraith", 202, "wraith" },
     { "rogue52", 'X', "monster.rogue52.X", "xorn", 509, "xorn" },
     { "rogue52", 'Y', "monster.rogue52.Y", "yeti", 513, "yeti" },
-    { "rogue52", 'Z', "monster.rogue52.Z", "human_zombie", 520, "zombie" }
+    { "rogue52", 'Z', "monster.rogue52.Z", "human_zombie", 520, "zombie" },
+    { "srogue90", 'A', "monster.srogue90.A", "queen_ant", 173, "giant ant" },
+    { "srogue90", 'B', "monster.srogue90.B", "bat", 434, "bat" },
+    { "srogue90", 'C', "monster.srogue90.C", "plains_centaur", 229, "centaur" },
+    { "srogue90", 'D', "monster.srogue90.D", "red_dragon", 452, "red dragon" },
+    { "srogue90", 'E', "monster.srogue90.E", "floating_eye", 132, "floating eye" },
+    { "srogue90", 'F', "monster.srogue90.F", "violet_fungus", 462, "violet fungi" },
+    { "srogue90", 'G', "monster.srogue90.G", "gnome", 463, "gnome" },
+    { "srogue90", 'H', "monster.srogue90.H", "hobgoblin", 386, "hobgoblin" },
+    { "srogue90", 'I', "monster.srogue90.I", "stalker", 455, "invisible stalker" },
+    { "srogue90", 'J', "monster.srogue90.J", "jackal", 268, "jackal" },
+    { "srogue90", 'K', "monster.srogue90.K", "big_kobold", 152, "kobold" },
+    { "srogue90", 'L', "monster.srogue90.L", "leprechaun", 378, "leprechaun" },
+    { "srogue90", 'M', "monster.srogue90.M", "small_mimic", 379, "mimic" },
+    { "srogue90", 'N', "monster.srogue90.N", "wood_nymph", 382, "nymph" },
+    { "srogue90", 'O', "monster.srogue90.O", "orc", 387, "orc" },
+    { "srogue90", 'P', "monster.srogue90.P", "purple_worm", 424, "purple worm" },
+    { "srogue90", 'Q', "monster.srogue90.Q", "quasit", 300, "quasit" },
+    { "srogue90", 'R', "monster.srogue90.R", "rust_monster", 497, "rust monster" },
+    { "srogue90", 'S', "monster.srogue90.S", "snake", 183, "snake" },
+    { "srogue90", 'T', "monster.srogue90.T", "troll", 189, "troll" },
+    { "srogue90", 'U', "monster.srogue90.U", "umber_hulk", 505, "umber hulk" },
+    { "srogue90", 'V', "monster.srogue90.V", "vampire", 194, "vampire" },
+    { "srogue90", 'W', "monster.srogue90.W", "wraith", 202, "wraith" },
+    { "srogue90", 'X', "monster.srogue90.X", "xorn", 509, "xorn" },
+    { "srogue90", 'Y', "monster.srogue90.Y", "yeti", 513, "yeti" },
+    { "srogue90", 'Z', "monster.srogue90.Z", "human_zombie", 520, "zombie" },
+    { "srogue90", 'a', "monster.srogue90.a", "giant_beetle", 98, "anhkheg" },
+    { "srogue90", 'b', "monster.srogue90.b", "giant_beetle", 98, "giant beetle" },
+    { "srogue90", 'c', "monster.srogue90.c", "cockatrice", 339, "cockatrice" },
+    { "srogue90", 'd', "monster.srogue90.d", "bone_devil", 560, "bone devil" },
+    { "srogue90", 'e', "monster.srogue90.e", "giant_lizard", 273, "elasmosaurus" },
+    { "srogue90", 'f', "monster.srogue90.f", "giant_frog", 128, "killer frog" },
+    { "srogue90", 'g', "monster.srogue90.g", "green_dragon", 108, "green dragon" },
+    { "srogue90", 'h', "monster.srogue90.h", "hell_hound", 262, "hell hound" },
+    { "srogue90", 'i', "monster.srogue90.i", "imp", 45, "imp" },
+    { "srogue90", 'j', "monster.srogue90.j", "jaguar", 357, "jaguar" },
+    { "srogue90", 'k', "monster.srogue90.k", "doppelganger", 533, "koppleganger" },
+    { "srogue90", 'l', "monster.srogue90.l", "shadow_imp", 49, "lonchu" },
+    { "srogue90", 'm', "monster.srogue90.m", "minotaur", 281, "minotaur" },
+    { "srogue90", 'n', "monster.srogue90.n", "abomination_small", 322, "neotyugh" },
+    { "srogue90", 'o', "monster.srogue90.o", "ogre", 168, "ogre" },
+    { "srogue90", 'p', "monster.srogue90.p", "baby_red_dragon", 442, "pseudo dragon" },
+    { "srogue90", 'q', "monster.srogue90.q", "blue_devil", 30, "quellit" },
+    { "srogue90", 'r', "monster.srogue90.r", "sphinx", 139, "rhynosphinx" },
+    { "srogue90", 's', "monster.srogue90.s", "shadow_wraith", 198, "shadow" },
+    { "srogue90", 't', "monster.srogue90.t", "titanothere", 400, "titanothere" },
+    { "srogue90", 'u', "monster.srogue90.u", "troll", 189, "ulodyte" },
+    { "srogue90", 'v', "monster.srogue90.v", "vrock", 558, "vrock" },
+    { "srogue90", 'w', "monster.srogue90.w", "succubus", 553, "wuccubi" },
+    { "srogue90", 'x', "monster.srogue90.x", "xorn", 509, "xonoclon" },
+    { "srogue90", 'y', "monster.srogue90.y", "yeenoghu", 562, "yeenoghu" },
+    { "srogue90", 'z', "monster.srogue90.z", "human_zombie", 520, "zemure" }
 };
 
-const int rogue_tile_variant_monster_mapping_count = 52;
+const int rogue_tile_variant_monster_mapping_count = 104;
 
 const char *
 rogue_tile_atlas_path(void)

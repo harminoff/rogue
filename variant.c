@@ -14,12 +14,21 @@ int rogue52_variant_level_number(void);
 int rogue52_variant_map_rows(void);
 int rogue52_variant_map_cols(void);
 bool rogue52_variant_cell_walkable(int y, int x);
+void rogue52_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
 void rogue36_variant_status(ROGUE_VARIANT_STATUS *status);
 void rogue36_variant_hero_position(int *y, int *x);
 int rogue36_variant_level_number(void);
 int rogue36_variant_map_rows(void);
 int rogue36_variant_map_cols(void);
 bool rogue36_variant_cell_walkable(int y, int x);
+void rogue36_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
+void srogue90_variant_status(ROGUE_VARIANT_STATUS *status);
+void srogue90_variant_hero_position(int *y, int *x);
+int srogue90_variant_level_number(void);
+int srogue90_variant_map_rows(void);
+int srogue90_variant_map_cols(void);
+bool srogue90_variant_cell_walkable(int y, int x);
+void srogue90_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
 
 static const ROGUE_VARIANT_INFO variants[] = {
     {
@@ -135,6 +144,45 @@ static const ROGUE_VARIANT_INFO variants[] = {
 		"rogue54.doc",
 		"BSD-style source distribution",
 		"Long-form Unix Rogue guide referenced by the 5.2 manual page and included with the Rogue 5.4.4 source distribution."
+	    },
+	    { NULL, NULL, NULL, NULL, NULL, NULL }
+	}
+    },
+    {
+	"srogue90",
+	"Super-Rogue 9.0.1",
+	1984,
+	"1984 expanded Rogue 3.6 descendant",
+	"Super-Rogue line based on Rogue 3.6",
+	"BSD-style with name-use restrictions",
+	"Bundled",
+	"Expanded Rogue ruleset",
+	"Super-Rogue 9.0.1 is an ambitious Rogue 3.6 descendant with a much larger monster table, deeper dungeon progression, extra player abilities, carrying volume, trading posts, magic pools, maze levels, and a greatly expanded item catalog.",
+	{
+	    "Monster roster expands to 52 entries using both uppercase and lowercase letters, including the classic early table plus later threats such as anhkheg, cockatrice, bone devil, green dragon, minotaur, shadow, and Asmodeus.",
+	    "The status model adds dexterity, wisdom, constitution, carry weight, and pack volume alongside the familiar level, gold, hit points, armor, and experience fields.",
+	    "Trading post levels let the player buy and sell objects for gold, changing dungeon economy beyond ordinary treasure pickup.",
+	    "Magic pools support the D command to dip objects, adding a new map feature and item-risk interaction.",
+	    "The item catalog is much larger: 21 potion types, 26 scroll types, 26 ring types, 26 stick types, 18 weapons, and 10 armor types.",
+	    "The Amulet appears much deeper than early Rogue, with the source setting its earliest level to 35.",
+	    NULL
+	},
+	{
+	    {
+		"Super-Rogue 9.0.1 guide",
+		"Bundled guide",
+		"variants/srogue90/rogue.nr",
+		"variants/srogue90/rogue.nr",
+		"BSD-style source distribution",
+		"Long-form Super-Rogue tutorial and command guide shipped with the source archive."
+	    },
+	    {
+		"Super-Rogue 9.0.1 license",
+		"Bundled license",
+		"variants/srogue90/LICENSE.TXT",
+		"variants/srogue90/LICENSE.TXT",
+		"BSD-style source distribution with name-use restrictions",
+		"Redistribution terms for Super-Rogue and its Rogue-derived portions."
 	    },
 	    { NULL, NULL, NULL, NULL, NULL, NULL }
 	}
@@ -275,6 +323,11 @@ rogue_variant_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
 	rogue36_tile_describe_cell(y, x, cell);
 	return;
     }
+    if (rogue_variant_is_current("srogue90"))
+    {
+	srogue90_tile_describe_cell(y, x, cell);
+	return;
+    }
 
     rogue_tile_describe_cell(y, x, cell);
 }
@@ -285,6 +338,8 @@ rogue_variant_status(ROGUE_VARIANT_STATUS *status)
     if (status == NULL)
 	return;
 
+    memset(status, 0, sizeof(*status));
+
     if (rogue_variant_is_current("rogue52"))
     {
 	rogue52_variant_status(status);
@@ -293,6 +348,11 @@ rogue_variant_status(ROGUE_VARIANT_STATUS *status)
     if (rogue_variant_is_current("rogue36"))
     {
 	rogue36_variant_status(status);
+	return;
+    }
+    if (rogue_variant_is_current("srogue90"))
+    {
+	srogue90_variant_status(status);
 	return;
     }
 
@@ -321,6 +381,11 @@ rogue_variant_hero_position(int *y, int *x)
 	rogue36_variant_hero_position(y, x);
 	return;
     }
+    if (rogue_variant_is_current("srogue90"))
+    {
+	srogue90_variant_hero_position(y, x);
+	return;
+    }
 
     if (y != NULL)
 	*y = hero.y;
@@ -335,6 +400,8 @@ rogue_variant_level_number(void)
 	return rogue52_variant_level_number();
     if (rogue_variant_is_current("rogue36"))
 	return rogue36_variant_level_number();
+    if (rogue_variant_is_current("srogue90"))
+	return srogue90_variant_level_number();
     return level;
 }
 
@@ -345,6 +412,8 @@ rogue_variant_map_rows(void)
 	return rogue52_variant_map_rows();
     if (rogue_variant_is_current("rogue36"))
 	return rogue36_variant_map_rows();
+    if (rogue_variant_is_current("srogue90"))
+	return srogue90_variant_map_rows();
     return NUMLINES;
 }
 
@@ -355,6 +424,8 @@ rogue_variant_map_cols(void)
 	return rogue52_variant_map_cols();
     if (rogue_variant_is_current("rogue36"))
 	return rogue36_variant_map_cols();
+    if (rogue_variant_is_current("srogue90"))
+	return srogue90_variant_map_cols();
     return NUMCOLS;
 }
 
@@ -367,6 +438,8 @@ rogue_variant_cell_walkable(int y, int x)
 	return rogue52_variant_cell_walkable(y, x);
     if (rogue_variant_is_current("rogue36"))
 	return rogue36_variant_cell_walkable(y, x);
+    if (rogue_variant_is_current("srogue90"))
+	return srogue90_variant_cell_walkable(y, x);
 
     if (y <= 0 || y >= NUMLINES - 1 || x < 0 || x >= NUMCOLS)
 	return FALSE;

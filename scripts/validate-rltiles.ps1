@@ -129,15 +129,38 @@ $variantMonsterCount = 0
 if ($mapping.PSObject.Properties.Name -contains "variantMonsters" -and $null -ne $mapping.variantMonsters) {
     foreach ($variant in $mapping.variantMonsters.PSObject.Properties) {
         $variantId = $variant.Name
-        $variantKeys = [string[]]($variant.Value.PSObject.Properties.Name)
+        $variantKeys = @()
+        if ($variant.Value -is [System.Array]) {
+            foreach ($entry in $variant.Value) {
+                if ($null -ne $entry -and $entry.PSObject.Properties.Name -contains "glyph") {
+                    $variantKeys += [string]$entry.glyph
+                }
+            }
+        }
+        elseif ($variant.Value -is [pscustomobject]) {
+            $variantKeys = [string[]]($variant.Value.PSObject.Properties.Name)
+        }
+
         foreach ($letter in [char[]]"ABCDEFGHIJKLMNOPQRSTUVWXYZ") {
             $key = [string]$letter
             if ($variantKeys -notcontains $key) {
                 throw "Missing required variant monster mapping: variantMonsters.$variantId.$key"
             }
         }
-        if ($variantKeys.Count -ne 26) {
-            throw "Expected 26 monster mappings for variant '$variantId', found $($variantKeys.Count)"
+
+        $expectedCount = 26
+        if ($variantId -eq "srogue90") {
+            foreach ($letter in [char[]]"abcdefghijklmnopqrstuvwxyz") {
+                $key = [string]$letter
+                if ($variantKeys -notcontains $key) {
+                    throw "Missing required variant monster mapping: variantMonsters.$variantId.$key"
+                }
+            }
+            $expectedCount = 52
+        }
+
+        if ($variantKeys.Count -ne $expectedCount) {
+            throw "Expected $expectedCount monster mappings for variant '$variantId', found $($variantKeys.Count)"
         }
         $variantMonsterCount += $variantKeys.Count
     }

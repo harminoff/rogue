@@ -10,7 +10,13 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from .role_catalog import Role, all_roles, variant_monster_roles
+from .role_catalog import (
+    Role,
+    all_roles,
+    trap_roles,
+    variant_monster_entry,
+    variant_monster_roles,
+)
 
 
 class TilePackError(ValueError):
@@ -35,7 +41,7 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 def role_atlas_from_mapping(mapping: dict[str, Any], role: Role) -> str | None:
     if role.role.startswith("monster.") and role.key.count(".") == 1:
         variant_id, glyph = role.key.split(".", 1)
-        entry = mapping.get("variantMonsters", {}).get(variant_id, {}).get(glyph, {})
+        entry = variant_monster_entry(mapping, variant_id, glyph)
     elif role.role.startswith("monster."):
         entry = mapping.get("monsters", {}).get(role.key, {})
     else:
@@ -62,6 +68,7 @@ def write_pack(
     tile_height: int,
     columns: int,
     roles: dict[str, dict[str, Any]],
+    fallback_to_generated: bool,
 ) -> dict[str, Any]:
     if tile_width <= 0 or tile_height <= 0 or columns <= 0:
         raise TilePackError("Tile width, tile height, and columns must be positive")
@@ -79,6 +86,7 @@ def write_pack(
         "tileWidth": tile_width,
         "tileHeight": tile_height,
         "columns": columns,
+        "fallbackToGenerated": fallback_to_generated,
     })
     write_json(pack_dir / "mapping.json", {
         "schemaVersion": 1,
@@ -94,7 +102,7 @@ def write_default_pack(root: Path, pack_name: str = "default") -> dict[str, Any]
     lookup = atlas_lookup(root)
     roles: dict[str, dict[str, Any]] = {}
 
-    for role in all_roles() + variant_monster_roles(mapping):
+    for role in all_roles() + trap_roles() + variant_monster_roles(mapping):
         atlas_name = role_atlas_from_mapping(mapping, role)
         if atlas_name is None:
             continue
@@ -111,6 +119,7 @@ def write_default_pack(root: Path, pack_name: str = "default") -> dict[str, Any]
         32,
         int(atlas.get("width", 30)),
         roles,
+        True,
     )
 
 
@@ -162,4 +171,5 @@ def write_active_custom_pack(root: Path, profile: dict[str, Any], pack_name: str
         int(source.get("tileHeight") or source.get("tileWidth") or 32),
         int(source.get("columns") or 1),
         roles,
+        False,
     )

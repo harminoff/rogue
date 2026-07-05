@@ -130,6 +130,8 @@ static bool smoke_mode = FALSE;
 static bool shader_smoke_mode = FALSE;
 static bool gloom_shader_failed = FALSE;
 static bool postprocess_shader_failed = FALSE;
+static unsigned char *atlas_tile_visible = NULL;
+static int atlas_tile_visible_count = 0;
 static int scene_bitmap_width = 0;
 static int scene_bitmap_height = 0;
 static int suppress_key_char_keycode = 0;
@@ -167,6 +169,7 @@ static int text_overlay_line_count = 0;
 static int text_overlay_selected = -1;
 static int text_overlay_scroll = 0;
 static bool text_overlay_selectable = FALSE;
+static bool text_overlay_fill_vertical = FALSE;
 static int manual_chapter_lines[ROGUE_MANUAL_MAX_CHAPTERS];
 static char manual_chapter_titles[ROGUE_MANUAL_MAX_CHAPTERS][ROGUE_OVERLAY_LINE_LEN];
 static int manual_chapter_count = 0;
@@ -191,6 +194,7 @@ static void write_locked_rgba(ALLEGRO_LOCKED_REGION *region, int x, int y,
 			      unsigned char b, unsigned char a);
 static void reset_manual_chapters(void);
 static bool manual_line_is_heading(const char *line);
+static void clean_manual_text(char *text);
 static void record_manual_chapter(const char *title);
 static char show_manual_chapter_picker(void);
 static void show_manuals_menu_for_variant(const ROGUE_VARIANT_INFO *current);
@@ -1032,6 +1036,115 @@ handle_view_key(int keycode)
     }
 }
 
+static void
+clear_atlas_visibility_cache(void)
+{
+    if (atlas_tile_visible != NULL)
+	free(atlas_tile_visible);
+    atlas_tile_visible = NULL;
+    atlas_tile_visible_count = 0;
+}
+
+static bool
+atlas_index_has_visible_pixels(int atlas_index)
+{
+    int columns;
+    int source_w, source_h;
+    int image_w, image_h;
+    int sx, sy;
+    int x, y;
+    int visible_pixels;
+    int alpha_pixels;
+    unsigned char r, g, b, a;
+    ALLEGRO_COLOR pixel;
+
+    if (atlas == NULL || atlas_index < 0)
+	return FALSE;
+
+    columns = rogue_tilepack_columns();
+    source_w = rogue_tilepack_source_width();
+    source_h = rogue_tilepack_source_height();
+    image_w = al_get_bitmap_width(atlas);
+    image_h = al_get_bitmap_height(atlas);
+    if (columns <= 0 || source_w <= 0 || source_h <= 0)
+	return FALSE;
+
+    sx = (atlas_index % columns) * source_w;
+    sy = (atlas_index / columns) * source_h;
+    if (sx < 0 || sy < 0 || sx + source_w > image_w || sy + source_h > image_h)
+	return FALSE;
+
+    visible_pixels = 0;
+    alpha_pixels = 0;
+    for (y = sy; y < sy + source_h; y += 2)
+	for (x = sx; x < sx + source_w; x += 2)
+	{
+	    pixel = al_get_pixel(atlas, x, y);
+	    al_unmap_rgba(pixel, &r, &g, &b, &a);
+	    if (a > 24)
+	    {
+		alpha_pixels++;
+		if ((int) r + (int) g + (int) b > 80
+		    || r > 56 || g > 56 || b > 56)
+		{
+		    visible_pixels++;
+		    if (visible_pixels >= 4)
+			return TRUE;
+		}
+	    }
+	}
+
+    return (bool)(alpha_pixels > 0 && visible_pixels > 0);
+}
+
+static void
+rebuild_atlas_visibility_cache(void)
+{
+    int columns;
+    int rows;
+    int image_h;
+    int source_h;
+
+    clear_atlas_visibility_cache();
+    if (atlas == NULL)
+	return;
+
+    columns = rogue_tilepack_columns();
+    source_h = rogue_tilepack_source_height();
+    image_h = al_get_bitmap_height(atlas);
+    if (columns <= 0 || source_h <= 0)
+	return;
+
+    rows = image_h / source_h;
+    atlas_tile_visible_count = columns * rows;
+    if (atlas_tile_visible_count <= 0)
+	return;
+
+    atlas_tile_visible = (unsigned char *) calloc(
+	(size_t) atlas_tile_visible_count, sizeof(*atlas_tile_visible));
+    if (atlas_tile_visible == NULL)
+    {
+	atlas_tile_visible_count = 0;
+	return;
+    }
+    memset(atlas_tile_visible, 255, (size_t) atlas_tile_visible_count);
+}
+
+static bool
+atlas_tile_is_visible(int atlas_index)
+{
+    if (atlas_index < 0)
+	return FALSE;
+    if (atlas_tile_visible == NULL || atlas_tile_visible_count <= 0)
+	return TRUE;
+    if (atlas_index >= atlas_tile_visible_count)
+	return FALSE;
+    if (atlas_tile_visible[atlas_index] == 255)
+	atlas_tile_visible[atlas_index] =
+	    atlas_index_has_visible_pixels(atlas_index) ? 1 : 0;
+    return (bool)(atlas_tile_visible[atlas_index] != 0);
+}
+
 static bool
 load_current_atlas(void)
 {
@@ -1058,6 +1171,7 @@ load_current_atlas(void)
     if (atlas != NULL)
 	al_destroy_bitmap(atlas);
     atlas = loaded;
+    rebuild_atlas_visibility_cache();
     return TRUE;
 }
 
@@ -1801,6 +1915,83 @@ manual_line_is_heading(const char *line)
     return (bool)(isspace((unsigned char)*p) && p[1] != '\0');
 }
 
+static char *
+manual_macro_text(char *line, const char *macro)
+{
+    int len;
+    char *text;
+
+    len = (int)strlen(macro);
+    if (strncmp(line, macro, (size_t)len) != 0)
+	return NULL;
+    text = line + len;
+    while (*text != '\0' && isspace((unsigned char)*text))
+	text++;
+    return text;
+}
+
+static char *
+manual_heading_text(char *line)
+{
+    char *text;
+
+    text = manual_macro_text(line, ".H");
+    if (text == NULL)
+	return NULL;
+    while (*text != '\0' && isspace((unsigned char)*text))
+	text++;
+    while (isdigit((unsigned char)*text))
+	text++;
+    while (*text != '\0' && isspace((unsigned char)*text))
+	text++;
+    return text;
+}
+
+static void
+manual_format_macro_text(char *source, char *out, int out_size)
+{
+    char *p;
+    int written;
+    bool copied;
+
+    if (out_size <= 0)
+	return;
+    out[0] = '\0';
+    if (source == NULL)
+	return;
+
+    p = trim_manual_text(source);
+    written = 0;
+    copied = FALSE;
+    while (*p != '\0' && written < out_size - 1)
+    {
+	while (*p != '\0' && isspace((unsigned char)*p))
+	    p++;
+	if (*p == '"')
+	{
+	    p++;
+	    if (copied && written < out_size - 1)
+		out[written++] = ' ';
+	    while (*p != '\0' && *p != '"' && written < out_size - 1)
+		out[written++] = *p++;
+	    if (*p == '"')
+		p++;
+	    copied = TRUE;
+	}
+	else
+	{
+	    if (copied && written < out_size - 1)
+		out[written++] = ' ';
+	    while (*p != '\0' && !isspace((unsigned char)*p)
+		   && written < out_size - 1)
+		out[written++] = *p++;
+	    copied = TRUE;
+	}
+    }
+    out[written] = '\0';
+    clean_manual_text(out);
+}
+
 static void
 record_manual_chapter(const char *title)
 {
@@ -1838,6 +2029,7 @@ show_manual_chapter_picker(void)
     int i;
     bool saved_active;
     bool saved_selectable;
+    bool saved_fill_vertical;
     char selected;
 
     if (manual_chapter_count <= 0)
@@ -1848,6 +2040,7 @@ show_manual_chapter_picker(void)
     saved_scroll = text_overlay_scroll;
     saved_active = text_overlay_active;
     saved_selectable = text_overlay_selectable;
+    saved_fill_vertical = text_overlay_fill_vertical;
     snprintf(saved_title, sizeof(saved_title), "%s", text_overlay_title);
     snprintf(saved_prompt, sizeof(saved_prompt), "%s", text_overlay_prompt);
     for (i = 0; i < saved_line_count; i++)
@@ -1874,6 +2067,7 @@ show_manual_chapter_picker(void)
     text_overlay_scroll = saved_scroll;
     text_overlay_active = saved_active;
     text_overlay_selectable = saved_selectable;
+    text_overlay_fill_vertical = saved_fill_vertical;
     for (i = 0; i < saved_line_count; i++)
 	snprintf(text_overlay_lines[i], sizeof(text_overlay_lines[i]), "%s",
 		 saved_lines[i]);
@@ -1990,14 +2184,57 @@ append_manual_paragraph_text(char *paragraph, int paragraph_size,
 }
 
 static void
+append_manual_literal_line(char *line)
+{
+    char formatted[512];
+    char *text;
+
+    if (strncmp(line, ".B ", 3) == 0
+	|| strncmp(line, ".I ", 3) == 0)
+    {
+	manual_format_macro_text(line + 3, formatted, (int)sizeof(formatted));
+	text = trim_manual_text(formatted);
+	if (*text != '\0')
+	    rogue_allegro_text_overlay_add(text);
+	return;
+    }
+
+    clean_manual_text(line);
+    text = line;
+    while (*text != '\0' && (*text == '\r' || *text == '\n'))
+	text++;
+    if (*text == '\0')
+    {
+	append_manual_blank_line();
+	return;
+    }
+    if (manual_line_is_artifact(text))
+	return;
+    rogue_allegro_text_overlay_add(text);
+}
+
+static void
 append_manual_file_line(const char *source, char *paragraph,
-			int paragraph_size)
+			int paragraph_size, bool *literal_block)
 {
     char line[512];
+    char formatted[512];
     char *text;
 
     snprintf(line, sizeof(line), "%s", source);
     line[sizeof(line) - 1] = '\0';
+
+    if (literal_block != NULL && *literal_block)
+    {
+	if (strncmp(line, ".DE", 3) == 0)
+	{
+	    *literal_block = FALSE;
+	    append_manual_blank_line();
+	    return;
+	}
+	append_manual_literal_line(line);
+	return;
+    }
 
     if (line[0] == '.' && line[1] == '\\' && line[2] == '"')
 	return;
@@ -2006,14 +2243,42 @@ append_manual_file_line(const char *source, char *paragraph,
 	if (strncmp(line, ".SH ", 4) == 0)
 	{
 	    flush_manual_paragraph(paragraph);
-	    text = unquote_manual_text(line + 4);
-	    clean_manual_text(text);
+	    manual_format_macro_text(line + 4, formatted,
+				     (int)sizeof(formatted));
+	    text = formatted;
+	    append_manual_blank_line();
+	    record_manual_chapter(text);
+	    rogue_allegro_text_overlay_add(text);
+	}
+	else if ((text = manual_heading_text(line)) != NULL)
+	{
+	    flush_manual_paragraph(paragraph);
+	    manual_format_macro_text(text, formatted,
+				     (int)sizeof(formatted));
+	    text = formatted;
 	    append_manual_blank_line();
 	    record_manual_chapter(text);
 	    rogue_allegro_text_overlay_add(text);
 	}
 	else if (strncmp(line, ".PP", 3) == 0
-		 || strncmp(line, ".br", 3) == 0)
+		 || strncmp(line, ".P", 2) == 0
+		 || strncmp(line, ".SP", 3) == 0
+		 || strncmp(line, ".br", 3) == 0
+		 || strncmp(line, ".bp", 3) == 0
+		 || strncmp(line, ".FS", 3) == 0
+		 || strncmp(line, ".FE", 3) == 0)
+	{
+	    flush_manual_paragraph(paragraph);
+	    append_manual_blank_line();
+	}
+	else if (strncmp(line, ".DS", 3) == 0)
+	{
+	    flush_manual_paragraph(paragraph);
+	    append_manual_blank_line();
+	    if (literal_block != NULL)
+		*literal_block = TRUE;
+	}
+	else if (strncmp(line, ".DE", 3) == 0)
 	{
 	    flush_manual_paragraph(paragraph);
 	    append_manual_blank_line();
@@ -2021,7 +2286,9 @@ append_manual_file_line(const char *source, char *paragraph,
 	else if (strncmp(line, ".B ", 3) == 0
 		 || strncmp(line, ".I ", 3) == 0)
 	{
-	    text = unquote_manual_text(line + 3);
+	    manual_format_macro_text(line + 3, formatted,
+				     (int)sizeof(formatted));
+	    text = formatted;
 	    append_manual_paragraph_text(paragraph, paragraph_size, text);
 	}
 	return;
@@ -2094,6 +2361,7 @@ load_manual_text_overlay(const ROGUE_VARIANT_MANUAL_REF *manual)
     char line[512];
     char paragraph[1024];
     int loaded_lines;
+    bool literal_block;
 
     reset_manual_chapters();
     if (!manual_has_local_text(manual))
@@ -2106,10 +2374,12 @@ load_manual_text_overlay(const ROGUE_VARIANT_MANUAL_REF *manual)
 
     loaded_lines = 0;
     paragraph[0] = '\0';
+    literal_block = FALSE;
     while (fgets(line, sizeof(line), file) != NULL
 	   && text_overlay_line_count < ROGUE_OVERLAY_MAX_LINES - 2)
     {
-	append_manual_file_line(line, paragraph, (int)sizeof(paragraph));
+	append_manual_file_line(line, paragraph, (int)sizeof(paragraph),
+				&literal_block);
 	loaded_lines++;
     }
     flush_manual_paragraph(paragraph);
@@ -2130,6 +2400,7 @@ show_manual_reader(const ROGUE_VARIANT_MANUAL_REF *manual)
 	return;
 
     rogue_allegro_text_overlay_begin(manual->title);
+    text_overlay_fill_vertical = TRUE;
     if (!load_manual_text_overlay(manual))
     {
 	rogue_allegro_text_overlay_add("This reference is not bundled as readable in-game text.");
@@ -2604,12 +2875,19 @@ draw_tile_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
 	return;
     }
 
-    if (atlas_index < 0 || atlas == NULL)
+    if (atlas_index < 0 || atlas == NULL
+	|| (cell->layer == ROGUE_TILE_ACTOR
+	    && !atlas_tile_is_visible(atlas_index)))
     {
-	fallback = al_map_rgb(100, 20, 60);
-	al_draw_filled_rectangle(dx, dy, dx + ROGUE_TILE_DRAW_SIZE,
-				 dy + ROGUE_TILE_DRAW_SIZE, fallback);
-	draw_glyph_cell(screen_x, screen_y, cell);
+	if (cell->has_underlay)
+	    draw_glyph_foreground_cell(screen_x, screen_y, cell);
+	else
+	{
+	    fallback = al_map_rgb(100, 20, 60);
+	    al_draw_filled_rectangle(dx, dy, dx + ROGUE_TILE_DRAW_SIZE,
+				     dy + ROGUE_TILE_DRAW_SIZE, fallback);
+	    draw_glyph_cell(screen_x, screen_y, cell);
+	}
 	return;
     }
 
@@ -2632,7 +2910,7 @@ draw_actor_foreground_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
     }
 
     atlas_index = resolved_cell_index(cell);
-    if (atlas_index < 0 || atlas == NULL)
+    if (atlas_index < 0 || atlas == NULL || !atlas_tile_is_visible(atlas_index))
     {
 	draw_glyph_foreground_cell(screen_x, screen_y, cell);
 	return;
@@ -2793,6 +3071,7 @@ draw_stylized_status_line(int width, int y, int armor,
     char str_text[24];
     char arm_text[24];
     char exp_text[32];
+    char vol_text[24];
     int total_width;
     int x;
     ALLEGRO_COLOR hp_color;
@@ -2805,13 +3084,17 @@ draw_stylized_status_line(int width, int y, int armor,
     snprintf(arm_text, sizeof(arm_text), "%d", armor);
     snprintf(exp_text, sizeof(exp_text), "%d/%ld", status->exp_level,
 	     status->exp_points);
+    snprintf(vol_text, sizeof(vol_text), "%d%%", status->volume_percent);
 
     total_width = status_piece_width("Level ", level_text)
 		  + status_piece_width("Gold ", gold_text)
 		  + status_piece_width("HP ", hp_text)
-		  + status_piece_width("ST ", str_text)
 		  + status_piece_width("Arm ", arm_text)
 		  + status_piece_width("Exp ", exp_text);
+    if (status->has_extended_stats)
+	total_width += status_piece_width("Vol ", vol_text);
+    else
+	total_width += status_piece_width("ST ", str_text);
     if (hungry_name != NULL && hungry_name[0] != '\0')
 	total_width += status_piece_width("", hungry_name);
 
@@ -2834,14 +3117,25 @@ draw_stylized_status_line(int width, int y, int armor,
     x = draw_status_piece("Gold ", gold_text, x, y,
 			  al_map_rgb(238, 205, 112));
     x = draw_status_piece("HP ", hp_text, x, y, hp_color);
-    x = draw_status_piece("ST ", str_text, x, y,
-			  al_map_rgb(228, 154, 83));
+    if (!status->has_extended_stats)
+	x = draw_status_piece("ST ", str_text, x, y,
+			      al_map_rgb(228, 154, 83));
     x = draw_status_piece("Arm ", arm_text, x, y,
 			  al_map_rgb(174, 190, 210));
     x = draw_status_piece("Exp ", exp_text, x, y,
 			  al_map_rgb(174, 154, 238));
+    if (status->has_extended_stats)
+	x = draw_status_piece("Vol ", vol_text, x, y,
+			      al_map_rgb(130, 205, 205));
     if (hungry_name != NULL && hungry_name[0] != '\0')
 	draw_status_piece("", hungry_name, x, y, al_map_rgb(228, 154, 83));
+}
+
+static void
+format_ability_pair(char *out, size_t out_size, unsigned int effective,
+		    unsigned int base)
+{
+    snprintf(out, out_size, "%u(%u)", effective, base);
 }
 
 static void
@@ -2852,9 +3146,11 @@ draw_status(void)
     int h;
     int armor;
     char line[256];
+    char second_status_line[256];
     int line_height;
     int first_line_y;
     int second_line_y;
+    int footer_line_y;
     static char *state_name[] = { "", "Hungry", "Weak", "Faint" };
     ROGUE_VARIANT_STATUS status;
 
@@ -2868,17 +3164,47 @@ draw_status(void)
     line_height = al_get_font_line_height(font);
     first_line_y = y + 8;
     second_line_y = first_line_y + line_height + 6;
+    footer_line_y = second_line_y;
+    second_status_line[0] = '\0';
 
     al_draw_filled_rectangle(0, y, w, h,
 			     al_map_rgb(5, 5, 8));
     al_draw_line(0, y, w, y, al_map_rgb(80, 80, 90), 1);
 
-    snprintf(line, sizeof(line),
-	     "Level:%d  Gold:%d  HP:%d(%d)  ST:%u  Arm:%d  Exp:%d/%ld %s",
-	     status.dungeon_level, status.gold, status.hp,
-	     status.max_hit_points,
-	     status.strength, armor, status.exp_level, status.exp_points,
-	     state_name[status.hungry_state]);
+    if (status.has_extended_stats)
+    {
+	char str_text[24];
+	char dex_text[24];
+	char wis_text[24];
+	char con_text[24];
+
+	format_ability_pair(str_text, sizeof(str_text), status.strength,
+			    status.strength_base);
+	format_ability_pair(dex_text, sizeof(dex_text), status.dexterity,
+			    status.dexterity_base);
+	format_ability_pair(wis_text, sizeof(wis_text), status.wisdom,
+			    status.wisdom_base);
+	format_ability_pair(con_text, sizeof(con_text), status.constitution,
+			    status.constitution_base);
+	snprintf(line, sizeof(line),
+		 "Level:%d  Gold:%d  HP:%d(%d)  Arm:%d  Exp:%d/%ld  Vol:%d%% %s",
+		 status.dungeon_level, status.gold, status.hp,
+		 status.max_hit_points, armor, status.exp_level,
+		 status.exp_points, status.volume_percent,
+		 state_name[status.hungry_state]);
+	snprintf(second_status_line, sizeof(second_status_line),
+		 "Str:%s  Dex:%s  Wis:%s  Con:%s  Carry:%d(%d)",
+		 str_text, dex_text, wis_text, con_text,
+		 status.carry_weight, status.carry_capacity);
+	footer_line_y = second_line_y + line_height + 4;
+    }
+    else
+	snprintf(line, sizeof(line),
+		 "Level:%d  Gold:%d  HP:%d(%d)  ST:%u  Arm:%d  Exp:%d/%ld %s",
+		 status.dungeon_level, status.gold, status.hp,
+		 status.max_hit_points,
+		 status.strength, armor, status.exp_level, status.exp_points,
+		 state_name[status.hungry_state]);
 
     if (settings.stylized_bottom_bar_enabled)
 	draw_stylized_status_line(w, first_line_y, armor,
@@ -2887,15 +3213,19 @@ draw_status(void)
     else
 	al_draw_text(font, al_map_rgb(230, 230, 220), w / 2,
 		     first_line_y, ALLEGRO_ALIGN_CENTRE, line);
+    if (second_status_line[0] != '\0')
+	al_draw_text(font, al_map_rgb(210, 220, 225), w / 2,
+		     second_line_y, ALLEGRO_ALIGN_CENTRE,
+		     second_status_line);
     if (!settings.side_panel_log_enabled)
-	al_draw_text(font, al_map_rgb(180, 200, 255), 8, second_line_y,
+	al_draw_text(font, al_map_rgb(180, 200, 255), 8, footer_line_y,
 		     0, status.message);
     if (prompt_active)
 	al_draw_text(font, al_map_rgb(245, 226, 170), w - 8,
-		     second_line_y, ALLEGRO_ALIGN_RIGHT, prompt_text);
+		     footer_line_y, ALLEGRO_ALIGN_RIGHT, prompt_text);
     else
 	al_draw_text(font, al_map_rgb(160, 160, 160), w - 8,
-		     second_line_y, ALLEGRO_ALIGN_RIGHT,
+		     footer_line_y, ALLEGRO_ALIGN_RIGHT,
 		     "F10 tiles  F11 full  F12 settings");
 }
 
@@ -3136,6 +3466,34 @@ next_wrap_len(const char *text, int start, int max_chars)
 	if (text[i] == '.')
 	    return i - start + 1;
 
+    if (end >= len)
+	return len - start;
+
+    split = end;
+    while (split > start && !isspace((unsigned char) text[split]))
+	split--;
+    if (split <= start)
+	split = end;
+
+    return split - start;
+}
+
+static int
+next_space_wrap_len(const char *text, int start, int max_chars)
+{
+    int len;
+    int end;
+    int split;
+
+    len = (int) strlen(text);
+    while (start < len && isspace((unsigned char) text[start]))
+	start++;
+    if (start >= len)
+	return 0;
+
+    end = start + max_chars;
+    if (end > len)
+	end = len;
     if (end >= len)
 	return len - start;
 
@@ -3420,6 +3778,27 @@ draw_side_panel(void)
 	al_draw_text(font, muted, x + 18, y, 0, "No messages yet");
 }
 
+static int
+text_overlay_visible_line_capacity(void)
+{
+    int line_height;
+    int max_lines;
+
+    line_height = al_get_font_line_height(font);
+    if (line_height < 1)
+	line_height = ROGUE_SMALL_FONT_SIZE;
+
+    if (text_overlay_fill_vertical)
+    {
+	max_lines = (display_height() - 160) / (line_height + 2);
+	if (max_lines < 4)
+	    max_lines = 4;
+	return max_lines;
+    }
+
+    return 14;
+}
+
 static void
 draw_text_overlay(void)
 {
@@ -3440,8 +3819,8 @@ draw_text_overlay(void)
     window_h = display_height();
     line_height = al_get_font_line_height(font);
     visible_lines = text_overlay_line_count;
-    if (visible_lines > 14)
-	visible_lines = 14;
+    if (visible_lines > text_overlay_visible_line_capacity())
+	visible_lines = text_overlay_visible_line_capacity();
     if (visible_lines < 1)
 	visible_lines = 1;
     if (text_overlay_selectable)
@@ -3477,7 +3856,14 @@ draw_text_overlay(void)
 	w = window_w - 48;
     if (w > window_w - 48)
 	w = window_w - 48;
-    h = 96 + visible_lines * (line_height + 2);
+    if (text_overlay_fill_vertical)
+    {
+	h = window_h - 48;
+	if (h < 220)
+	    h = window_h - 16;
+    }
+    else
+	h = 96 + visible_lines * (line_height + 2);
     x = (window_w - w) / 2;
     y = (window_h - h) / 2;
 
@@ -3655,6 +4041,9 @@ rogue_allegro_render(void)
     int top;
     int rows;
     int cols;
+    int old_blender_op;
+    int old_blender_src;
+    int old_blender_dst;
     bool render_to_scene;
     ROGUE_TILE_CELL view[ROGUE_MAX_VIEW_ROWS][ROGUE_MAX_VIEW_COLS];
     ROGUE_TILE_CELL *cell;
@@ -3690,6 +4079,8 @@ rogue_allegro_render(void)
 	al_set_target_backbuffer(display);
 
     al_clear_to_color(al_map_rgb(0, 0, 0));
+    al_get_blender(&old_blender_op, &old_blender_src, &old_blender_dst);
+    al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
     al_hold_bitmap_drawing(TRUE);
     for (screen_y = 0; screen_y < rows; screen_y++)
 	for (screen_x = 0; screen_x < cols; screen_x++)
@@ -3713,6 +4104,7 @@ rogue_allegro_render(void)
 	for (screen_x = 0; screen_x < cols; screen_x++)
 	    draw_actor_foreground_cell(screen_x, screen_y,
 				       &view[screen_y][screen_x]);
+    al_set_blender(old_blender_op, old_blender_src, old_blender_dst);
     draw_enemy_health_overlays(view, rows, cols);
     if (render_to_scene)
 	save_shader_smoke_bitmap("rogue_scene_before_shader.png",
@@ -3961,6 +4353,7 @@ rogue_allegro_text_overlay_begin(const char *title)
     text_overlay_selected = -1;
     text_overlay_scroll = 0;
     text_overlay_selectable = FALSE;
+    text_overlay_fill_vertical = FALSE;
 }
 
 static void
@@ -4004,7 +4397,7 @@ rogue_allegro_text_overlay_add(const char *line)
 	if (start >= text_len)
 	    break;
 
-	len = next_wrap_len(line, start, TEXT_OVERLAY_WRAP_CHARS);
+	len = next_space_wrap_len(line, start, TEXT_OVERLAY_WRAP_CHARS);
 	if (len <= 0)
 	    break;
 	if (len >= (int) sizeof(segment))
@@ -4047,8 +4440,8 @@ rogue_allegro_text_overlay_show(const char *prompt)
     while (ch == '\0')
     {
 	visible_lines = text_overlay_line_count;
-	if (visible_lines > 14)
-	    visible_lines = 14;
+	if (visible_lines > text_overlay_visible_line_capacity())
+	    visible_lines = text_overlay_visible_line_capacity();
 	if (visible_lines < 1)
 	    visible_lines = 1;
 	page = visible_lines - 1;
@@ -4211,8 +4604,8 @@ rogue_allegro_text_overlay_pick(const char *prompt)
     while (chosen == '\0')
     {
 	visible_lines = text_overlay_line_count;
-	if (visible_lines > 14)
-	    visible_lines = 14;
+	if (visible_lines > text_overlay_visible_line_capacity())
+	    visible_lines = text_overlay_visible_line_capacity();
 	if (visible_lines < 1)
 	    visible_lines = 1;
 	page = visible_lines - 1;
@@ -4336,6 +4729,7 @@ rogue_allegro_text_overlay_clear(void)
     text_overlay_selected = -1;
     text_overlay_scroll = 0;
     text_overlay_selectable = FALSE;
+    text_overlay_fill_vertical = FALSE;
 }
 
 bool
@@ -4552,6 +4946,7 @@ rogue_allegro_shutdown(void)
 	al_destroy_bitmap(scene_source_bitmap);
     if (atlas != NULL)
 	al_destroy_bitmap(atlas);
+    clear_atlas_visibility_cache();
     if (queue != NULL)
 	al_destroy_event_queue(queue);
     if (display != NULL)

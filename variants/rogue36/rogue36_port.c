@@ -14,6 +14,7 @@ extern struct object *rogue36_cur_armor;
 extern struct linked_list *rogue36_lvl_obj;
 extern struct linked_list *rogue36_mlist;
 extern struct room rogue36_rooms[MAXROOMS];
+extern struct trap traps[MAXTRAPS];
 extern struct thing rogue36_player;
 extern int rogue36_level;
 extern int rogue36_purse;
@@ -113,13 +114,13 @@ rogue36_bridge_room_at(int y, int x)
 int
 rogue36_bridge_hero_y(void)
 {
-    return rogue36_player.t_pos.y;
+    return player.t_pos.y;
 }
 
 int
 rogue36_bridge_hero_x(void)
 {
-    return rogue36_player.t_pos.x;
+    return player.t_pos.x;
 }
 
 int
@@ -131,7 +132,7 @@ rogue36_bridge_level(void)
 int
 rogue36_bridge_map_rows(void)
 {
-    return LINES;
+    return LINES > 1 ? LINES - 1 : LINES;
 }
 
 int
@@ -243,16 +244,14 @@ rogue36_bridge_cansee(int y, int x)
     if (rogue36_bridge_player_is_blind())
 	return FALSE;
 
-    hero_room = rogue36_bridge_room_at(rogue36_player.t_pos.y,
-				       rogue36_player.t_pos.x);
+    hero_room = rogue36_bridge_room_at(player.t_pos.y, player.t_pos.x);
     cell_room = rogue36_bridge_room_at(y, x);
 
     if (hero_room != NULL && hero_room == cell_room
 	&& !(hero_room->r_flags & ISDARK))
 	return TRUE;
 
-    return DISTANCE(rogue36_player.t_pos.y, rogue36_player.t_pos.x, y, x)
-	< 3 * 3;
+    return DISTANCE(player.t_pos.y, player.t_pos.x, y, x) < 3 * 3;
 }
 
 int
@@ -275,6 +274,20 @@ char
 rogue36_bridge_monster_disguise(void *monster)
 {
     return monster == NULL ? '\0' : ((struct thing *) monster)->t_disguise;
+}
+
+char
+rogue36_bridge_trap_type_at(int y, int x)
+{
+    int i;
+
+    for (i = 0; i < MAXTRAPS; i++)
+	if (traps[i].tr_pos.y == y
+	    && traps[i].tr_pos.x == x
+	    && (traps[i].tr_flags & ISFOUND))
+	    return traps[i].tr_type;
+
+    return '\0';
 }
 
 char

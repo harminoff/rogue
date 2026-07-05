@@ -9,7 +9,13 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from .role_catalog import Role, all_roles, variant_monster_roles
+from .role_catalog import (
+    Role,
+    all_roles,
+    trap_roles,
+    variant_monster_entry,
+    variant_monster_roles,
+)
 
 
 def read_json(path: Path) -> dict[str, Any]:
@@ -22,7 +28,7 @@ def read_json(path: Path) -> dict[str, Any]:
 def role_entry(mapping: dict[str, Any], lookup: dict[str, int], role: Role) -> dict[str, Any]:
     if role.role.startswith("monster.") and role.key.count(".") == 1:
         variant_id, glyph = role.key.split(".", 1)
-        raw = mapping.get("variantMonsters", {}).get(variant_id, {}).get(glyph, {})
+        raw = variant_monster_entry(mapping, variant_id, glyph)
     elif role.role.startswith("monster."):
         raw = mapping.get("monsters", {}).get(role.key, {})
     else:
@@ -51,7 +57,7 @@ def build_data(root: Path) -> dict[str, Any]:
     columns = int(atlas.get("width", 30))
     tile_size = int(atlas.get("tileSize", 32))
 
-    roles = all_roles() + variant_monster_roles(mapping)
+    roles = all_roles() + trap_roles() + variant_monster_roles(mapping)
 
     return {
         "version": 1,
