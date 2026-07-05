@@ -17,6 +17,7 @@ def test_tilepack_uses_platform_asset_paths():
     assert "rogue_platform_read_text_file" in text
     assert "rogue_platform_asset_path" in text
     assert 'fopen(path, "rb")' not in text
+    assert 'opendir("tilepacks")' not in text
 
 
 def test_allegro_frontend_uses_platform_paths_for_settings_and_atlas():

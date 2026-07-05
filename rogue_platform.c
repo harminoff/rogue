@@ -120,6 +120,18 @@ Java_com_roguetiles_RogueTilesActivity_nativeConfigureStorage(
 	? NULL
 	: (*env)->GetStringUTFChars(env, user_root_jstring, NULL);
 
+    if ((asset_root_jstring != NULL && asset_root_chars == NULL)
+	|| (user_root_jstring != NULL && user_root_chars == NULL))
+    {
+	if (asset_root_chars != NULL)
+	    (*env)->ReleaseStringUTFChars(env, asset_root_jstring,
+					  asset_root_chars);
+	if (user_root_chars != NULL)
+	    (*env)->ReleaseStringUTFChars(env, user_root_jstring,
+					  user_root_chars);
+	return;
+    }
+
     rogue_platform_configure_storage(asset_root_chars, user_root_chars);
 
     if (asset_root_chars != NULL)

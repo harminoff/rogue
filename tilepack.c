@@ -506,6 +506,7 @@ rogue_tilepack_list(ROGUE_TILEPACK_CHOICE *choices, int max_choices)
 {
     DIR *dir;
     struct dirent *entry;
+    char tilepacks_path[512];
     int count;
 
     if (choices == NULL || max_choices <= 0)
@@ -516,7 +517,8 @@ rogue_tilepack_list(ROGUE_TILEPACK_CHOICE *choices, int max_choices)
     add_choice(choices, &count, max_choices, "active");
     add_choice(choices, &count, max_choices, "default");
 
-    dir = opendir("tilepacks");
+    dir = opendir(rogue_platform_asset_path("tilepacks", tilepacks_path,
+					    sizeof(tilepacks_path)));
     if (dir == NULL)
 	return count;
 

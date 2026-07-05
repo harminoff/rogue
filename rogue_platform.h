@@ -2,7 +2,6 @@
 #define ROGUE_PLATFORM_H
 
 #include <stddef.h>
-#include <stdbool.h>
 
 void rogue_platform_configure_storage(const char *asset_root,
 				      const char *user_root);
