@@ -230,6 +230,21 @@ find_variant_monster_mapping(const char *variant_id, char glyph)
     return NULL;
 }
 
+static const ROGUE_GENERATED_VARIANT_TILE_MAPPING *
+find_variant_tile_mapping(const char *variant_id, char glyph)
+{
+    int i;
+
+    for (i = 0; i < rogue_tile_variant_tile_mapping_count; i++)
+	if (rogue_tile_variant_tile_mappings[i].variant_id != NULL
+	    && strcmp(rogue_tile_variant_tile_mappings[i].variant_id,
+		      variant_id) == 0
+	    && rogue_tile_variant_tile_mappings[i].glyph == glyph)
+	    return &rogue_tile_variant_tile_mappings[i];
+
+    return NULL;
+}
+
 static const ROGUE_GENERATED_TRAP_MAPPING *
 find_trap_mapping(char trap_type)
 {
@@ -279,6 +294,32 @@ apply_glyph_mapping(int y, int x, char glyph, ROGUE_TILE_CELL *cell)
 }
 
 static bool
+apply_variant_glyph_mapping(const char *variant_id, int y, int x, char glyph,
+			    ROGUE_TILE_CELL *cell)
+{
+    const ROGUE_GENERATED_VARIANT_TILE_MAPPING *mapping;
+
+    mapping = find_variant_tile_mapping(variant_id, glyph);
+    if (mapping == NULL)
+	return FALSE;
+
+    cell->y = y;
+    cell->x = x;
+    cell->glyph = glyph;
+    cell->layer = mapping->layer;
+    cell->role = mapping->role;
+    cell->atlas_key = mapping->atlas_key;
+    cell->atlas_index = mapping->atlas_index;
+    cell->has_underlay = FALSE;
+    cell->under_glyph = ' ';
+    cell->under_role = NULL;
+    cell->under_atlas_key = NULL;
+    cell->under_atlas_index = -1;
+    cell->name = mapping->name;
+    return TRUE;
+}
+
+static bool
 apply_trap_mapping(int y, int x, char trap_type, ROGUE_TILE_CELL *cell)
 {
     const ROGUE_GENERATED_TRAP_MAPPING *mapping;
@@ -301,6 +342,35 @@ apply_trap_mapping(int y, int x, char trap_type, ROGUE_TILE_CELL *cell)
     cell->under_atlas_index = -1;
     cell->name = mapping->name;
     return TRUE;
+}
+
+static void
+apply_variant_underlay_for_glyph(const char *variant_id, int y, int x,
+				 char glyph, ROGUE_TILE_CELL *cell)
+{
+    const ROGUE_GENERATED_VARIANT_TILE_MAPPING *variant_mapping;
+    const ROGUE_GENERATED_TILE_MAPPING *mapping;
+
+    variant_mapping = find_variant_tile_mapping(variant_id, glyph);
+    if (variant_mapping != NULL && variant_mapping->atlas_index >= 0)
+    {
+	cell->has_underlay = TRUE;
+	cell->under_glyph = glyph;
+	cell->under_role = variant_mapping->role;
+	cell->under_atlas_key = variant_mapping->atlas_key;
+	cell->under_atlas_index = variant_mapping->atlas_index;
+	return;
+    }
+
+    mapping = find_glyph_mapping(glyph);
+    if (mapping == NULL || mapping->atlas_index < 0)
+	return;
+
+    cell->has_underlay = TRUE;
+    cell->under_glyph = glyph;
+    cell->under_role = mapping->role;
+    cell->under_atlas_key = mapping->atlas_key;
+    cell->under_atlas_index = mapping->atlas_index;
 }
 
 static void
@@ -760,11 +830,19 @@ srogue90_underlay_glyph(int y, int x, char fallback)
 	case '-':
 	case STAIRS:
 	case TRAP:
+	case MAGIC:
+	case '"':
+	case '&':
+	case '\\':
+	case '>':
+	case '{':
+	case '}':
+	case '~':
+	case '`':
 	    return glyph;
 	case GOLD:
 	case POTION:
 	case SCROLL:
-	case MAGIC:
 	case FOOD:
 	case WEAPON:
 	case ARMOR:
@@ -840,10 +918,10 @@ srogue90_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
 	&& srogue90_bridge_hero_x() == x)
     {
 	apply_glyph_mapping(y, x, PLAYER, cell);
-	apply_underlay_for_flags(y, x, 0,
-				 srogue90_underlay_glyph(y, x,
-							 terrain_glyph),
-				 cell);
+	apply_variant_underlay_for_glyph("srogue90", y, x,
+					 srogue90_underlay_glyph(y, x,
+								 terrain_glyph),
+					 cell);
 	cell->seen = TRUE;
 	cell->visible = TRUE;
 	return;
@@ -860,10 +938,10 @@ srogue90_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
 				srogue90_bridge_monster_disguise(monster),
 				cell);
 	    if (cell->layer == ROGUE_TILE_OBJECT)
-		apply_underlay_for_flags(y, x, 0,
-					 srogue90_underlay_glyph(y, x,
-								 terrain_glyph),
-					 cell);
+		apply_variant_underlay_for_glyph("srogue90", y, x,
+						 srogue90_underlay_glyph(
+						     y, x, terrain_glyph),
+						 cell);
 	    cell->seen = TRUE;
 	    cell->visible = TRUE;
 	    return;
@@ -872,10 +950,10 @@ srogue90_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
 	apply_variant_monster_mapping("srogue90", y, x,
 				      srogue90_bridge_monster_type(monster),
 				      cell);
-	apply_underlay_for_flags(y, x, 0,
-				 srogue90_underlay_glyph(y, x,
-							 terrain_glyph),
-				 cell);
+	apply_variant_underlay_for_glyph("srogue90", y, x,
+					 srogue90_underlay_glyph(y, x,
+								 terrain_glyph),
+					 cell);
 	cell->seen = TRUE;
 	cell->visible = TRUE;
 	return;
@@ -889,12 +967,17 @@ srogue90_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
     if (glyph == ' ' && terrain_glyph != ' ')
 	glyph = terrain_glyph;
 
-    apply_glyph_mapping(y, x, glyph, cell);
+    if (object_visible && glyph_is_object)
+	apply_glyph_mapping(y, x, glyph, cell);
+    else if (glyph == MAGIC && terrain_glyph != MAGIC)
+	apply_glyph_mapping(y, x, glyph, cell);
+    else if (!apply_variant_glyph_mapping("srogue90", y, x, glyph, cell))
+	apply_glyph_mapping(y, x, glyph, cell);
     if (cell->layer == ROGUE_TILE_OBJECT)
-	apply_underlay_for_flags(y, x, 0,
-				 srogue90_underlay_glyph(y, x,
-							 terrain_glyph),
-				 cell);
+	apply_variant_underlay_for_glyph("srogue90", y, x,
+					 srogue90_underlay_glyph(y, x,
+								 terrain_glyph),
+					 cell);
 }
 
 void

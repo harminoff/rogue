@@ -201,6 +201,46 @@
       "index": 1453,
       "name": "dart_trap"
     },
+    "terrain.srogue90.magic_pool": {
+      "index": 1413,
+      "name": "dngn_sparkling_fountain"
+    },
+    "terrain.srogue90.secret_door": {
+      "index": 1367,
+      "name": "dngn_closed_door"
+    },
+    "terrain.srogue90.trading_post": {
+      "index": 1385,
+      "name": "dngn_enter_shop"
+    },
+    "trap.srogue90.arrow": {
+      "index": 1452,
+      "name": "arrow_trap"
+    },
+    "trap.srogue90.bear": {
+      "index": 1456,
+      "name": "bear_trap"
+    },
+    "trap.srogue90.maze": {
+      "index": 1470,
+      "name": "magic_trap"
+    },
+    "trap.srogue90.poison_dart": {
+      "index": 1453,
+      "name": "dart_trap"
+    },
+    "trap.srogue90.sleeping_gas": {
+      "index": 1458,
+      "name": "sleeping_gas_trap"
+    },
+    "trap.srogue90.teleport": {
+      "index": 1465,
+      "name": "teleportation_trap"
+    },
+    "trap.srogue90.trapdoor": {
+      "index": 1464,
+      "name": "trap_door"
+    },
     "monster.rogue36.A": {
       "index": 173,
       "name": "queen_ant"

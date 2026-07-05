@@ -9,6 +9,7 @@
     "This file maps Rogue semantics to rltiles atlas keys.",
     "The upstream rltiles JSON is an atlas manifest, not gameplay semantics.",
     "Map-visible object categories stay generic so tile rendering does not reveal hidden item identity.",
+    "Use variantTerrain and variantTraps for variant-only map features or glyphs whose meaning differs by variant.",
     "New variants should add a complete A-Z entry under variantMonsters.<variant-id> when their monster alphabet differs from the base Rogue 5.4.4 table."
   ],
   "terrain": {
@@ -30,6 +31,24 @@
     "poison_dart": { "id": 5, "atlas": "dart_trap" },
     "rust": { "id": 6, "atlas": "rust_trap" },
     "mysterious": { "id": 7, "atlas": "dngn_trap_magical" }
+  },
+  "variantTerrain": {
+    "srogue90": {
+      "magic_pool": { "glyph": "\"", "name": "magic pool", "atlas": "dngn_sparkling_fountain" },
+      "trading_post": { "glyph": "^", "name": "trading post", "atlas": "dngn_enter_shop" },
+      "secret_door": { "glyph": "&", "name": "revealed secret door", "atlas": "dngn_closed_door" }
+    }
+  },
+  "variantTraps": {
+    "srogue90": {
+      "maze": { "glyph": "\\", "name": "maze trap", "atlas": "magic_trap" },
+      "trapdoor": { "glyph": ">", "name": "trapdoor", "atlas": "trap_door" },
+      "arrow": { "glyph": "{", "name": "arrow trap", "atlas": "arrow_trap" },
+      "sleeping_gas": { "glyph": "$", "name": "sleeping gas trap", "atlas": "sleeping_gas_trap" },
+      "bear": { "glyph": "}", "name": "bear trap", "atlas": "bear_trap" },
+      "teleport": { "glyph": "~", "name": "teleport trap", "atlas": "teleportation_trap" },
+      "poison_dart": { "glyph": "`", "name": "poison dart trap", "atlas": "dart_trap" }
+    }
   },
   "objects": {
     "gold": { "glyph": "*", "atlas": "gold_piece" },

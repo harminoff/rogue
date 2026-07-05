@@ -77,6 +77,21 @@ const ROGUE_GENERATED_MONSTER_MAPPING rogue_tile_monster_mappings[] = {
 const int rogue_tile_monster_mapping_count =
     sizeof(rogue_tile_monster_mappings) / sizeof(rogue_tile_monster_mappings[0]);
 
+const ROGUE_GENERATED_VARIANT_TILE_MAPPING rogue_tile_variant_tile_mappings[] = {
+    { "srogue90", '"', ROGUE_TILE_TERRAIN, "terrain.srogue90.magic_pool", "dngn_sparkling_fountain", 1413, "magic pool" },
+    { "srogue90", '&', ROGUE_TILE_TERRAIN, "terrain.srogue90.secret_door", "dngn_closed_door", 1367, "revealed secret door" },
+    { "srogue90", '^', ROGUE_TILE_TERRAIN, "terrain.srogue90.trading_post", "dngn_enter_shop", 1385, "trading post" },
+    { "srogue90", '{', ROGUE_TILE_TERRAIN, "trap.srogue90.arrow", "arrow_trap", 1452, "arrow trap" },
+    { "srogue90", '}', ROGUE_TILE_TERRAIN, "trap.srogue90.bear", "bear_trap", 1456, "bear trap" },
+    { "srogue90", '\\', ROGUE_TILE_TERRAIN, "trap.srogue90.maze", "magic_trap", 1470, "maze trap" },
+    { "srogue90", '`', ROGUE_TILE_TERRAIN, "trap.srogue90.poison_dart", "dart_trap", 1453, "poison dart trap" },
+    { "srogue90", '$', ROGUE_TILE_TERRAIN, "trap.srogue90.sleeping_gas", "sleeping_gas_trap", 1458, "sleeping gas trap" },
+    { "srogue90", '~', ROGUE_TILE_TERRAIN, "trap.srogue90.teleport", "teleportation_trap", 1465, "teleport trap" },
+    { "srogue90", '>', ROGUE_TILE_TERRAIN, "trap.srogue90.trapdoor", "trap_door", 1464, "trapdoor" }
+};
+
+const int rogue_tile_variant_tile_mapping_count = 10;
+
 const ROGUE_GENERATED_VARIANT_MONSTER_MAPPING rogue_tile_variant_monster_mappings[] = {
     { "rogue36", 'A', "monster.rogue36.A", "queen_ant", 173, "giant ant" },
     { "rogue36", 'B', "monster.rogue36.B", "bat", 434, "bat" },

@@ -14,8 +14,11 @@ from .role_catalog import (
     Role,
     all_roles,
     trap_roles,
+    variant_entry,
     variant_monster_entry,
     variant_monster_roles,
+    variant_terrain_roles,
+    variant_trap_roles,
 )
 
 
@@ -39,7 +42,10 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 
 
 def role_atlas_from_mapping(mapping: dict[str, Any], role: Role) -> str | None:
-    if role.role.startswith("monster.") and role.key.count(".") == 1:
+    if role.group in ("variantTerrain", "variantTraps") and role.key.count(".") == 1:
+        variant_id, key = role.key.split(".", 1)
+        entry = variant_entry(mapping, role.group, variant_id, key)
+    elif role.role.startswith("monster.") and role.key.count(".") == 1:
         variant_id, glyph = role.key.split(".", 1)
         entry = variant_monster_entry(mapping, variant_id, glyph)
     elif role.role.startswith("monster."):
@@ -102,7 +108,13 @@ def write_default_pack(root: Path, pack_name: str = "default") -> dict[str, Any]
     lookup = atlas_lookup(root)
     roles: dict[str, dict[str, Any]] = {}
 
-    for role in all_roles() + trap_roles() + variant_monster_roles(mapping):
+    for role in (
+        all_roles()
+        + trap_roles()
+        + variant_terrain_roles(mapping)
+        + variant_trap_roles(mapping)
+        + variant_monster_roles(mapping)
+    ):
         atlas_name = role_atlas_from_mapping(mapping, role)
         if atlas_name is None:
             continue

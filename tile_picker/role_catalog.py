@@ -49,6 +49,24 @@ TRAP_ROLES: tuple[Role, ...] = (
 )
 
 
+VARIANT_TERRAIN_ROLES: tuple[Role, ...] = (
+    Role("terrain.srogue90.magic_pool", "variantTerrain", "srogue90.magic_pool", "'\"'", "terrain", "ROGUE_TILE_TERRAIN", "Super-Rogue Magic Pool", "magic pool"),
+    Role("terrain.srogue90.trading_post", "variantTerrain", "srogue90.trading_post", "'^'", "terrain", "ROGUE_TILE_TERRAIN", "Super-Rogue Trading Post", "trading post"),
+    Role("terrain.srogue90.secret_door", "variantTerrain", "srogue90.secret_door", "'&'", "terrain", "ROGUE_TILE_TERRAIN", "Super-Rogue Revealed Secret Door", "revealed secret door"),
+)
+
+
+VARIANT_TRAP_ROLES: tuple[Role, ...] = (
+    Role("trap.srogue90.maze", "variantTraps", "srogue90.maze", "'\\\\'", "terrain", "ROGUE_TILE_TERRAIN", "Super-Rogue Maze Trap", "maze trap"),
+    Role("trap.srogue90.trapdoor", "variantTraps", "srogue90.trapdoor", "'>'", "terrain", "ROGUE_TILE_TERRAIN", "Super-Rogue Trapdoor", "trapdoor"),
+    Role("trap.srogue90.arrow", "variantTraps", "srogue90.arrow", "'{'", "terrain", "ROGUE_TILE_TERRAIN", "Super-Rogue Arrow Trap", "arrow trap"),
+    Role("trap.srogue90.sleeping_gas", "variantTraps", "srogue90.sleeping_gas", "'$'", "terrain", "ROGUE_TILE_TERRAIN", "Super-Rogue Sleeping Gas Trap", "sleeping gas trap"),
+    Role("trap.srogue90.bear", "variantTraps", "srogue90.bear", "'}'", "terrain", "ROGUE_TILE_TERRAIN", "Super-Rogue Bear Trap", "bear trap"),
+    Role("trap.srogue90.teleport", "variantTraps", "srogue90.teleport", "'~'", "terrain", "ROGUE_TILE_TERRAIN", "Super-Rogue Teleport Trap", "teleport trap"),
+    Role("trap.srogue90.poison_dart", "variantTraps", "srogue90.poison_dart", "'`'", "terrain", "ROGUE_TILE_TERRAIN", "Super-Rogue Poison Dart Trap", "poison dart trap"),
+)
+
+
 MONSTER_NAMES: dict[str, str] = {
     "A": "aquator",
     "B": "bat",
@@ -79,6 +97,14 @@ MONSTER_NAMES: dict[str, str] = {
 }
 
 
+def c_glyph_display(c_expr: str) -> str:
+    if len(c_expr) >= 2 and c_expr[0] == "'" and c_expr[-1] == "'":
+        glyph = c_expr[1:-1]
+    else:
+        glyph = c_expr
+    return glyph.replace("\\\\", "\\").replace("\\'", "'").replace('\\"', '"')
+
+
 def monster_role(glyph: str, name: str, variant_id: str | None = None) -> Role:
     if variant_id:
         role_id = f"monster.{variant_id}.{glyph}"
@@ -102,6 +128,62 @@ def all_roles() -> list[Role]:
 
 def trap_roles() -> list[Role]:
     return list(TRAP_ROLES)
+
+
+def variant_terrain_roles(mapping: dict | None = None) -> list[Role]:
+    if mapping is None:
+        return list(VARIANT_TERRAIN_ROLES)
+    variants = mapping.get("variantTerrain", {})
+    if not isinstance(variants, dict):
+        return []
+    configured = {(role.role, role.key): role for role in VARIANT_TERRAIN_ROLES}
+    roles: list[Role] = []
+    for variant_id in sorted(variants):
+        entries = variants.get(variant_id, {})
+        if not isinstance(entries, dict):
+            continue
+        for key, entry in sorted(entries.items()):
+            role_key = f"{variant_id}.{key}"
+            role_id = f"terrain.{role_key}"
+            role = configured.get((role_id, role_key))
+            if role is not None:
+                roles.append(role)
+                continue
+            if not isinstance(entry, dict):
+                entry = {}
+            glyph = str(entry.get("glyph") or "?")
+            name = str(entry.get("name") or str(key).replace("_", " "))
+            label = f"{variant_id} {name.title()}"
+            roles.append(Role(role_id, "variantTerrain", role_key, f"'{glyph}'", "terrain", "ROGUE_TILE_TERRAIN", label, name))
+    return roles
+
+
+def variant_trap_roles(mapping: dict | None = None) -> list[Role]:
+    if mapping is None:
+        return list(VARIANT_TRAP_ROLES)
+    variants = mapping.get("variantTraps", {})
+    if not isinstance(variants, dict):
+        return []
+    configured = {(role.role, role.key): role for role in VARIANT_TRAP_ROLES}
+    roles: list[Role] = []
+    for variant_id in sorted(variants):
+        entries = variants.get(variant_id, {})
+        if not isinstance(entries, dict):
+            continue
+        for key, entry in sorted(entries.items()):
+            role_key = f"{variant_id}.{key}"
+            role_id = f"trap.{role_key}"
+            role = configured.get((role_id, role_key))
+            if role is not None:
+                roles.append(role)
+                continue
+            if not isinstance(entry, dict):
+                entry = {}
+            glyph = str(entry.get("glyph") or "?")
+            name = str(entry.get("name") or str(key).replace("_", " trap"))
+            label = f"{variant_id} {name.title()}"
+            roles.append(Role(role_id, "variantTraps", role_key, f"'{glyph}'", "terrain", "ROGUE_TILE_TERRAIN", label, name))
+    return roles
 
 
 def variant_monster_entries(mapping: dict, variant_id: str) -> list[tuple[str, dict]]:
@@ -155,6 +237,30 @@ def set_variant_monster_atlas(
         entry["atlas"] = atlas_name
 
 
+def variant_entry(mapping: dict, section: str, variant_id: str, key: str) -> dict:
+    variants = mapping.get(section, {})
+    if not isinstance(variants, dict):
+        return {}
+    entries = variants.get(variant_id, {})
+    if not isinstance(entries, dict):
+        return {}
+    entry = entries.get(key, {})
+    return entry if isinstance(entry, dict) else {}
+
+
+def set_variant_atlas(
+    mapping: dict, section: str, variant_id: str, key: str, atlas_name: str | None
+) -> None:
+    variants = mapping.setdefault(section, {})
+    entries = variants.setdefault(variant_id, {})
+    if not isinstance(entries, dict):
+        entries = {}
+        variants[variant_id] = entries
+    entry = entries.setdefault(key, {})
+    if isinstance(entry, dict):
+        entry["atlas"] = atlas_name
+
+
 def variant_monster_roles(mapping: dict) -> list[Role]:
     roles: list[Role] = []
     variants = mapping.get("variantMonsters", {})
@@ -170,5 +276,7 @@ def variant_monster_roles(mapping: dict) -> list[Role]:
 def role_by_id(mapping: dict | None = None) -> dict[str, Role]:
     roles = all_roles() + trap_roles()
     if mapping is not None:
+        roles += variant_terrain_roles(mapping)
+        roles += variant_trap_roles(mapping)
         roles += variant_monster_roles(mapping)
     return {role.role: role for role in roles}

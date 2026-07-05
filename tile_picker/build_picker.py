@@ -12,9 +12,13 @@ from typing import Any
 from .role_catalog import (
     Role,
     all_roles,
+    c_glyph_display,
     trap_roles,
+    variant_entry,
     variant_monster_entry,
     variant_monster_roles,
+    variant_terrain_roles,
+    variant_trap_roles,
 )
 
 
@@ -26,7 +30,11 @@ def read_json(path: Path) -> dict[str, Any]:
 
 
 def role_entry(mapping: dict[str, Any], lookup: dict[str, int], role: Role) -> dict[str, Any]:
-    if role.role.startswith("monster.") and role.key.count(".") == 1:
+    variant_id = None
+    if role.group in ("variantTerrain", "variantTraps") and role.key.count(".") == 1:
+        variant_id, key = role.key.split(".", 1)
+        raw = variant_entry(mapping, role.group, variant_id, key)
+    elif role.role.startswith("monster.") and role.key.count(".") == 1:
         variant_id, glyph = role.key.split(".", 1)
         raw = variant_monster_entry(mapping, variant_id, glyph)
     elif role.role.startswith("monster."):
@@ -35,11 +43,22 @@ def role_entry(mapping: dict[str, Any], lookup: dict[str, int], role: Role) -> d
         raw = mapping.get(role.group, {}).get(role.key, {})
     raw = raw if isinstance(raw, dict) else {}
     atlas = raw.get("atlas")
+    display_group = "monsters" if role.role.startswith("monster.") else role.layer + "s"
+    if role.role.startswith("terrain."):
+        display_group = "terrain"
+    elif role.role.startswith("trap."):
+        display_group = "traps"
+    elif role.role.startswith("object."):
+        display_group = "objects"
+    elif role.role.startswith("actor."):
+        display_group = "actors"
     return {
         "role": role.role,
-        "group": "monsters" if role.role.startswith("monster.") else role.group,
-            "key": role.key,
-            "glyph": raw.get("glyph", role.glyph.strip("'")),
+        "group": display_group,
+        "key": role.key,
+        "glyph": raw.get("glyph", c_glyph_display(role.glyph)),
+        "scope": "variant" if variant_id else "global",
+        "variantId": variant_id,
         "label": role.label,
         "name": raw.get("name", role.name),
         "currentRltilesName": atlas,
@@ -57,7 +76,13 @@ def build_data(root: Path) -> dict[str, Any]:
     columns = int(atlas.get("width", 30))
     tile_size = int(atlas.get("tileSize", 32))
 
-    roles = all_roles() + trap_roles() + variant_monster_roles(mapping)
+    roles = (
+        all_roles()
+        + trap_roles()
+        + variant_terrain_roles(mapping)
+        + variant_trap_roles(mapping)
+        + variant_monster_roles(mapping)
+    )
 
     return {
         "version": 1,
