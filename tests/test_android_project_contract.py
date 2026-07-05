@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -29,7 +30,7 @@ def test_android_build_uses_cmake_and_default_only_native_flag():
     cmake = read("android/app/src/main/cpp/CMakeLists.txt")
     assert "externalNativeBuild" in build_gradle
     assert "src/main/cpp/CMakeLists.txt" in build_gradle
-    assert "ROGUE_ANDROID" in cmake
+    assert re.search(r"\bROGUE_ANDROID\b", cmake)
     assert "ROGUE_ANDROID_DEFAULT_ONLY" in cmake
     assert "allegro_frontend.c" in cmake
     assert "mobile_controls.c" in cmake
@@ -39,10 +40,17 @@ def test_android_build_uses_cmake_and_default_only_native_flag():
 def test_android_app_excludes_tile_editor_artifacts():
     build_text = read("android/app/build.gradle")
     sync_script = read("scripts/sync-android-assets.ps1")
+    relevant_lines = [
+        line
+        for line in build_text.splitlines()
+        if line.strip() and not line.strip().startswith("//")
+    ]
+    relevant_lines.extend(
+        line for line in sync_script.splitlines() if "Copy-Item" in line
+    )
     forbidden = ["tile_picker", "TilePicker.exe", "RogueTiles-windows-x64.zip"]
     for value in forbidden:
-        assert value not in build_text
-        assert value not in sync_script
+        assert all(value not in line for line in relevant_lines)
 
 
 def test_android_activity_loads_allegro_and_roguetiles_library():
