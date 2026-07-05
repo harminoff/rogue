@@ -76,3 +76,24 @@ def test_android_activity_loads_allegro_and_roguetiles_library():
     assert 'System.loadLibrary("roguetiles")' in activity
     assert 'super("libroguetiles.so")' in activity
     assert "nativeConfigureStorage" in activity
+
+
+def test_android_debug_build_requires_project_gradle_wrapper():
+    build_script = read("scripts/build-android-debug.ps1")
+    assert '$gradlew = Join-Path $androidRoot "gradlew.bat"' in build_script
+    assert "Android Gradle wrapper not found." in build_script
+    assert "& $gradlew :app:assembleDebug" in build_script
+    assert "gradle :app:assembleDebug" not in build_script.replace(
+        "& $gradlew :app:assembleDebug", ""
+    )
+
+
+def test_android_asset_sync_clears_stale_bundled_assets_before_copying():
+    asset_sync = read("android/app/src/main/java/com/roguetiles/AndroidAssetSync.java")
+    assert 'new File(context.getFilesDir(), "bundled-assets")' in asset_sync
+    assert "deleteTree(root);" in asset_sync
+    assert asset_sync.index("deleteTree(root);") < asset_sync.index(
+        'copyTree(context.getAssets(), "assets", root);'
+    )
+    assert "private static void deleteTree(File target)" in asset_sync
+    assert "target.delete()" in asset_sync

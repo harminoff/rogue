@@ -14,9 +14,28 @@ final class AndroidAssetSync {
 
     static File syncBundledAssets(Context context) {
         File root = new File(context.getFilesDir(), "bundled-assets");
+        deleteTree(root);
         copyTree(context.getAssets(), "assets", root);
         copyTree(context.getAssets(), "tilepacks", root);
         return root;
+    }
+
+    private static void deleteTree(File target) {
+        if (!target.exists()) {
+            return;
+        }
+        if (target.isDirectory()) {
+            File[] children = target.listFiles();
+            if (children == null) {
+                throw new IllegalStateException("Could not list bundled asset directory: " + target);
+            }
+            for (File child : children) {
+                deleteTree(child);
+            }
+        }
+        if (!target.delete()) {
+            throw new IllegalStateException("Could not delete bundled asset path: " + target);
+        }
     }
 
     private static void copyTree(AssetManager assets, String source, File root) {
