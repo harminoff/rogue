@@ -65,6 +65,13 @@ typedef enum rogue_allegro_view {
     ROGUE_ALLEGRO_VIEW_GLYPHS
 } ROGUE_ALLEGRO_VIEW;
 
+typedef enum rogue_crt_effect_mode {
+    ROGUE_CRT_OFF = 0,
+    ROGUE_CRT_SUBTLE = 1,
+    ROGUE_CRT_BALANCED = 2,
+    ROGUE_CRT_DRAMATIC = 3
+} ROGUE_CRT_EFFECT_MODE;
+
 typedef struct rogue_allegro_settings {
     int tile_draw_size;
     ROGUE_ALLEGRO_VIEW view_mode;
@@ -73,6 +80,7 @@ typedef struct rogue_allegro_settings {
     bool low_hp_pulse_enabled;
     bool pixel_sharpen_enabled;
     bool posterize_enabled;
+    ROGUE_CRT_EFFECT_MODE crt_effect_mode;
     bool blood_spatter_enabled;
     bool enemy_health_overlay_enabled;
     bool side_panel_log_enabled;
@@ -102,6 +110,7 @@ static ROGUE_ALLEGRO_SETTINGS settings = {
     FALSE,
     FALSE,
     FALSE,
+    ROGUE_CRT_OFF,
     FALSE,
     FALSE,
     FALSE,
@@ -429,6 +438,9 @@ load_settings(void)
 	text, "pixelSharpen", settings.pixel_sharpen_enabled);
     settings.posterize_enabled = json_bool_field(
 	text, "posterize", settings.posterize_enabled);
+    settings.crt_effect_mode = (ROGUE_CRT_EFFECT_MODE)json_int_field(
+	text, "crtEffect", settings.crt_effect_mode,
+	ROGUE_CRT_OFF, ROGUE_CRT_DRAMATIC);
     settings.wall_thickness = json_int_field(
 	text, "wallThickness", settings.wall_thickness,
 	ROGUE_MIN_WALL_THICKNESS, ROGUE_MAX_WALL_THICKNESS);
@@ -455,6 +467,7 @@ save_settings(void)
 	    "  \"lowHpPulse\": %s,\n"
 	    "  \"pixelSharpen\": %s,\n"
 	    "  \"posterize\": %s,\n"
+	    "  \"crtEffect\": %d,\n"
 	    "  \"wallThickness\": %d\n"
 	    "}\n",
 	    settings.side_panel_log_enabled ? "true" : "false",
@@ -467,6 +480,7 @@ save_settings(void)
 	    settings.low_hp_pulse_enabled ? "true" : "false",
 	    settings.pixel_sharpen_enabled ? "true" : "false",
 	    settings.posterize_enabled ? "true" : "false",
+	    settings.crt_effect_mode,
 	    settings.wall_thickness);
     fclose(file);
 }
@@ -1199,6 +1213,42 @@ cycle_wall_thickness(void)
 	settings.wall_thickness = ROGUE_MIN_WALL_THICKNESS;
 }
 
+static const char *
+crt_effect_label(ROGUE_CRT_EFFECT_MODE mode)
+{
+    switch (mode)
+    {
+	case ROGUE_CRT_SUBTLE:
+	    return "Subtle";
+	case ROGUE_CRT_BALANCED:
+	    return "Balanced";
+	case ROGUE_CRT_DRAMATIC:
+	    return "Dramatic";
+	default:
+	    return "Off";
+    }
+}
+
+static void
+cycle_crt_effect_mode(void)
+{
+    switch (settings.crt_effect_mode)
+    {
+	case ROGUE_CRT_OFF:
+	    settings.crt_effect_mode = ROGUE_CRT_SUBTLE;
+	    break;
+	case ROGUE_CRT_SUBTLE:
+	    settings.crt_effect_mode = ROGUE_CRT_BALANCED;
+	    break;
+	case ROGUE_CRT_BALANCED:
+	    settings.crt_effect_mode = ROGUE_CRT_DRAMATIC;
+	    break;
+	default:
+	    settings.crt_effect_mode = ROGUE_CRT_OFF;
+	    break;
+    }
+}
+
 static bool
 postprocess_enabled(void)
 {
@@ -1744,6 +1794,9 @@ show_shader_settings_menu(void)
 	snprintf(line, sizeof(line), "e) Posterize: %s",
 		 settings.posterize_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "f) CRT Effect: %s",
+		 crt_effect_label(settings.crt_effect_mode));
+	rogue_allegro_text_overlay_add(line);
 	rogue_allegro_text_overlay_add("");
 	rogue_allegro_text_overlay_add("Shader effects are independent and visual-only.");
 
@@ -1781,6 +1834,11 @@ show_shader_settings_menu(void)
 	    case 'E':
 		settings.posterize_enabled =
 		    !settings.posterize_enabled;
+		save_settings();
+		break;
+	    case 'f':
+	    case 'F':
+		cycle_crt_effect_mode();
 		save_settings();
 		break;
 	    default:
