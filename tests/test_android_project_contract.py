@@ -97,3 +97,56 @@ def test_android_asset_sync_clears_stale_bundled_assets_before_copying():
     )
     assert "private static void deleteTree(File target)" in asset_sync
     assert "target.delete()" in asset_sync
+
+
+def test_android_cmake_uses_default_ruleset_only():
+    cmake = read("android/app/src/main/cpp/CMakeLists.txt")
+    base_sources = [
+        "vers.c",
+        "extern.c",
+        "armor.c",
+        "chase.c",
+        "command.c",
+        "daemon.c",
+        "daemons.c",
+        "fight.c",
+        "init.c",
+        "io.c",
+        "list.c",
+        "mach_dep.c",
+        "main.c",
+        "mdport.c",
+        "misc.c",
+        "monsters.c",
+        "move.c",
+        "new_level.c",
+        "options.c",
+        "pack.c",
+        "passages.c",
+        "potions.c",
+        "rings.c",
+        "rip.c",
+        "rooms.c",
+        "save.c",
+        "scrolls.c",
+        "state.c",
+        "sticks.c",
+        "things.c",
+        "tiles.c",
+        "tilepack.c",
+        "frontend.c",
+        "overlay_picker.c",
+        "variant.c",
+        "rogue_platform.c",
+        "mobile_controls.c",
+        "generated/rogue_tile_mapping.c",
+        "allegro_frontend.c",
+        "weapons.c",
+        "wizard.c",
+        "xcrypt.c",
+    ]
+    for source in base_sources:
+        assert source in cmake
+    assert "variants/rogue52" not in cmake
+    assert "variants/rogue36" not in cmake
+    assert "variants/srogue90" not in cmake
