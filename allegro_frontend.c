@@ -20,6 +20,7 @@
 #include "overlay_picker.h"
 #include "tilepack.h"
 #include "rogue_platform.h"
+#include "mobile_controls.h"
 #include "variant.h"
 
 #define ROGUE_DEFAULT_TILE_DRAW_SIZE 32
@@ -158,6 +159,11 @@ static int suppress_key_char_keycode = 0;
 static int held_movement_keycode = 0;
 static char held_movement = '\0';
 static double held_movement_next_time = 0.0;
+#ifdef ROGUE_ANDROID
+static ROGUE_MOBILE_LAYOUT mobile_layout;
+static char pending_touch_command = '\0';
+static bool mobile_attack_disabled = TRUE;
+#endif
 static double damage_flash_until = 0.0;
 static int render_origin_x = 0;
 static int render_origin_y = 0;
@@ -4222,6 +4228,68 @@ draw_death_overlay(void)
 		 ALLEGRO_ALIGN_CENTRE, death_prompt);
 }
 
+#ifdef ROGUE_ANDROID
+static int
+mobile_controls_height(void)
+{
+    return display_height() / 3;
+}
+
+static void
+build_mobile_layout(void)
+{
+    int h;
+
+    h = mobile_controls_height();
+    rogue_mobile_layout_build(&mobile_layout, 16, display_height() - h + 8,
+			      display_width() - 32, h - 16);
+}
+
+static void
+draw_mobile_controls(void)
+{
+    ALLEGRO_COLOR border;
+    ALLEGRO_COLOR fill;
+    ALLEGRO_COLOR text;
+    ALLEGRO_COLOR accent;
+    ROGUE_MOBILE_BUTTON *button;
+    int i;
+
+    border = al_map_rgb(64, 88, 154);
+    fill = al_map_rgb(7, 11, 28);
+    text = al_map_rgb(210, 226, 255);
+    accent = al_map_rgb(228, 154, 83);
+
+    build_mobile_layout();
+    for (i = 0; i < mobile_layout.button_count; i++)
+    {
+	button = &mobile_layout.buttons[i];
+	al_draw_filled_rectangle(button->rect.x, button->rect.y,
+				 button->rect.x + button->rect.w,
+				 button->rect.y + button->rect.h,
+				 fill);
+	al_draw_rectangle(button->rect.x, button->rect.y,
+			  button->rect.x + button->rect.w,
+			  button->rect.y + button->rect.h,
+			  border, 1);
+	al_draw_text(font, text,
+		     button->rect.x + button->rect.w / 2,
+		     button->rect.y + button->rect.h / 2 - 16,
+		     ALLEGRO_ALIGN_CENTRE,
+		     button->label);
+    }
+
+    al_draw_text(small_font, accent, 32, display_height() - 30, 0, "ATK");
+    al_draw_text(small_font, text, display_width() / 3,
+		 display_height() - 30, ALLEGRO_ALIGN_CENTRE, "WAIT");
+    al_draw_text(small_font, text, display_width() * 2 / 3,
+		 display_height() - 30, ALLEGRO_ALIGN_CENTRE, "LOOK");
+    al_draw_text(small_font, text, display_width() - 32,
+		 display_height() - 30, ALLEGRO_ALIGN_RIGHT, "DOWN");
+    (void) mobile_attack_disabled;
+}
+#endif
+
 bool
 rogue_allegro_start(bool smoke)
 {
@@ -4251,6 +4319,13 @@ rogue_allegro_start(bool smoke)
 	allegro_start_error("Allegro keyboard initialization failed.");
 	return FALSE;
     }
+#ifdef ROGUE_ANDROID
+    if (!al_install_touch_input())
+    {
+	allegro_start_error("Allegro touch initialization failed.");
+	return FALSE;
+    }
+#endif
 
     al_init_image_addon();
     al_init_font_addon();
@@ -4281,6 +4356,9 @@ rogue_allegro_start(bool smoke)
 
     al_register_event_source(queue, al_get_display_event_source(display));
     al_register_event_source(queue, al_get_keyboard_event_source());
+#ifdef ROGUE_ANDROID
+    al_register_event_source(queue, al_get_touch_input_event_source());
+#endif
 
     rogue_tilepack_load();
     if (!load_current_atlas())
@@ -4388,6 +4466,9 @@ rogue_allegro_render(void)
     draw_side_panel();
     draw_text_overlay();
     draw_death_overlay();
+#ifdef ROGUE_ANDROID
+    draw_mobile_controls();
+#endif
     al_flip_display();
 
     if (smoke_mode)
@@ -4425,6 +4506,15 @@ rogue_allegro_readchar(void)
 	    }
 	}
 
+#ifdef ROGUE_ANDROID
+	if (pending_touch_command != '\0')
+	{
+	    mapped = pending_touch_command;
+	    pending_touch_command = '\0';
+	    return mapped;
+	}
+#endif
+
 	rogue_allegro_render();
 	if (timeout >= 0.0)
 	    got_event = (bool) al_wait_for_event_timed(queue, &event,
@@ -4446,6 +4536,22 @@ rogue_allegro_readchar(void)
 	    rogue_allegro_render();
 	    continue;
 	}
+
+#ifdef ROGUE_ANDROID
+	if (event.type == ALLEGRO_EVENT_TOUCH_BEGIN)
+	{
+	    build_mobile_layout();
+	    pending_touch_command = rogue_mobile_command_at(
+		&mobile_layout, (int) event.touch.x, (int) event.touch.y);
+	    if (pending_touch_command != '\0')
+	    {
+		mapped = pending_touch_command;
+		pending_touch_command = '\0';
+		return mapped;
+	    }
+	    continue;
+	}
+#endif
 
 	if (event.type == ALLEGRO_EVENT_KEY_DOWN)
 	{
