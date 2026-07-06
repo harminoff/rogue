@@ -1,0 +1,661 @@
+{
+  "schemaVersion": 1,
+  "roles": {
+    "terrain.floor": {
+      "index": 1378,
+      "name": "floor_of_a_room"
+    },
+    "terrain.passage": {
+      "index": 1434,
+      "name": "corridor"
+    },
+    "terrain.door": {
+      "index": 1367,
+      "name": "dngn_closed_door"
+    },
+    "terrain.vertical_wall": {
+      "index": 1350,
+      "name": "dngn_rock_wall_00"
+    },
+    "terrain.horizontal_wall": {
+      "index": 1350,
+      "name": "dngn_rock_wall_00"
+    },
+    "terrain.stairs_down": {
+      "index": 1381,
+      "name": "staircase_down"
+    },
+    "terrain.known_trap": {
+      "index": 1382,
+      "name": "dngn_trap_mechanical"
+    },
+    "object.gold": {
+      "index": 1084,
+      "name": "gold_piece"
+    },
+    "object.potion": {
+      "index": 1274,
+      "name": "bubbly"
+    },
+    "object.scroll": {
+      "index": 1306,
+      "name": "vellum"
+    },
+    "object.magic": {
+      "index": 1034,
+      "name": "i-magic"
+    },
+    "object.food": {
+      "index": 1265,
+      "name": "food_ration"
+    },
+    "object.weapon": {
+      "index": 1106,
+      "name": "long_sword"
+    },
+    "object.armor": {
+      "index": 1160,
+      "name": "leather_armor"
+    },
+    "object.amulet": {
+      "index": 1207,
+      "name": "amulet_of_yendor"
+    },
+    "object.ring": {
+      "index": 992,
+      "name": "ring_green"
+    },
+    "object.stick": {
+      "index": 1061,
+      "name": "staff00"
+    },
+    "actor.player": {
+      "index": 74,
+      "name": "human"
+    },
+    "monster.A": {
+      "index": 334,
+      "name": "water_elemental"
+    },
+    "monster.B": {
+      "index": 434,
+      "name": "bat"
+    },
+    "monster.C": {
+      "index": 229,
+      "name": "plains_centaur"
+    },
+    "monster.D": {
+      "index": 108,
+      "name": "green_dragon"
+    },
+    "monster.E": {
+      "index": 338,
+      "name": "chickatrice"
+    },
+    "monster.F": {
+      "index": 172,
+      "name": "plant"
+    },
+    "monster.G": {
+      "index": 137,
+      "name": "griffon"
+    },
+    "monster.H": {
+      "index": 386,
+      "name": "hobgoblin"
+    },
+    "monster.I": {
+      "index": 140,
+      "name": "ice_beast"
+    },
+    "monster.J": {
+      "index": 469,
+      "name": "jabberwock"
+    },
+    "monster.K": {
+      "index": 434,
+      "name": "bat"
+    },
+    "monster.L": {
+      "index": 378,
+      "name": "leprechaun"
+    },
+    "monster.M": {
+      "index": 547,
+      "name": "medusa"
+    },
+    "monster.N": {
+      "index": 382,
+      "name": "wood_nymph"
+    },
+    "monster.O": {
+      "index": 387,
+      "name": "orc"
+    },
+    "monster.P": {
+      "index": 298,
+      "name": "phantom"
+    },
+    "monster.Q": {
+      "index": 415,
+      "name": "horse"
+    },
+    "monster.R": {
+      "index": 183,
+      "name": "snake"
+    },
+    "monster.S": {
+      "index": 183,
+      "name": "snake"
+    },
+    "monster.T": {
+      "index": 189,
+      "name": "troll"
+    },
+    "monster.U": {
+      "index": 413,
+      "name": "black_unicorn"
+    },
+    "monster.V": {
+      "index": 194,
+      "name": "vampire"
+    },
+    "monster.W": {
+      "index": 202,
+      "name": "wraith"
+    },
+    "monster.X": {
+      "index": 379,
+      "name": "small_mimic"
+    },
+    "monster.Y": {
+      "index": 513,
+      "name": "yeti"
+    },
+    "monster.Z": {
+      "index": 520,
+      "name": "human_zombie"
+    },
+    "trap.trapdoor": {
+      "index": 1464,
+      "name": "trap_door"
+    },
+    "trap.arrow": {
+      "index": 1452,
+      "name": "arrow_trap"
+    },
+    "trap.sleeping_gas": {
+      "index": 1458,
+      "name": "sleeping_gas_trap"
+    },
+    "trap.bear": {
+      "index": 1456,
+      "name": "bear_trap"
+    },
+    "trap.teleport": {
+      "index": 1465,
+      "name": "teleportation_trap"
+    },
+    "trap.poison_dart": {
+      "index": 1453,
+      "name": "dart_trap"
+    },
+    "terrain.srogue90.magic_pool": {
+      "index": 1413,
+      "name": "dngn_sparkling_fountain"
+    },
+    "terrain.srogue90.secret_door": {
+      "index": 1367,
+      "name": "dngn_closed_door"
+    },
+    "terrain.srogue90.trading_post": {
+      "index": 1385,
+      "name": "dngn_enter_shop"
+    },
+    "trap.srogue90.arrow": {
+      "index": 1452,
+      "name": "arrow_trap"
+    },
+    "trap.srogue90.bear": {
+      "index": 1456,
+      "name": "bear_trap"
+    },
+    "trap.srogue90.maze": {
+      "index": 1470,
+      "name": "magic_trap"
+    },
+    "trap.srogue90.poison_dart": {
+      "index": 1453,
+      "name": "dart_trap"
+    },
+    "trap.srogue90.sleeping_gas": {
+      "index": 1458,
+      "name": "sleeping_gas_trap"
+    },
+    "trap.srogue90.teleport": {
+      "index": 1465,
+      "name": "teleportation_trap"
+    },
+    "trap.srogue90.trapdoor": {
+      "index": 1464,
+      "name": "trap_door"
+    },
+    "monster.rogue36.A": {
+      "index": 173,
+      "name": "queen_ant"
+    },
+    "monster.rogue36.B": {
+      "index": 434,
+      "name": "bat"
+    },
+    "monster.rogue36.C": {
+      "index": 229,
+      "name": "plains_centaur"
+    },
+    "monster.rogue36.D": {
+      "index": 108,
+      "name": "green_dragon"
+    },
+    "monster.rogue36.E": {
+      "index": 132,
+      "name": "floating_eye"
+    },
+    "monster.rogue36.F": {
+      "index": 462,
+      "name": "violet_fungus"
+    },
+    "monster.rogue36.G": {
+      "index": 463,
+      "name": "gnome"
+    },
+    "monster.rogue36.H": {
+      "index": 386,
+      "name": "hobgoblin"
+    },
+    "monster.rogue36.I": {
+      "index": 455,
+      "name": "stalker"
+    },
+    "monster.rogue36.J": {
+      "index": 268,
+      "name": "jackal"
+    },
+    "monster.rogue36.K": {
+      "index": 152,
+      "name": "big_kobold"
+    },
+    "monster.rogue36.L": {
+      "index": 378,
+      "name": "leprechaun"
+    },
+    "monster.rogue36.M": {
+      "index": 379,
+      "name": "small_mimic"
+    },
+    "monster.rogue36.N": {
+      "index": 382,
+      "name": "wood_nymph"
+    },
+    "monster.rogue36.O": {
+      "index": 387,
+      "name": "orc"
+    },
+    "monster.rogue36.P": {
+      "index": 424,
+      "name": "purple_worm"
+    },
+    "monster.rogue36.Q": {
+      "index": 300,
+      "name": "quasit"
+    },
+    "monster.rogue36.R": {
+      "index": 497,
+      "name": "rust_monster"
+    },
+    "monster.rogue36.S": {
+      "index": 183,
+      "name": "snake"
+    },
+    "monster.rogue36.T": {
+      "index": 189,
+      "name": "troll"
+    },
+    "monster.rogue36.U": {
+      "index": 505,
+      "name": "umber_hulk"
+    },
+    "monster.rogue36.V": {
+      "index": 194,
+      "name": "vampire"
+    },
+    "monster.rogue36.W": {
+      "index": 202,
+      "name": "wraith"
+    },
+    "monster.rogue36.X": {
+      "index": 509,
+      "name": "xorn"
+    },
+    "monster.rogue36.Y": {
+      "index": 513,
+      "name": "yeti"
+    },
+    "monster.rogue36.Z": {
+      "index": 520,
+      "name": "human_zombie"
+    },
+    "monster.rogue52.A": {
+      "index": 173,
+      "name": "queen_ant"
+    },
+    "monster.rogue52.B": {
+      "index": 434,
+      "name": "bat"
+    },
+    "monster.rogue52.C": {
+      "index": 229,
+      "name": "plains_centaur"
+    },
+    "monster.rogue52.D": {
+      "index": 108,
+      "name": "green_dragon"
+    },
+    "monster.rogue52.E": {
+      "index": 132,
+      "name": "floating_eye"
+    },
+    "monster.rogue52.F": {
+      "index": 462,
+      "name": "violet_fungus"
+    },
+    "monster.rogue52.G": {
+      "index": 463,
+      "name": "gnome"
+    },
+    "monster.rogue52.H": {
+      "index": 386,
+      "name": "hobgoblin"
+    },
+    "monster.rogue52.I": {
+      "index": 455,
+      "name": "stalker"
+    },
+    "monster.rogue52.J": {
+      "index": 268,
+      "name": "jackal"
+    },
+    "monster.rogue52.K": {
+      "index": 152,
+      "name": "big_kobold"
+    },
+    "monster.rogue52.L": {
+      "index": 378,
+      "name": "leprechaun"
+    },
+    "monster.rogue52.M": {
+      "index": 379,
+      "name": "small_mimic"
+    },
+    "monster.rogue52.N": {
+      "index": 382,
+      "name": "wood_nymph"
+    },
+    "monster.rogue52.O": {
+      "index": 387,
+      "name": "orc"
+    },
+    "monster.rogue52.P": {
+      "index": 424,
+      "name": "purple_worm"
+    },
+    "monster.rogue52.Q": {
+      "index": 300,
+      "name": "quasit"
+    },
+    "monster.rogue52.R": {
+      "index": 497,
+      "name": "rust_monster"
+    },
+    "monster.rogue52.S": {
+      "index": 183,
+      "name": "snake"
+    },
+    "monster.rogue52.T": {
+      "index": 189,
+      "name": "troll"
+    },
+    "monster.rogue52.U": {
+      "index": 505,
+      "name": "umber_hulk"
+    },
+    "monster.rogue52.V": {
+      "index": 194,
+      "name": "vampire"
+    },
+    "monster.rogue52.W": {
+      "index": 202,
+      "name": "wraith"
+    },
+    "monster.rogue52.X": {
+      "index": 509,
+      "name": "xorn"
+    },
+    "monster.rogue52.Y": {
+      "index": 513,
+      "name": "yeti"
+    },
+    "monster.rogue52.Z": {
+      "index": 520,
+      "name": "human_zombie"
+    },
+    "monster.srogue90.A": {
+      "index": 173,
+      "name": "queen_ant"
+    },
+    "monster.srogue90.B": {
+      "index": 434,
+      "name": "bat"
+    },
+    "monster.srogue90.C": {
+      "index": 229,
+      "name": "plains_centaur"
+    },
+    "monster.srogue90.D": {
+      "index": 452,
+      "name": "red_dragon"
+    },
+    "monster.srogue90.E": {
+      "index": 132,
+      "name": "floating_eye"
+    },
+    "monster.srogue90.F": {
+      "index": 462,
+      "name": "violet_fungus"
+    },
+    "monster.srogue90.G": {
+      "index": 463,
+      "name": "gnome"
+    },
+    "monster.srogue90.H": {
+      "index": 386,
+      "name": "hobgoblin"
+    },
+    "monster.srogue90.I": {
+      "index": 455,
+      "name": "stalker"
+    },
+    "monster.srogue90.J": {
+      "index": 268,
+      "name": "jackal"
+    },
+    "monster.srogue90.K": {
+      "index": 152,
+      "name": "big_kobold"
+    },
+    "monster.srogue90.L": {
+      "index": 378,
+      "name": "leprechaun"
+    },
+    "monster.srogue90.M": {
+      "index": 379,
+      "name": "small_mimic"
+    },
+    "monster.srogue90.N": {
+      "index": 382,
+      "name": "wood_nymph"
+    },
+    "monster.srogue90.O": {
+      "index": 387,
+      "name": "orc"
+    },
+    "monster.srogue90.P": {
+      "index": 424,
+      "name": "purple_worm"
+    },
+    "monster.srogue90.Q": {
+      "index": 300,
+      "name": "quasit"
+    },
+    "monster.srogue90.R": {
+      "index": 497,
+      "name": "rust_monster"
+    },
+    "monster.srogue90.S": {
+      "index": 183,
+      "name": "snake"
+    },
+    "monster.srogue90.T": {
+      "index": 189,
+      "name": "troll"
+    },
+    "monster.srogue90.U": {
+      "index": 505,
+      "name": "umber_hulk"
+    },
+    "monster.srogue90.V": {
+      "index": 194,
+      "name": "vampire"
+    },
+    "monster.srogue90.W": {
+      "index": 202,
+      "name": "wraith"
+    },
+    "monster.srogue90.X": {
+      "index": 509,
+      "name": "xorn"
+    },
+    "monster.srogue90.Y": {
+      "index": 513,
+      "name": "yeti"
+    },
+    "monster.srogue90.Z": {
+      "index": 520,
+      "name": "human_zombie"
+    },
+    "monster.srogue90.a": {
+      "index": 98,
+      "name": "giant_beetle"
+    },
+    "monster.srogue90.b": {
+      "index": 98,
+      "name": "giant_beetle"
+    },
+    "monster.srogue90.c": {
+      "index": 339,
+      "name": "cockatrice"
+    },
+    "monster.srogue90.d": {
+      "index": 560,
+      "name": "bone_devil"
+    },
+    "monster.srogue90.e": {
+      "index": 273,
+      "name": "giant_lizard"
+    },
+    "monster.srogue90.f": {
+      "index": 128,
+      "name": "giant_frog"
+    },
+    "monster.srogue90.g": {
+      "index": 108,
+      "name": "green_dragon"
+    },
+    "monster.srogue90.h": {
+      "index": 262,
+      "name": "hell_hound"
+    },
+    "monster.srogue90.i": {
+      "index": 45,
+      "name": "imp"
+    },
+    "monster.srogue90.j": {
+      "index": 357,
+      "name": "jaguar"
+    },
+    "monster.srogue90.k": {
+      "index": 533,
+      "name": "doppelganger"
+    },
+    "monster.srogue90.l": {
+      "index": 49,
+      "name": "shadow_imp"
+    },
+    "monster.srogue90.m": {
+      "index": 281,
+      "name": "minotaur"
+    },
+    "monster.srogue90.n": {
+      "index": 322,
+      "name": "abomination_small"
+    },
+    "monster.srogue90.o": {
+      "index": 168,
+      "name": "ogre"
+    },
+    "monster.srogue90.p": {
+      "index": 442,
+      "name": "baby_red_dragon"
+    },
+    "monster.srogue90.q": {
+      "index": 30,
+      "name": "blue_devil"
+    },
+    "monster.srogue90.r": {
+      "index": 139,
+      "name": "sphinx"
+    },
+    "monster.srogue90.s": {
+      "index": 198,
+      "name": "shadow_wraith"
+    },
+    "monster.srogue90.t": {
+      "index": 400,
+      "name": "titanothere"
+    },
+    "monster.srogue90.u": {
+      "index": 189,
+      "name": "troll"
+    },
+    "monster.srogue90.v": {
+      "index": 558,
+      "name": "vrock"
+    },
+    "monster.srogue90.w": {
+      "index": 553,
+      "name": "succubus"
+    },
+    "monster.srogue90.x": {
+      "index": 509,
+      "name": "xorn"
+    },
+    "monster.srogue90.y": {
+      "index": 562,
+      "name": "yeenoghu"
+    },
+    "monster.srogue90.z": {
+      "index": 520,
+      "name": "human_zombie"
+    }
+  }
+}

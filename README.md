@@ -157,6 +157,26 @@ The zip is written to:
 dist\RogueTiles-windows-x64.zip
 ```
 
+## Building Locally For Android
+
+The Android build is a graphics-only developer APK. It lives beside the Windows build and does not include `TilePicker.exe` or the desktop tile editor.
+
+Before building, add an Android Gradle wrapper under `android\` and place the Allegro Android artifacts listed in `android\vendor\allegro\README.md`.
+
+Build the debug APK:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-android-debug.ps1
+```
+
+The debug APK is written to:
+
+```text
+android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+The first Android slice uses the default RogueTiles ruleset, bundled default tiles, and touch controls for movement, wait, look, and descend.
+
 ## GitHub Release Builds
 
 This repo includes a Windows release workflow at `.github/workflows/release-windows.yml`.

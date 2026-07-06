@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "name": "Default RL Tiles",
+  "image": "tiles.png",
+  "mapping": "mapping.json",
+  "tileWidth": 32,
+  "tileHeight": 32,
+  "columns": 30,
+  "fallbackToGenerated": true
+}
