@@ -1,9 +1,13 @@
 native-build/
 .native-build/
 native-build-tests/
+.worktrees/
 build/
+android/.gradle/
+android/app/.cxx/
 dist/
 variants/*/build/
+variants/*/build-temp/
 __pycache__/
 *.pyc
 rogue54.scr

@@ -7,6 +7,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <curses.h>
+#ifdef ROGUE_ANDROID
+#include <android/log.h>
+#endif
 #ifdef _WIN32
 #include <windows.h>
 #endif
@@ -19,13 +22,27 @@
 #include "tiles.h"
 #include "overlay_picker.h"
 #include "tilepack.h"
+#include "rogue_platform.h"
+#include "mobile_controls.h"
 #include "variant.h"
 
 #define ROGUE_DEFAULT_TILE_DRAW_SIZE 32
 #define ROGUE_STATUS_HEIGHT 96
 #define ROGUE_MIN_TILE_DRAW_SIZE 16
-#define ROGUE_MAX_TILE_DRAW_SIZE 64
+#define ROGUE_DESKTOP_MAX_TILE_DRAW_SIZE 64
+#define ROGUE_ANDROID_MAX_TILE_DRAW_SIZE 128
+#ifdef ROGUE_ANDROID
+#define ROGUE_MAX_TILE_DRAW_SIZE ROGUE_ANDROID_MAX_TILE_DRAW_SIZE
+#else
+#define ROGUE_MAX_TILE_DRAW_SIZE ROGUE_DESKTOP_MAX_TILE_DRAW_SIZE
+#endif
 #define ROGUE_TILE_ZOOM_STEP 4
+#define ROGUE_MOBILE_PINCH_RENDER_INTERVAL 0.033
+#ifdef ROGUE_ANDROID
+#define ROGUE_PLATFORM_DEFAULT_TILE_DRAW_SIZE 48
+#else
+#define ROGUE_PLATFORM_DEFAULT_TILE_DRAW_SIZE ROGUE_DEFAULT_TILE_DRAW_SIZE
+#endif
 #define ROGUE_DEFAULT_VIEW_COLS 40
 #define ROGUE_MAX_VIEW_COLS 80
 #define ROGUE_MAX_VIEW_ROWS 32
@@ -34,6 +51,12 @@
 #define ROGUE_FONT_SIZE 32
 #define ROGUE_DETAIL_FONT_SIZE 32
 #define ROGUE_SMALL_FONT_SIZE 16
+#define ROGUE_MOBILE_HUD_FONT_SIZE 52
+#define ROGUE_MOBILE_CONTROL_FONT_SIZE 84
+#define ROGUE_MOBILE_ACTION_FONT_SIZE 64
+#define ROGUE_MOBILE_ACTION_SCROLL_THRESHOLD 18
+#define ROGUE_MOBILE_LOG_MIN_VISIBLE_LINES 7
+#define ROGUE_MOBILE_MIN_TOP_SAFE_HEIGHT 0
 #define ROGUE_OVERLAY_MAX_LINES 1536
 #define ROGUE_OVERLAY_LINE_LEN 160
 #define TEXT_OVERLAY_WRAP_CHARS 92
@@ -54,6 +77,16 @@
 #define ROGUE_LOW_HP_PULSE_MAX_ALPHA 0.30f
 #define ROGUE_PIXEL_SHARPEN_STRENGTH 0.38f
 #define ROGUE_POSTERIZE_LEVELS 6.0f
+#define ROGUE_CRT_SUBTLE_SCANLINE_STRENGTH 0.10f
+#define ROGUE_CRT_BALANCED_SCANLINE_STRENGTH 0.18f
+#define ROGUE_CRT_DRAMATIC_SCANLINE_STRENGTH 0.30f
+#define ROGUE_CRT_SUBTLE_VIGNETTE_STRENGTH 0.08f
+#define ROGUE_CRT_BALANCED_VIGNETTE_STRENGTH 0.16f
+#define ROGUE_CRT_DRAMATIC_VIGNETTE_STRENGTH 0.28f
+#define ROGUE_CRT_BALANCED_CURVATURE 0.035f
+#define ROGUE_CRT_DRAMATIC_CURVATURE 0.070f
+#define ROGUE_CRT_BALANCED_RGB_OFFSET 1
+#define ROGUE_CRT_DRAMATIC_RGB_OFFSET 2
 #define ROGUE_MIN_WALL_THICKNESS 1
 #define ROGUE_DEFAULT_WALL_THICKNESS 2
 #define ROGUE_THICK_WALL_THICKNESS 3
@@ -65,6 +98,13 @@ typedef enum rogue_allegro_view {
     ROGUE_ALLEGRO_VIEW_GLYPHS
 } ROGUE_ALLEGRO_VIEW;
 
+typedef enum rogue_crt_effect_mode {
+    ROGUE_CRT_OFF = 0,
+    ROGUE_CRT_SUBTLE = 1,
+    ROGUE_CRT_BALANCED = 2,
+    ROGUE_CRT_DRAMATIC = 3
+} ROGUE_CRT_EFFECT_MODE;
+
 typedef struct rogue_allegro_settings {
     int tile_draw_size;
     ROGUE_ALLEGRO_VIEW view_mode;
@@ -73,6 +113,7 @@ typedef struct rogue_allegro_settings {
     bool low_hp_pulse_enabled;
     bool pixel_sharpen_enabled;
     bool posterize_enabled;
+    ROGUE_CRT_EFFECT_MODE crt_effect_mode;
     bool blood_spatter_enabled;
     bool enemy_health_overlay_enabled;
     bool side_panel_log_enabled;
@@ -80,6 +121,7 @@ typedef struct rogue_allegro_settings {
     bool stylized_bottom_bar_enabled;
     int wall_thickness;
     bool fullscreen;
+    bool mobile_controls_swapped;
     int windowed_width;
     int windowed_height;
 } ROGUE_ALLEGRO_SETTINGS;
@@ -95,19 +137,21 @@ typedef struct rogue_blood_splat {
 } ROGUE_BLOOD_SPLAT;
 
 static ROGUE_ALLEGRO_SETTINGS settings = {
-    ROGUE_DEFAULT_TILE_DRAW_SIZE,
+    ROGUE_PLATFORM_DEFAULT_TILE_DRAW_SIZE,
     ROGUE_ALLEGRO_VIEW_TILES,
     FALSE,
     FALSE,
     FALSE,
     FALSE,
     FALSE,
+    ROGUE_CRT_OFF,
     FALSE,
     FALSE,
     FALSE,
     FALSE,
     FALSE,
     ROGUE_DEFAULT_WALL_THICKNESS,
+    FALSE,
     FALSE,
     ROGUE_DEFAULT_VIEW_COLS * ROGUE_DEFAULT_TILE_DRAW_SIZE,
     ROGUE_MAX_VIEW_ROWS * ROGUE_DEFAULT_TILE_DRAW_SIZE + ROGUE_STATUS_HEIGHT
@@ -118,6 +162,7 @@ static ROGUE_ALLEGRO_SETTINGS settings = {
 static ALLEGRO_DISPLAY *display = NULL;
 static ALLEGRO_EVENT_QUEUE *queue = NULL;
 static ALLEGRO_BITMAP *atlas = NULL;
+static ALLEGRO_BITMAP *mobile_dpad_bitmap = NULL;
 static ALLEGRO_BITMAP *scene_bitmap = NULL;
 static ALLEGRO_BITMAP *scene_source_bitmap = NULL;
 static ALLEGRO_SHADER *gloom_shader = NULL;
@@ -125,17 +170,52 @@ static ALLEGRO_SHADER *postprocess_shader = NULL;
 static ALLEGRO_FONT *font = NULL;
 static ALLEGRO_FONT *detail_font = NULL;
 static ALLEGRO_FONT *small_font = NULL;
+static ALLEGRO_FONT *mobile_hud_font = NULL;
+static ALLEGRO_FONT *mobile_control_font = NULL;
+static ALLEGRO_FONT *mobile_action_font = NULL;
 static bool started = FALSE;
 static bool smoke_mode = FALSE;
 static bool shader_smoke_mode = FALSE;
 static bool gloom_shader_failed = FALSE;
 static bool postprocess_shader_failed = FALSE;
+static unsigned char *atlas_tile_visible = NULL;
+static int atlas_tile_visible_count = 0;
 static int scene_bitmap_width = 0;
 static int scene_bitmap_height = 0;
 static int suppress_key_char_keycode = 0;
 static int held_movement_keycode = 0;
 static char held_movement = '\0';
 static double held_movement_next_time = 0.0;
+#ifdef ROGUE_ANDROID
+static ROGUE_MOBILE_LAYOUT mobile_layout;
+static int mobile_action_scroll_y = 0;
+static int mobile_action_touch_id = -1;
+static int mobile_action_touch_start_y = 0;
+static int mobile_action_touch_start_scroll_y = 0;
+static int mobile_action_touch_index = -1;
+static bool mobile_action_touch_scrolled = FALSE;
+static int mobile_log_scroll_y = 0;
+static int mobile_log_touch_id = -1;
+static int mobile_log_touch_start_y = 0;
+static int mobile_log_touch_start_scroll_y = 0;
+static char android_prompt_response = '\0';
+static int mobile_pinch_touch_ids[2] = { -1, -1 };
+static int mobile_pinch_touch_x[2] = { 0, 0 };
+static int mobile_pinch_touch_y[2] = { 0, 0 };
+static bool mobile_pinch_active = FALSE;
+static int mobile_pinch_start_distance = 0;
+static int mobile_pinch_start_tile_size = 0;
+static bool mobile_pinch_render_requested = FALSE;
+static double mobile_pinch_last_render_at = 0.0;
+static bool mobile_game_render_ready = FALSE;
+static ROGUE_MOBILE_RECT text_overlay_close_rect = { 0, 0, 0, 0 };
+static ROGUE_MOBILE_RECT text_overlay_chapters_rect = { 0, 0, 0, 0 };
+static int mobile_text_overlay_touch_id = -1;
+static int mobile_text_overlay_touch_start_y = 0;
+static int mobile_text_overlay_touch_start_scroll = 0;
+static int mobile_text_overlay_touch_line = -1;
+static bool mobile_text_overlay_touch_scrolled = FALSE;
+#endif
 static double damage_flash_until = 0.0;
 static int render_origin_x = 0;
 static int render_origin_y = 0;
@@ -167,6 +247,8 @@ static int text_overlay_line_count = 0;
 static int text_overlay_selected = -1;
 static int text_overlay_scroll = 0;
 static bool text_overlay_selectable = FALSE;
+static bool text_overlay_fill_vertical = FALSE;
+static bool text_overlay_fullscreen = FALSE;
 static int manual_chapter_lines[ROGUE_MANUAL_MAX_CHAPTERS];
 static char manual_chapter_titles[ROGUE_MANUAL_MAX_CHAPTERS][ROGUE_OVERLAY_LINE_LEN];
 static int manual_chapter_count = 0;
@@ -177,20 +259,30 @@ void rogue_allegro_text_overlay_add(const char *line);
 char rogue_allegro_text_overlay_show(const char *prompt);
 char rogue_allegro_text_overlay_pick(const char *prompt);
 void rogue_allegro_text_overlay_clear(void);
+void rogue_allegro_record_message(const char *message);
 bool rogue_allegro_notice(const char *title, const char *message);
 void rogue_allegro_render(void);
 static int display_width(void);
 static int display_height(void);
+#ifdef ROGUE_ANDROID
+static int mobile_bottom_safe_height(void);
+#endif
 static int channel_clamp(float value);
 static unsigned char posterize_channel(unsigned char value);
 static void read_locked_rgba(ALLEGRO_LOCKED_REGION *region, int x, int y,
 			     unsigned char *r, unsigned char *g,
 			     unsigned char *b, unsigned char *a);
+static void crt_sample_coordinates(ROGUE_CRT_EFFECT_MODE mode, int x, int y,
+				   int *sample_x, int *sample_y);
+static float crt_scanline_factor(ROGUE_CRT_EFFECT_MODE mode, int y);
+static float crt_vignette_factor(ROGUE_CRT_EFFECT_MODE mode, int x, int y);
+static int crt_rgb_offset_pixels(ROGUE_CRT_EFFECT_MODE mode);
 static void write_locked_rgba(ALLEGRO_LOCKED_REGION *region, int x, int y,
 			      unsigned char r, unsigned char g,
 			      unsigned char b, unsigned char a);
 static void reset_manual_chapters(void);
 static bool manual_line_is_heading(const char *line);
+static void clean_manual_text(char *text);
 static void record_manual_chapter(const char *title);
 static char show_manual_chapter_picker(void);
 static void show_manuals_menu_for_variant(const ROGUE_VARIANT_INFO *current);
@@ -208,10 +300,14 @@ static void
 allegro_start_error(const char *message)
 {
     fprintf(stderr, "%s\n", message);
+#ifdef ROGUE_ANDROID
+    __android_log_print(ANDROID_LOG_ERROR, "RogueTiles", "%s", message);
+#endif
 #ifdef _WIN32
     MessageBoxA(NULL, message, "RogueTiles", MB_OK | MB_ICONERROR);
 #endif
 }
+
 
 static bool
 is_movement_command(char ch)
@@ -262,15 +358,30 @@ begin_held_movement(int keycode, char mapped)
 }
 
 static ALLEGRO_FONT *
+load_monogram_font(int size, ALLEGRO_FONT *fallback)
+{
+    char resolved_path[512];
+    ALLEGRO_FONT *loaded;
+
+    loaded = al_load_ttf_font(
+	rogue_platform_asset_path("assets/fonts/monogram/monogram.ttf",
+				  resolved_path, sizeof(resolved_path)),
+	size, ALLEGRO_TTF_MONOCHROME);
+    if (loaded == NULL)
+	loaded = al_load_ttf_font("../assets/fonts/monogram/monogram.ttf",
+				  size, ALLEGRO_TTF_MONOCHROME);
+    if (loaded == NULL)
+	loaded = fallback;
+
+    return loaded;
+}
+
+static ALLEGRO_FONT *
 load_ui_font(void)
 {
     ALLEGRO_FONT *loaded;
 
-    loaded = al_load_ttf_font("assets/fonts/monogram/monogram.ttf",
-			      ROGUE_FONT_SIZE, ALLEGRO_TTF_MONOCHROME);
-    if (loaded == NULL)
-	loaded = al_load_ttf_font("../assets/fonts/monogram/monogram.ttf",
-				  ROGUE_FONT_SIZE, ALLEGRO_TTF_MONOCHROME);
+    loaded = load_monogram_font(ROGUE_FONT_SIZE, NULL);
     if (loaded == NULL)
 	loaded = al_create_builtin_font();
 
@@ -282,15 +393,7 @@ load_detail_ui_font(void)
 {
     ALLEGRO_FONT *loaded;
 
-    loaded = al_load_ttf_font("assets/fonts/monogram/monogram.ttf",
-			      ROGUE_DETAIL_FONT_SIZE,
-			      ALLEGRO_TTF_MONOCHROME);
-    if (loaded == NULL)
-	loaded = al_load_ttf_font("../assets/fonts/monogram/monogram.ttf",
-				  ROGUE_DETAIL_FONT_SIZE,
-				  ALLEGRO_TTF_MONOCHROME);
-    if (loaded == NULL)
-	loaded = font;
+    loaded = load_monogram_font(ROGUE_DETAIL_FONT_SIZE, font);
 
     return loaded;
 }
@@ -300,15 +403,37 @@ load_small_ui_font(void)
 {
     ALLEGRO_FONT *loaded;
 
-    loaded = al_load_ttf_font("assets/fonts/monogram/monogram.ttf",
-			      ROGUE_SMALL_FONT_SIZE,
-			      ALLEGRO_TTF_MONOCHROME);
-    if (loaded == NULL)
-	loaded = al_load_ttf_font("../assets/fonts/monogram/monogram.ttf",
-				  ROGUE_SMALL_FONT_SIZE,
-				  ALLEGRO_TTF_MONOCHROME);
-    if (loaded == NULL)
-	loaded = font;
+    loaded = load_monogram_font(ROGUE_SMALL_FONT_SIZE, font);
+
+    return loaded;
+}
+
+static ALLEGRO_FONT *
+load_mobile_control_font(void)
+{
+    ALLEGRO_FONT *loaded;
+
+    loaded = load_monogram_font(ROGUE_MOBILE_CONTROL_FONT_SIZE, font);
+
+    return loaded;
+}
+
+static ALLEGRO_FONT *
+load_mobile_hud_font(void)
+{
+    ALLEGRO_FONT *loaded;
+
+    loaded = load_monogram_font(ROGUE_MOBILE_HUD_FONT_SIZE, font);
+
+    return loaded;
+}
+
+static ALLEGRO_FONT *
+load_mobile_action_font(void)
+{
+    ALLEGRO_FONT *loaded;
+
+    loaded = load_monogram_font(ROGUE_MOBILE_ACTION_FONT_SIZE, font);
 
     return loaded;
 }
@@ -369,6 +494,8 @@ json_int_field(const char *json, const char *key, int fallback,
 static void
 init_settings_path(void)
 {
+    rogue_platform_user_path("settings.json", settings_path,
+			     sizeof(settings_path));
 #ifdef _WIN32
     char exe_path[512];
     char *slash;
@@ -425,9 +552,14 @@ load_settings(void)
 	text, "pixelSharpen", settings.pixel_sharpen_enabled);
     settings.posterize_enabled = json_bool_field(
 	text, "posterize", settings.posterize_enabled);
+    settings.crt_effect_mode = (ROGUE_CRT_EFFECT_MODE)json_int_field(
+	text, "crtEffect", settings.crt_effect_mode,
+	ROGUE_CRT_OFF, ROGUE_CRT_DRAMATIC);
     settings.wall_thickness = json_int_field(
 	text, "wallThickness", settings.wall_thickness,
 	ROGUE_MIN_WALL_THICKNESS, ROGUE_MAX_WALL_THICKNESS);
+    settings.mobile_controls_swapped = json_bool_field(
+	text, "mobileControlsSwapped", settings.mobile_controls_swapped);
 }
 
 static void
@@ -451,7 +583,9 @@ save_settings(void)
 	    "  \"lowHpPulse\": %s,\n"
 	    "  \"pixelSharpen\": %s,\n"
 	    "  \"posterize\": %s,\n"
-	    "  \"wallThickness\": %d\n"
+	    "  \"crtEffect\": %d,\n"
+	    "  \"wallThickness\": %d,\n"
+	    "  \"mobileControlsSwapped\": %s\n"
 	    "}\n",
 	    settings.side_panel_log_enabled ? "true" : "false",
 	    settings.stylized_log_enabled ? "true" : "false",
@@ -463,7 +597,9 @@ save_settings(void)
 	    settings.low_hp_pulse_enabled ? "true" : "false",
 	    settings.pixel_sharpen_enabled ? "true" : "false",
 	    settings.posterize_enabled ? "true" : "false",
-	    settings.wall_thickness);
+	    settings.crt_effect_mode,
+	    settings.wall_thickness,
+	    settings.mobile_controls_swapped ? "true" : "false");
     fclose(file);
 }
 
@@ -590,6 +726,101 @@ variant_picker_index_of(const ROGUE_VARIANT_INFO *variant)
     return 0;
 }
 
+static void
+variant_picker_panel_geometry(int *panel_x, int *panel_y, int *panel_w,
+			      int *panel_h)
+{
+    int w, h, x, y;
+
+    w = display_width() - 100;
+    if (w > 1180)
+	w = 1180;
+    if (w < 560)
+	w = display_width() - 40;
+    h = display_height() - 120;
+    if (h < 430)
+	h = display_height() - 40;
+    x = (display_width() - w) / 2;
+    y = (display_height() - h) / 2;
+
+    if (panel_x != NULL)
+	*panel_x = x;
+    if (panel_y != NULL)
+	*panel_y = y;
+    if (panel_w != NULL)
+	*panel_w = w;
+    if (panel_h != NULL)
+	*panel_h = h;
+}
+
+static int
+variant_picker_left_width(int panel_w)
+{
+    int left_w;
+
+    left_w = panel_w / 3;
+    if (left_w < 230)
+	left_w = 230;
+    if (left_w > 340)
+	left_w = 340;
+    return left_w;
+}
+
+static void
+variant_picker_start_geometry(int *button_x, int *button_y, int *button_w,
+			      int *button_h)
+{
+    int panel_x, panel_y, panel_w, panel_h;
+    int safe_bottom;
+
+    variant_picker_panel_geometry(&panel_x, &panel_y, &panel_w, &panel_h);
+    safe_bottom = 0;
+#ifdef ROGUE_ANDROID
+    safe_bottom = mobile_bottom_safe_height();
+#endif
+    if (button_w != NULL)
+	*button_w = 220;
+    if (button_h != NULL)
+	*button_h = 72;
+    if (button_x != NULL)
+	*button_x = panel_x + panel_w - 220 - 24;
+    if (button_y != NULL)
+	*button_y = panel_y + panel_h - 72 - 18 - safe_bottom;
+}
+
+static bool
+variant_picker_start_hit(int x, int y)
+{
+    int button_x, button_y, button_w, button_h;
+
+    variant_picker_start_geometry(&button_x, &button_y, &button_w,
+				  &button_h);
+    return (bool)(x >= button_x && x <= button_x + button_w
+		  && y >= button_y && y <= button_y + button_h);
+}
+
+static int
+variant_picker_index_at_point(int x, int y)
+{
+    int panel_x, panel_y, panel_w, panel_h;
+    int left_w, line_height, row_y, row_h, i;
+
+    variant_picker_panel_geometry(&panel_x, &panel_y, &panel_w, &panel_h);
+    left_w = variant_picker_left_width(panel_w);
+    line_height = al_get_font_line_height(font);
+    row_h = line_height + 12;
+    if (x < panel_x + 22 || x > panel_x + left_w - 18)
+	return -1;
+    row_y = panel_y + 124;
+    for (i = 0; i < rogue_variant_count(); i++)
+    {
+	if (y >= row_y - 4 && y <= row_y + line_height + 8)
+	    return i;
+	row_y += row_h;
+    }
+    return -1;
+}
+
 static int
 variant_picker_draw_detail(const ROGUE_VARIANT_INFO *current,
 			   ALLEGRO_FONT *body_font, int x, int y,
@@ -674,16 +905,7 @@ draw_variant_picker(int selected, int detail_scroll, int *max_detail_scroll)
     al_set_target_backbuffer(display);
     al_clear_to_color(bg);
 
-    panel_w = display_width() - 100;
-    if (panel_w > 1180)
-	panel_w = 1180;
-    if (panel_w < 560)
-	panel_w = display_width() - 40;
-    panel_h = display_height() - 120;
-    if (panel_h < 430)
-	panel_h = display_height() - 40;
-    panel_x = (display_width() - panel_w) / 2;
-    panel_y = (display_height() - panel_h) / 2;
+    variant_picker_panel_geometry(&panel_x, &panel_y, &panel_w, &panel_h);
 
     al_draw_rectangle(panel_x + 0.5, panel_y + 0.5,
 		      panel_x + panel_w - 0.5, panel_y + panel_h - 0.5,
@@ -691,16 +913,16 @@ draw_variant_picker(int selected, int detail_scroll, int *max_detail_scroll)
     al_draw_text(font, title, panel_x + 24, panel_y + 22, 0,
 		 "Choose Rogue Version");
     al_draw_text(font, muted, panel_x + 24, panel_y + 62, 0,
+#ifdef ROGUE_ANDROID
+		 "Tap a version. Tap Start. Tap selected version to start.");
+#else
 		 "Arrow keys select. Enter starts. F1 reads manuals.");
+#endif
     al_draw_line(panel_x + 24, panel_y + 100, panel_x + panel_w - 24,
 		 panel_y + 100, al_map_rgb(62, 66, 84), 1);
 
     y = panel_y + 124;
-    left_w = panel_w / 3;
-    if (left_w < 230)
-	left_w = 230;
-    if (left_w > 340)
-	left_w = 340;
+    left_w = variant_picker_left_width(panel_w);
     for (i = 0; i < rogue_variant_count(); i++)
     {
 	variant = variant_picker_at(i);
@@ -746,11 +968,30 @@ draw_variant_picker(int selected, int detail_scroll, int *max_detail_scroll)
 			       detail_line_height, muted, text, TRUE);
     al_set_clipping_rectangle(0, 0, display_width(), display_height());
 
+#ifdef ROGUE_ANDROID
+    {
+	int button_w, button_h, button_x, button_y;
+	variant_picker_start_geometry(&button_x, &button_y, &button_w,
+				      &button_h);
+	al_draw_filled_rectangle(button_x, button_y, button_x + button_w,
+				 button_y + button_h, al_map_rgb(26, 32, 48));
+	al_draw_rectangle(button_x + 0.5, button_y + 0.5,
+			  button_x + button_w - 0.5, button_y + button_h - 0.5,
+			  accent, 2);
+	al_draw_text(font, text, button_x + button_w / 2,
+		     button_y + (button_h - line_height) / 2,
+		     ALLEGRO_ALIGN_CENTRE, "START");
+	al_draw_text(small_font, muted, panel_x + 24,
+		     panel_y + panel_h - 38, 0,
+		     "Tap selected version again to start");
+    }
+#else
     al_draw_text(small_font, muted, panel_x + panel_w - 24,
 		 panel_y + panel_h - 38, ALLEGRO_ALIGN_RIGHT,
 		 max_detail_scroll != NULL && *max_detail_scroll > 0
 		 ? "PgUp/PgDn scroll details. Esc keeps the default"
 		 : "Esc keeps the default");
+#endif
     al_flip_display();
 }
 
@@ -785,6 +1026,57 @@ rogue_allegro_choose_variant(void)
 	    al_acknowledge_resize(display);
 	    continue;
 	}
+#ifdef ROGUE_ANDROID
+	if (event.type == ALLEGRO_EVENT_TOUCH_BEGIN)
+	{
+	    int hit;
+
+	    if (variant_picker_start_hit((int) event.touch.x,
+					 (int) event.touch.y))
+	    {
+		variant = variant_picker_at(selected);
+		return variant == NULL ? rogue_variant_default()->id : variant->id;
+	    }
+	    hit = variant_picker_index_at_point((int) event.touch.x,
+						(int) event.touch.y);
+	    if (hit >= 0)
+	    {
+		if (hit == selected)
+		{
+		    variant = variant_picker_at(selected);
+		    return variant == NULL ? rogue_variant_default()->id
+					   : variant->id;
+		}
+		selected = hit;
+		detail_scroll = 0;
+	    }
+	    continue;
+	}
+	if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN &&
+	    event.mouse.button == 1)
+	{
+	    int hit;
+
+	    if (variant_picker_start_hit(event.mouse.x, event.mouse.y))
+	    {
+		variant = variant_picker_at(selected);
+		return variant == NULL ? rogue_variant_default()->id : variant->id;
+	    }
+	    hit = variant_picker_index_at_point(event.mouse.x, event.mouse.y);
+	    if (hit >= 0)
+	    {
+		if (hit == selected)
+		{
+		    variant = variant_picker_at(selected);
+		    return variant == NULL ? rogue_variant_default()->id
+					   : variant->id;
+		}
+		selected = hit;
+		detail_scroll = 0;
+	    }
+	    continue;
+	}
+#endif
 	if (event.type != ALLEGRO_EVENT_KEY_DOWN)
 	    continue;
 
@@ -873,6 +1165,9 @@ display_height(void)
 static int
 side_panel_width(void)
 {
+#ifdef ROGUE_ANDROID
+    return 0;
+#else
     int width;
     int max_width;
 
@@ -888,14 +1183,134 @@ side_panel_width(void)
     if (width > max_width)
 	width = max_width;
     return width;
+#endif
 }
+
+#ifdef ROGUE_ANDROID
+static int
+mobile_margin(void)
+{
+    return 10;
+}
+
+static int
+mobile_gap(void)
+{
+    return 8;
+}
+
+static int
+mobile_bottom_safe_height(void)
+{
+    return 56;
+}
+
+static int
+mobile_top_safe_height(void)
+{
+    return clamp_int(rogue_platform_android_safe_top_inset(),
+		     ROGUE_MOBILE_MIN_TOP_SAFE_HEIGHT,
+		     display_height() / 4);
+}
+
+static int
+mobile_stats_height(void)
+{
+    if (rogue_variant_is_current("srogue90"))
+	return clamp_int(display_height() / 7, 150, 190);
+    return clamp_int(display_height() / 10, 112, 140);
+}
+
+static int
+mobile_movement_height(void)
+{
+    return clamp_int(display_height() / 6, 270, 380);
+}
+
+static int
+mobile_action_height(void)
+{
+    return mobile_movement_height();
+}
+
+static int
+mobile_log_height(void)
+{
+    return clamp_int(display_height() / 5, 256, 360);
+}
+
+static int
+mobile_controls_top(void)
+{
+    return display_height() - mobile_bottom_safe_height()
+	   - mobile_movement_height();
+}
+
+static int
+mobile_action_top(void)
+{
+    return mobile_controls_top();
+}
+
+static int
+mobile_log_top(void)
+{
+    int top;
+    int min_top;
+
+    top = mobile_controls_top() - mobile_gap() - mobile_log_height();
+    min_top = mobile_top_safe_height() + mobile_stats_height()
+	      + mobile_gap() + ROGUE_TILE_DRAW_SIZE + mobile_gap();
+    if (top < min_top)
+	top = min_top;
+    return top;
+}
+
+static int
+mobile_play_top(void)
+{
+    return mobile_top_safe_height() + mobile_stats_height() + mobile_gap();
+}
+
+static int
+mobile_play_height(void)
+{
+    int height;
+
+    height = mobile_log_top() - mobile_gap() - mobile_play_top();
+    if (height < ROGUE_TILE_DRAW_SIZE)
+	height = ROGUE_TILE_DRAW_SIZE;
+    return height;
+}
+
+static int
+mobile_zoom_width(void)
+{
+    return 0;
+}
+
+static int
+mobile_play_area_width(void)
+{
+    int width;
+
+    width = display_width() - (mobile_margin() * 2) - mobile_zoom_width();
+    if (width < ROGUE_TILE_DRAW_SIZE)
+	width = ROGUE_TILE_DRAW_SIZE;
+    return width;
+}
+#endif
 
 static int
 play_area_width(void)
 {
     int width;
 
+#ifdef ROGUE_ANDROID
+    width = mobile_play_area_width();
+#else
     width = display_width() - side_panel_width();
+#endif
     if (width < ROGUE_TILE_DRAW_SIZE)
 	width = ROGUE_TILE_DRAW_SIZE;
     return width;
@@ -921,7 +1336,11 @@ view_rows(void)
     int rows;
     int max_rows;
 
+#ifdef ROGUE_ANDROID
+    available = mobile_play_height();
+#else
     available = display_height() - ROGUE_STATUS_HEIGHT;
+#endif
     if (available < ROGUE_TILE_DRAW_SIZE)
 	available = ROGUE_TILE_DRAW_SIZE;
     rows = available / ROGUE_TILE_DRAW_SIZE;
@@ -999,12 +1418,18 @@ toggle_fullscreen(void)
     }
 }
 
-static void
+static bool
 set_zoom(int tile_draw_size)
 {
-    settings.tile_draw_size = clamp_int(tile_draw_size,
-					ROGUE_MIN_TILE_DRAW_SIZE,
-					ROGUE_MAX_TILE_DRAW_SIZE);
+    int clamped;
+
+    clamped = clamp_int(tile_draw_size, ROGUE_MIN_TILE_DRAW_SIZE,
+			ROGUE_MAX_TILE_DRAW_SIZE);
+    if (settings.tile_draw_size == clamped)
+	return FALSE;
+
+    settings.tile_draw_size = clamped;
+    return TRUE;
 }
 
 static bool
@@ -1025,22 +1450,135 @@ handle_view_key(int keycode)
 	    return TRUE;
 	case ALLEGRO_KEY_0:
 	case ALLEGRO_KEY_PAD_0:
-	    set_zoom(ROGUE_DEFAULT_TILE_DRAW_SIZE);
+	    set_zoom(ROGUE_PLATFORM_DEFAULT_TILE_DRAW_SIZE);
 	    return TRUE;
 	default:
 	    return FALSE;
     }
 }
 
+static void
+clear_atlas_visibility_cache(void)
+{
+    if (atlas_tile_visible != NULL)
+	free(atlas_tile_visible);
+    atlas_tile_visible = NULL;
+    atlas_tile_visible_count = 0;
+}
+
+static bool
+atlas_index_has_visible_pixels(int atlas_index)
+{
+    int columns;
+    int source_w, source_h;
+    int image_w, image_h;
+    int sx, sy;
+    int x, y;
+    int visible_pixels;
+    int alpha_pixels;
+    unsigned char r, g, b, a;
+    ALLEGRO_COLOR pixel;
+
+    if (atlas == NULL || atlas_index < 0)
+	return FALSE;
+
+    columns = rogue_tilepack_columns();
+    source_w = rogue_tilepack_source_width();
+    source_h = rogue_tilepack_source_height();
+    image_w = al_get_bitmap_width(atlas);
+    image_h = al_get_bitmap_height(atlas);
+    if (columns <= 0 || source_w <= 0 || source_h <= 0)
+	return FALSE;
+
+    sx = (atlas_index % columns) * source_w;
+    sy = (atlas_index / columns) * source_h;
+    if (sx < 0 || sy < 0 || sx + source_w > image_w || sy + source_h > image_h)
+	return FALSE;
+
+    visible_pixels = 0;
+    alpha_pixels = 0;
+    for (y = sy; y < sy + source_h; y += 2)
+	for (x = sx; x < sx + source_w; x += 2)
+	{
+	    pixel = al_get_pixel(atlas, x, y);
+	    al_unmap_rgba(pixel, &r, &g, &b, &a);
+	    if (a > 24)
+	    {
+		alpha_pixels++;
+		if ((int) r + (int) g + (int) b > 80
+		    || r > 56 || g > 56 || b > 56)
+		{
+		    visible_pixels++;
+		    if (visible_pixels >= 4)
+			return TRUE;
+		}
+	    }
+	}
+
+    return (bool)(alpha_pixels > 0 && visible_pixels > 0);
+}
+
+static void
+rebuild_atlas_visibility_cache(void)
+{
+    int columns;
+    int rows;
+    int image_h;
+    int source_h;
+
+    clear_atlas_visibility_cache();
+    if (atlas == NULL)
+	return;
+
+    columns = rogue_tilepack_columns();
+    source_h = rogue_tilepack_source_height();
+    image_h = al_get_bitmap_height(atlas);
+    if (columns <= 0 || source_h <= 0)
+	return;
+
+    rows = image_h / source_h;
+    atlas_tile_visible_count = columns * rows;
+    if (atlas_tile_visible_count <= 0)
+	return;
+
+    atlas_tile_visible = (unsigned char *) calloc(
+	(size_t) atlas_tile_visible_count, sizeof(*atlas_tile_visible));
+    if (atlas_tile_visible == NULL)
+    {
+	atlas_tile_visible_count = 0;
+	return;
+    }
+    memset(atlas_tile_visible, 255, (size_t) atlas_tile_visible_count);
+
+}
+
+static bool
+atlas_tile_is_visible(int atlas_index)
+{
+    if (atlas_index < 0)
+	return FALSE;
+    if (atlas_tile_visible == NULL || atlas_tile_visible_count <= 0)
+	return TRUE;
+    if (atlas_index >= atlas_tile_visible_count)
+	return FALSE;
+    if (atlas_tile_visible[atlas_index] == 255)
+	atlas_tile_visible[atlas_index] =
+	    atlas_index_has_visible_pixels(atlas_index) ? 1 : 0;
+    return (bool)(atlas_tile_visible[atlas_index] != 0);
+}
+
 static bool
 load_current_atlas(void)
 {
     const char *atlas_path;
+    char resolved_atlas_path[512];
     char parent_atlas_path[512];
     ALLEGRO_BITMAP *loaded;
 
     atlas_path = rogue_tilepack_atlas_path();
-    loaded = al_load_bitmap(atlas_path);
+    loaded = al_load_bitmap(rogue_platform_asset_path(atlas_path,
+						      resolved_atlas_path,
+						      sizeof(resolved_atlas_path)));
     if (loaded == NULL)
     {
 	snprintf(parent_atlas_path, sizeof(parent_atlas_path), "../%s",
@@ -1058,8 +1596,23 @@ load_current_atlas(void)
     if (atlas != NULL)
 	al_destroy_bitmap(atlas);
     atlas = loaded;
+    rebuild_atlas_visibility_cache();
     return TRUE;
 }
+
+#ifdef ROGUE_ANDROID
+static void
+load_mobile_dpad_bitmap(void)
+{
+    char resolved_path[512];
+
+    if (mobile_dpad_bitmap != NULL)
+	al_destroy_bitmap(mobile_dpad_bitmap);
+    mobile_dpad_bitmap = al_load_bitmap(
+	rogue_platform_asset_path("assets/mobile/dpad_reference.png",
+				  resolved_path, sizeof(resolved_path)));
+}
+#endif
 
 static const char *
 wall_thickness_name(void)
@@ -1085,11 +1638,48 @@ cycle_wall_thickness(void)
 	settings.wall_thickness = ROGUE_MIN_WALL_THICKNESS;
 }
 
+static const char *
+crt_effect_label(ROGUE_CRT_EFFECT_MODE mode)
+{
+    switch (mode)
+    {
+	case ROGUE_CRT_SUBTLE:
+	    return "Subtle";
+	case ROGUE_CRT_BALANCED:
+	    return "Balanced";
+	case ROGUE_CRT_DRAMATIC:
+	    return "Dramatic";
+	default:
+	    return "Off";
+    }
+}
+
+static void
+cycle_crt_effect_mode(void)
+{
+    switch (settings.crt_effect_mode)
+    {
+	case ROGUE_CRT_OFF:
+	    settings.crt_effect_mode = ROGUE_CRT_SUBTLE;
+	    break;
+	case ROGUE_CRT_SUBTLE:
+	    settings.crt_effect_mode = ROGUE_CRT_BALANCED;
+	    break;
+	case ROGUE_CRT_BALANCED:
+	    settings.crt_effect_mode = ROGUE_CRT_DRAMATIC;
+	    break;
+	default:
+	    settings.crt_effect_mode = ROGUE_CRT_OFF;
+	    break;
+    }
+}
+
 static bool
 postprocess_enabled(void)
 {
     return (bool)(settings.pixel_sharpen_enabled
-		  || settings.posterize_enabled);
+		  || settings.posterize_enabled
+		  || settings.crt_effect_mode != ROGUE_CRT_OFF);
 }
 
 static bool
@@ -1105,6 +1695,11 @@ static const char *postprocess_pixel_shader_source =
     "uniform sampler2D u_scene_texture;\n"
     "uniform bool u_pixel_sharpen_enabled;\n"
     "uniform bool u_posterize_enabled;\n"
+    "uniform int u_crt_effect_mode;\n"
+    "uniform float u_crt_scanline_strength;\n"
+    "uniform float u_crt_vignette_strength;\n"
+    "uniform float u_crt_curvature;\n"
+    "uniform float u_crt_rgb_offset;\n"
     "uniform float u_pixel_sharpen_strength;\n"
     "uniform float u_posterize_levels;\n"
     "uniform vec2 u_scene_texel_size;\n"
@@ -1113,13 +1708,30 @@ static const char *postprocess_pixel_shader_source =
     "    vec2 uv = vec2(gl_FragCoord.x * u_scene_texel_size.x,\n"
     "                   1.0 - gl_FragCoord.y * u_scene_texel_size.y);\n"
     "    uv = clamp(uv, vec2(0.0, 0.0), vec2(1.0, 1.0));\n"
-    "    vec4 color = texture2D(u_scene_texture, uv);\n"
+    "    vec2 sample_uv = uv;\n"
+    "    vec2 crt_pos = (uv - vec2(0.5, 0.5)) * 2.0;\n"
+    "    if (u_crt_effect_mode > 0 && u_crt_curvature > 0.0)\n"
+    "    {\n"
+    "        float warp = 1.0 + u_crt_curvature * dot(crt_pos, crt_pos);\n"
+    "        sample_uv = clamp((crt_pos * warp + vec2(1.0, 1.0)) * 0.5, vec2(0.0, 0.0), vec2(1.0, 1.0));\n"
+    "    }\n"
+    "    vec4 color = texture2D(u_scene_texture, sample_uv);\n"
+    "    if (u_crt_effect_mode > 0)\n"
+    "    {\n"
+    "        float scanline = 1.0 - u_crt_scanline_strength * mod(floor(gl_FragCoord.y), 2.0);\n"
+    "        float vignette = 1.0 - u_crt_vignette_strength * min(dot(crt_pos, crt_pos), 1.0);\n"
+    "        vec2 red_uv = clamp(sample_uv + vec2(u_crt_rgb_offset, 0.0) * u_scene_texel_size, vec2(0.0, 0.0), vec2(1.0, 1.0));\n"
+    "        vec2 blue_uv = clamp(sample_uv - vec2(u_crt_rgb_offset, 0.0) * u_scene_texel_size, vec2(0.0, 0.0), vec2(1.0, 1.0));\n"
+    "        color.r = texture2D(u_scene_texture, red_uv).r;\n"
+    "        color.b = texture2D(u_scene_texture, blue_uv).b;\n"
+    "        color.rgb *= scanline * vignette;\n"
+    "    }\n"
     "    if (u_pixel_sharpen_enabled)\n"
     "    {\n"
-    "        vec3 north = texture2D(u_scene_texture, uv + vec2(0.0, -u_scene_texel_size.y)).rgb;\n"
-    "        vec3 south = texture2D(u_scene_texture, uv + vec2(0.0, u_scene_texel_size.y)).rgb;\n"
-    "        vec3 east = texture2D(u_scene_texture, uv + vec2(u_scene_texel_size.x, 0.0)).rgb;\n"
-    "        vec3 west = texture2D(u_scene_texture, uv + vec2(-u_scene_texel_size.x, 0.0)).rgb;\n"
+    "        vec3 north = texture2D(u_scene_texture, clamp(sample_uv + vec2(0.0, -u_scene_texel_size.y), vec2(0.0, 0.0), vec2(1.0, 1.0))).rgb;\n"
+    "        vec3 south = texture2D(u_scene_texture, clamp(sample_uv + vec2(0.0, u_scene_texel_size.y), vec2(0.0, 0.0), vec2(1.0, 1.0))).rgb;\n"
+    "        vec3 east = texture2D(u_scene_texture, clamp(sample_uv + vec2(u_scene_texel_size.x, 0.0), vec2(0.0, 0.0), vec2(1.0, 1.0))).rgb;\n"
+    "        vec3 west = texture2D(u_scene_texture, clamp(sample_uv + vec2(-u_scene_texel_size.x, 0.0), vec2(0.0, 0.0), vec2(1.0, 1.0))).rgb;\n"
     "        vec3 blur = (north + south + east + west) * 0.25;\n"
     "        color.rgb = clamp(color.rgb + (color.rgb - blur) * u_pixel_sharpen_strength, 0.0, 1.0);\n"
     "    }\n"
@@ -1323,6 +1935,138 @@ ensure_postprocess_shader(void)
     return TRUE;
 }
 
+static float
+crt_mode_scanline_strength(ROGUE_CRT_EFFECT_MODE mode)
+{
+    switch (mode)
+    {
+	case ROGUE_CRT_SUBTLE:
+	    return ROGUE_CRT_SUBTLE_SCANLINE_STRENGTH;
+	case ROGUE_CRT_BALANCED:
+	    return ROGUE_CRT_BALANCED_SCANLINE_STRENGTH;
+	case ROGUE_CRT_DRAMATIC:
+	    return ROGUE_CRT_DRAMATIC_SCANLINE_STRENGTH;
+	default:
+	    return 0.0f;
+    }
+}
+
+static float
+crt_mode_vignette_strength(ROGUE_CRT_EFFECT_MODE mode)
+{
+    switch (mode)
+    {
+	case ROGUE_CRT_SUBTLE:
+	    return ROGUE_CRT_SUBTLE_VIGNETTE_STRENGTH;
+	case ROGUE_CRT_BALANCED:
+	    return ROGUE_CRT_BALANCED_VIGNETTE_STRENGTH;
+	case ROGUE_CRT_DRAMATIC:
+	    return ROGUE_CRT_DRAMATIC_VIGNETTE_STRENGTH;
+	default:
+	    return 0.0f;
+    }
+}
+
+static float
+crt_mode_curvature(ROGUE_CRT_EFFECT_MODE mode)
+{
+    switch (mode)
+    {
+	case ROGUE_CRT_BALANCED:
+	    return ROGUE_CRT_BALANCED_CURVATURE;
+	case ROGUE_CRT_DRAMATIC:
+	    return ROGUE_CRT_DRAMATIC_CURVATURE;
+	default:
+	    return 0.0f;
+    }
+}
+
+static int
+crt_rgb_offset_pixels(ROGUE_CRT_EFFECT_MODE mode)
+{
+    switch (mode)
+    {
+	case ROGUE_CRT_BALANCED:
+	    return ROGUE_CRT_BALANCED_RGB_OFFSET;
+	case ROGUE_CRT_DRAMATIC:
+	    return ROGUE_CRT_DRAMATIC_RGB_OFFSET;
+	default:
+	    return 0;
+    }
+}
+
+static void
+crt_sample_coordinates(ROGUE_CRT_EFFECT_MODE mode, int x, int y,
+		       int *sample_x, int *sample_y)
+{
+    float curvature;
+    float nx;
+    float ny;
+    float warp;
+    int sx;
+    int sy;
+
+    curvature = crt_mode_curvature(mode);
+    if (curvature <= 0.0f || scene_bitmap_width <= 1
+	|| scene_bitmap_height <= 1)
+    {
+	*sample_x = x;
+	*sample_y = y;
+	return;
+    }
+
+    nx = ((float)x / (float)(scene_bitmap_width - 1)) * 2.0f - 1.0f;
+    ny = ((float)y / (float)(scene_bitmap_height - 1)) * 2.0f - 1.0f;
+    warp = 1.0f + curvature * (nx * nx + ny * ny);
+    sx = (int)(((nx * warp + 1.0f) * 0.5f
+		* (float)(scene_bitmap_width - 1)) + 0.5f);
+    sy = (int)(((ny * warp + 1.0f) * 0.5f
+		* (float)(scene_bitmap_height - 1)) + 0.5f);
+
+    if (sx < 0)
+	sx = 0;
+    if (sx >= scene_bitmap_width)
+	sx = scene_bitmap_width - 1;
+    if (sy < 0)
+	sy = 0;
+    if (sy >= scene_bitmap_height)
+	sy = scene_bitmap_height - 1;
+    *sample_x = sx;
+    *sample_y = sy;
+}
+
+static float
+crt_scanline_factor(ROGUE_CRT_EFFECT_MODE mode, int y)
+{
+    float strength;
+
+    strength = crt_mode_scanline_strength(mode);
+    if (strength <= 0.0f)
+	return 1.0f;
+    return (y % 2) == 0 ? 1.0f : 1.0f - strength;
+}
+
+static float
+crt_vignette_factor(ROGUE_CRT_EFFECT_MODE mode, int x, int y)
+{
+    float strength;
+    float nx;
+    float ny;
+    float dist;
+    float edge;
+
+    strength = crt_mode_vignette_strength(mode);
+    if (strength <= 0.0f || scene_bitmap_width <= 1
+	|| scene_bitmap_height <= 1)
+	return 1.0f;
+
+    nx = ((float)x / (float)(scene_bitmap_width - 1)) * 2.0f - 1.0f;
+    ny = ((float)y / (float)(scene_bitmap_height - 1)) * 2.0f - 1.0f;
+    dist = nx * nx + ny * ny;
+    edge = dist > 1.0f ? 1.0f : dist;
+    return 1.0f - strength * edge;
+}
+
 static bool
 draw_scene_with_postprocess_shader(void)
 {
@@ -1332,6 +2076,11 @@ draw_scene_with_postprocess_shader(void)
     unsigned char south_r, south_g, south_b;
     unsigned char east_r, east_g, east_b;
     unsigned char west_r, west_g, west_b;
+    unsigned char dummy_r, dummy_g, dummy_b;
+    int sample_x, sample_y;
+    int rgb_offset;
+    int red_x, blue_x;
+    float crt_factor;
     ALLEGRO_LOCKED_REGION *source_lock;
     ALLEGRO_LOCKED_REGION *target_lock;
 
@@ -1358,18 +2107,46 @@ draw_scene_with_postprocess_shader(void)
     for (y = 0; y < scene_bitmap_height; y++)
 	for (x = 0; x < scene_bitmap_width; x++)
 	{
-	    read_locked_rgba(source_lock, x, y, &r, &g, &b, &a);
+	    crt_sample_coordinates(settings.crt_effect_mode, x, y,
+				   &sample_x, &sample_y);
+	    read_locked_rgba(source_lock, sample_x, sample_y, &r, &g, &b, &a);
+	    if (settings.crt_effect_mode != ROGUE_CRT_OFF)
+	    {
+		rgb_offset = crt_rgb_offset_pixels(settings.crt_effect_mode);
+		red_x = sample_x + rgb_offset;
+		blue_x = sample_x - rgb_offset;
+		if (red_x >= scene_bitmap_width)
+		    red_x = scene_bitmap_width - 1;
+		if (blue_x < 0)
+		    blue_x = 0;
+		read_locked_rgba(source_lock, red_x, sample_y,
+				 &r, &dummy_g, &dummy_b, &ignored_a);
+		read_locked_rgba(source_lock, blue_x, sample_y,
+				 &dummy_r, &dummy_g, &b, &ignored_a);
+		crt_factor =
+		    crt_scanline_factor(settings.crt_effect_mode, y)
+		    * crt_vignette_factor(settings.crt_effect_mode, x, y);
+		r = (unsigned char)channel_clamp((float)r * crt_factor);
+		g = (unsigned char)channel_clamp((float)g * crt_factor);
+		b = (unsigned char)channel_clamp((float)b * crt_factor);
+	    }
 	    if (settings.pixel_sharpen_enabled)
 	    {
-		read_locked_rgba(source_lock, x, y > 0 ? y - 1 : y,
+		read_locked_rgba(source_lock, sample_x,
+				 sample_y > 0 ? sample_y - 1 : sample_y,
 				 &north_r, &north_g, &north_b, &ignored_a);
-		read_locked_rgba(source_lock, x,
-				 y + 1 < scene_bitmap_height ? y + 1 : y,
+		read_locked_rgba(source_lock, sample_x,
+				 sample_y + 1 < scene_bitmap_height
+				     ? sample_y + 1 : sample_y,
 				 &south_r, &south_g, &south_b, &ignored_a);
 		read_locked_rgba(source_lock,
-				 x + 1 < scene_bitmap_width ? x + 1 : x,
-				 y, &east_r, &east_g, &east_b, &ignored_a);
-		read_locked_rgba(source_lock, x > 0 ? x - 1 : x, y,
+				 sample_x + 1 < scene_bitmap_width
+				     ? sample_x + 1 : sample_x,
+				 sample_y, &east_r, &east_g, &east_b,
+				 &ignored_a);
+		read_locked_rgba(source_lock,
+				 sample_x > 0 ? sample_x - 1 : sample_x,
+				 sample_y,
 				 &west_r, &west_g, &west_b, &ignored_a);
 		r = (unsigned char)channel_clamp(
 		    (float)r + ((float)r - ((float)north_r
@@ -1630,6 +2407,9 @@ show_shader_settings_menu(void)
 	snprintf(line, sizeof(line), "e) Posterize: %s",
 		 settings.posterize_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
+	snprintf(line, sizeof(line), "f) CRT Effect: %s",
+		 crt_effect_label(settings.crt_effect_mode));
+	rogue_allegro_text_overlay_add(line);
 	rogue_allegro_text_overlay_add("");
 	rogue_allegro_text_overlay_add("Shader effects are independent and visual-only.");
 
@@ -1667,6 +2447,11 @@ show_shader_settings_menu(void)
 	    case 'E':
 		settings.posterize_enabled =
 		    !settings.posterize_enabled;
+		save_settings();
+		break;
+	    case 'f':
+	    case 'F':
+		cycle_crt_effect_mode();
 		save_settings();
 		break;
 	    default:
@@ -1801,6 +2586,83 @@ manual_line_is_heading(const char *line)
     return (bool)(isspace((unsigned char)*p) && p[1] != '\0');
 }
 
+static char *
+manual_macro_text(char *line, const char *macro)
+{
+    int len;
+    char *text;
+
+    len = (int)strlen(macro);
+    if (strncmp(line, macro, (size_t)len) != 0)
+	return NULL;
+    text = line + len;
+    while (*text != '\0' && isspace((unsigned char)*text))
+	text++;
+    return text;
+}
+
+static char *
+manual_heading_text(char *line)
+{
+    char *text;
+
+    text = manual_macro_text(line, ".H");
+    if (text == NULL)
+	return NULL;
+    while (*text != '\0' && isspace((unsigned char)*text))
+	text++;
+    while (isdigit((unsigned char)*text))
+	text++;
+    while (*text != '\0' && isspace((unsigned char)*text))
+	text++;
+    return text;
+}
+
+static void
+manual_format_macro_text(char *source, char *out, int out_size)
+{
+    char *p;
+    int written;
+    bool copied;
+
+    if (out_size <= 0)
+	return;
+    out[0] = '\0';
+    if (source == NULL)
+	return;
+
+    p = trim_manual_text(source);
+    written = 0;
+    copied = FALSE;
+    while (*p != '\0' && written < out_size - 1)
+    {
+	while (*p != '\0' && isspace((unsigned char)*p))
+	    p++;
+	if (*p == '"')
+	{
+	    p++;
+	    if (copied && written < out_size - 1)
+		out[written++] = ' ';
+	    while (*p != '\0' && *p != '"' && written < out_size - 1)
+		out[written++] = *p++;
+	    if (*p == '"')
+		p++;
+	    copied = TRUE;
+	}
+	else
+	{
+	    if (copied && written < out_size - 1)
+		out[written++] = ' ';
+	    while (*p != '\0' && !isspace((unsigned char)*p)
+		   && written < out_size - 1)
+		out[written++] = *p++;
+	    copied = TRUE;
+	}
+    }
+    out[written] = '\0';
+    clean_manual_text(out);
+}
+
 static void
 record_manual_chapter(const char *title)
 {
@@ -1838,6 +2700,8 @@ show_manual_chapter_picker(void)
     int i;
     bool saved_active;
     bool saved_selectable;
+    bool saved_fill_vertical;
+    bool saved_fullscreen;
     char selected;
 
     if (manual_chapter_count <= 0)
@@ -1848,6 +2712,8 @@ show_manual_chapter_picker(void)
     saved_scroll = text_overlay_scroll;
     saved_active = text_overlay_active;
     saved_selectable = text_overlay_selectable;
+    saved_fill_vertical = text_overlay_fill_vertical;
+    saved_fullscreen = text_overlay_fullscreen;
     snprintf(saved_title, sizeof(saved_title), "%s", text_overlay_title);
     snprintf(saved_prompt, sizeof(saved_prompt), "%s", text_overlay_prompt);
     for (i = 0; i < saved_line_count; i++)
@@ -1855,6 +2721,10 @@ show_manual_chapter_picker(void)
 		 text_overlay_lines[i]);
 
     rogue_allegro_text_overlay_begin("Chapters");
+    text_overlay_fill_vertical = TRUE;
+#ifdef ROGUE_ANDROID
+    text_overlay_fullscreen = TRUE;
+#endif
     for (i = 0; i < manual_chapter_count && i < 26; i++)
     {
 	snprintf(line, sizeof(line), "%c) %s", 'a' + i,
@@ -1874,6 +2744,8 @@ show_manual_chapter_picker(void)
     text_overlay_scroll = saved_scroll;
     text_overlay_active = saved_active;
     text_overlay_selectable = saved_selectable;
+    text_overlay_fill_vertical = saved_fill_vertical;
+    text_overlay_fullscreen = saved_fullscreen;
     for (i = 0; i < saved_line_count; i++)
 	snprintf(text_overlay_lines[i], sizeof(text_overlay_lines[i]), "%s",
 		 saved_lines[i]);
@@ -1990,14 +2862,57 @@ append_manual_paragraph_text(char *paragraph, int paragraph_size,
 }
 
 static void
+append_manual_literal_line(char *line)
+{
+    char formatted[512];
+    char *text;
+
+    if (strncmp(line, ".B ", 3) == 0
+	|| strncmp(line, ".I ", 3) == 0)
+    {
+	manual_format_macro_text(line + 3, formatted, (int)sizeof(formatted));
+	text = trim_manual_text(formatted);
+	if (*text != '\0')
+	    rogue_allegro_text_overlay_add(text);
+	return;
+    }
+
+    clean_manual_text(line);
+    text = line;
+    while (*text != '\0' && (*text == '\r' || *text == '\n'))
+	text++;
+    if (*text == '\0')
+    {
+	append_manual_blank_line();
+	return;
+    }
+    if (manual_line_is_artifact(text))
+	return;
+    rogue_allegro_text_overlay_add(text);
+}
+
+static void
 append_manual_file_line(const char *source, char *paragraph,
-			int paragraph_size)
+			int paragraph_size, bool *literal_block)
 {
     char line[512];
+    char formatted[512];
     char *text;
 
     snprintf(line, sizeof(line), "%s", source);
     line[sizeof(line) - 1] = '\0';
+
+    if (literal_block != NULL && *literal_block)
+    {
+	if (strncmp(line, ".DE", 3) == 0)
+	{
+	    *literal_block = FALSE;
+	    append_manual_blank_line();
+	    return;
+	}
+	append_manual_literal_line(line);
+	return;
+    }
 
     if (line[0] == '.' && line[1] == '\\' && line[2] == '"')
 	return;
@@ -2006,14 +2921,42 @@ append_manual_file_line(const char *source, char *paragraph,
 	if (strncmp(line, ".SH ", 4) == 0)
 	{
 	    flush_manual_paragraph(paragraph);
-	    text = unquote_manual_text(line + 4);
-	    clean_manual_text(text);
+	    manual_format_macro_text(line + 4, formatted,
+				     (int)sizeof(formatted));
+	    text = formatted;
+	    append_manual_blank_line();
+	    record_manual_chapter(text);
+	    rogue_allegro_text_overlay_add(text);
+	}
+	else if ((text = manual_heading_text(line)) != NULL)
+	{
+	    flush_manual_paragraph(paragraph);
+	    manual_format_macro_text(text, formatted,
+				     (int)sizeof(formatted));
+	    text = formatted;
 	    append_manual_blank_line();
 	    record_manual_chapter(text);
 	    rogue_allegro_text_overlay_add(text);
 	}
 	else if (strncmp(line, ".PP", 3) == 0
-		 || strncmp(line, ".br", 3) == 0)
+		 || strncmp(line, ".P", 2) == 0
+		 || strncmp(line, ".SP", 3) == 0
+		 || strncmp(line, ".br", 3) == 0
+		 || strncmp(line, ".bp", 3) == 0
+		 || strncmp(line, ".FS", 3) == 0
+		 || strncmp(line, ".FE", 3) == 0)
+	{
+	    flush_manual_paragraph(paragraph);
+	    append_manual_blank_line();
+	}
+	else if (strncmp(line, ".DS", 3) == 0)
+	{
+	    flush_manual_paragraph(paragraph);
+	    append_manual_blank_line();
+	    if (literal_block != NULL)
+		*literal_block = TRUE;
+	}
+	else if (strncmp(line, ".DE", 3) == 0)
 	{
 	    flush_manual_paragraph(paragraph);
 	    append_manual_blank_line();
@@ -2021,7 +2964,9 @@ append_manual_file_line(const char *source, char *paragraph,
 	else if (strncmp(line, ".B ", 3) == 0
 		 || strncmp(line, ".I ", 3) == 0)
 	{
-	    text = unquote_manual_text(line + 3);
+	    manual_format_macro_text(line + 3, formatted,
+				     (int)sizeof(formatted));
+	    text = formatted;
 	    append_manual_paragraph_text(paragraph, paragraph_size, text);
 	}
 	return;
@@ -2056,6 +3001,14 @@ open_manual_file(const char *path, char *opened_path, int opened_path_size)
 
     if (path == NULL || *path == '\0')
 	return NULL;
+
+    file = fopen(rogue_platform_asset_path(path, candidate,
+					   sizeof(candidate)), "r");
+    if (file != NULL)
+    {
+	snprintf(opened_path, opened_path_size, "%s", candidate);
+	return file;
+    }
 
     snprintf(candidate, sizeof(candidate), "%s", path);
     candidate[sizeof(candidate) - 1] = '\0';
@@ -2094,6 +3047,7 @@ load_manual_text_overlay(const ROGUE_VARIANT_MANUAL_REF *manual)
     char line[512];
     char paragraph[1024];
     int loaded_lines;
+    bool literal_block;
 
     reset_manual_chapters();
     if (!manual_has_local_text(manual))
@@ -2106,10 +3060,12 @@ load_manual_text_overlay(const ROGUE_VARIANT_MANUAL_REF *manual)
 
     loaded_lines = 0;
     paragraph[0] = '\0';
+    literal_block = FALSE;
     while (fgets(line, sizeof(line), file) != NULL
 	   && text_overlay_line_count < ROGUE_OVERLAY_MAX_LINES - 2)
     {
-	append_manual_file_line(line, paragraph, (int)sizeof(paragraph));
+	append_manual_file_line(line, paragraph, (int)sizeof(paragraph),
+				&literal_block);
 	loaded_lines++;
     }
     flush_manual_paragraph(paragraph);
@@ -2130,6 +3086,10 @@ show_manual_reader(const ROGUE_VARIANT_MANUAL_REF *manual)
 	return;
 
     rogue_allegro_text_overlay_begin(manual->title);
+    text_overlay_fill_vertical = TRUE;
+#ifdef ROGUE_ANDROID
+    text_overlay_fullscreen = TRUE;
+#endif
     if (!load_manual_text_overlay(manual))
     {
 	rogue_allegro_text_overlay_add("This reference is not bundled as readable in-game text.");
@@ -2145,9 +3105,12 @@ show_manual_reader(const ROGUE_VARIANT_MANUAL_REF *manual)
     }
     if (manual_chapter_count > 0)
 	rogue_allegro_text_overlay_show(
-	    "Arrows/Page scroll, C Chapters, Space closes");
+	    "Arrows/Page scroll, C/Chapters jumps, Space closes");
     else
 	rogue_allegro_text_overlay_show("Arrows/Page scroll, Space closes");
+#ifdef ROGUE_ANDROID
+    text_overlay_fullscreen = FALSE;
+#endif
     rogue_allegro_text_overlay_clear();
 }
 
@@ -2213,15 +3176,19 @@ show_settings_menu(void)
     while (!done)
     {
 	rogue_allegro_text_overlay_begin("Settings");
+#ifndef ROGUE_ANDROID
 	snprintf(line, sizeof(line), "a) Side Panel Log: %s",
 		 settings.side_panel_log_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
+#endif
 	snprintf(line, sizeof(line), "b) Stylized Log: %s",
 		 settings.stylized_log_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
+#ifndef ROGUE_ANDROID
 	snprintf(line, sizeof(line), "c) Stylized Bottom Bar: %s",
 		 settings.stylized_bottom_bar_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
+#endif
 	snprintf(line, sizeof(line), "d) Blood Spatter: %s",
 		 settings.blood_spatter_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
@@ -2232,6 +3199,11 @@ show_settings_menu(void)
 	snprintf(line, sizeof(line), "g) Enemy Health Overlay: %s",
 		 settings.enemy_health_overlay_enabled ? "On" : "Off");
 	rogue_allegro_text_overlay_add(line);
+#ifdef ROGUE_ANDROID
+	snprintf(line, sizeof(line), "h) Swap Controls: %s",
+		 settings.mobile_controls_swapped ? "On" : "Off");
+	rogue_allegro_text_overlay_add(line);
+#endif
 	rogue_allegro_text_overlay_add("");
 	rogue_allegro_text_overlay_add("Visual-only settings. Gameplay rules stay unchanged.");
 
@@ -2241,24 +3213,28 @@ show_settings_menu(void)
 
 	switch (selected)
 	{
+#ifndef ROGUE_ANDROID
 	    case 'a':
 	    case 'A':
 		settings.side_panel_log_enabled =
 		    !settings.side_panel_log_enabled;
 		save_settings();
 		break;
+#endif
 	    case 'b':
 	    case 'B':
 		settings.stylized_log_enabled =
 		    !settings.stylized_log_enabled;
 		save_settings();
 		break;
+#ifndef ROGUE_ANDROID
 	    case 'c':
 	    case 'C':
 		settings.stylized_bottom_bar_enabled =
 		    !settings.stylized_bottom_bar_enabled;
 		save_settings();
 		break;
+#endif
 	    case 'd':
 	    case 'D':
 		settings.blood_spatter_enabled =
@@ -2280,6 +3256,14 @@ show_settings_menu(void)
 		    !settings.enemy_health_overlay_enabled;
 		save_settings();
 		break;
+#ifdef ROGUE_ANDROID
+	    case 'h':
+	    case 'H':
+		settings.mobile_controls_swapped =
+		    !settings.mobile_controls_swapped;
+		save_settings();
+		break;
+#endif
 	    default:
 		done = TRUE;
 		break;
@@ -2428,6 +3412,223 @@ draw_atlas_tile(int atlas_index, int dx, int dy)
 			  ROGUE_TILE_DRAW_SIZE, ROGUE_TILE_DRAW_SIZE, 0);
 }
 
+static void
+draw_atlas_tile_seamless(int atlas_index, int dx, int dy)
+{
+    int sx, sy;
+    int source_w, source_h;
+    int columns;
+    int source_inset;
+
+    columns = rogue_tilepack_columns();
+    source_w = rogue_tilepack_source_width();
+    source_h = rogue_tilepack_source_height();
+    source_inset = 1;
+
+    if (source_w <= source_inset * 2 || source_h <= source_inset * 2)
+    {
+	draw_atlas_tile(atlas_index, dx, dy);
+	return;
+    }
+
+    sx = (atlas_index % columns) * source_w;
+    sy = (atlas_index / columns) * source_h;
+    al_draw_scaled_bitmap(atlas, sx + source_inset, sy + source_inset,
+			  source_w - source_inset * 2,
+			  source_h - source_inset * 2,
+			  dx, dy, ROGUE_TILE_DRAW_SIZE, ROGUE_TILE_DRAW_SIZE,
+			  0);
+}
+
+static void
+draw_atlas_tile_for_role(int atlas_index, const char *role, int dx, int dy)
+{
+    if (role != NULL && strcmp(role, "terrain.floor") == 0)
+    {
+	draw_atlas_tile_seamless(atlas_index, dx, dy);
+	return;
+    }
+
+    draw_atlas_tile(atlas_index, dx, dy);
+}
+
+static bool
+foreground_pixel_visible(unsigned char r, unsigned char g, unsigned char b,
+			 unsigned char a)
+{
+    if (a <= 24)
+	return FALSE;
+    if (r <= 32 && g <= 32 && b <= 32)
+	return FALSE;
+    return TRUE;
+}
+
+static bool
+foreground_background_pixel(unsigned char r, unsigned char g, unsigned char b,
+			    unsigned char a)
+{
+    if (a <= 24)
+	return TRUE;
+    if (r <= 32 && g <= 32 && b <= 32)
+	return TRUE;
+    if (r <= 144 && g <= 96 && b <= 64)
+	return TRUE;
+    return FALSE;
+}
+
+static void
+foreground_queue_background_pixel(int index, const unsigned char *candidate,
+				  unsigned char *background, int *queue,
+				  int *tail)
+{
+    if (candidate[index] && !background[index])
+    {
+	background[index] = 1;
+	queue[*tail] = index;
+	(*tail)++;
+    }
+}
+
+static void
+foreground_mark_edge_background(int source_w, int source_h,
+				const unsigned char *candidate,
+				unsigned char *background, int *queue)
+{
+    int head;
+    int tail;
+    int x, y;
+    int index;
+
+    head = 0;
+    tail = 0;
+
+    for (x = 0; x < source_w; x++)
+    {
+	foreground_queue_background_pixel(x, candidate, background, queue,
+					  &tail);
+	foreground_queue_background_pixel((source_h - 1) * source_w + x,
+					  candidate, background, queue, &tail);
+    }
+    for (y = 1; y < source_h - 1; y++)
+    {
+	foreground_queue_background_pixel(y * source_w, candidate, background,
+					  queue, &tail);
+	foreground_queue_background_pixel(y * source_w + source_w - 1,
+					  candidate, background, queue, &tail);
+    }
+
+    while (head < tail)
+    {
+	index = queue[head++];
+	x = index % source_w;
+	y = index / source_w;
+	if (x > 0)
+	    foreground_queue_background_pixel(index - 1, candidate, background,
+					      queue, &tail);
+	if (x + 1 < source_w)
+	    foreground_queue_background_pixel(index + 1, candidate, background,
+					      queue, &tail);
+	if (y > 0)
+	    foreground_queue_background_pixel(index - source_w, candidate,
+					      background, queue, &tail);
+	if (y + 1 < source_h)
+	    foreground_queue_background_pixel(index + source_w, candidate,
+					      background, queue, &tail);
+    }
+}
+
+static void
+draw_atlas_tile_foreground_pixel(int dx, int dy, int x, int y,
+				 int source_w, int source_h,
+				 ALLEGRO_COLOR pixel)
+{
+    float scale_x;
+    float scale_y;
+    float left;
+    float top;
+    float right;
+    float bottom;
+
+    scale_x = (float)ROGUE_TILE_DRAW_SIZE / (float)source_w;
+    scale_y = (float)ROGUE_TILE_DRAW_SIZE / (float)source_h;
+    left = (float)dx + (float)x * scale_x;
+    top = (float)dy + (float)y * scale_y;
+    right = (float)dx + (float)(x + 1) * scale_x;
+    bottom = (float)dy + (float)(y + 1) * scale_y;
+    al_draw_filled_rectangle(left, top, right + 0.01f, bottom + 0.01f,
+			     pixel);
+}
+
+static void
+draw_atlas_tile_foreground(int atlas_index, int dx, int dy)
+{
+    ALLEGRO_COLOR pixel;
+    unsigned char *candidate;
+    unsigned char *background;
+    int *queue;
+    int columns;
+    int source_w, source_h;
+    int sx, sy;
+    int pixel_count;
+    int x, y;
+    int index;
+    unsigned char r, g, b, a;
+
+    if (atlas == NULL || atlas_index < 0)
+	return;
+
+    columns = rogue_tilepack_columns();
+    source_w = rogue_tilepack_source_width();
+    source_h = rogue_tilepack_source_height();
+    if (columns <= 0 || source_w <= 0 || source_h <= 0)
+    {
+	draw_atlas_tile(atlas_index, dx, dy);
+	return;
+    }
+
+    sx = (atlas_index % columns) * source_w;
+    sy = (atlas_index / columns) * source_h;
+    pixel_count = source_w * source_h;
+    candidate = (unsigned char *)calloc(pixel_count, sizeof(unsigned char));
+    background = (unsigned char *)calloc(pixel_count, sizeof(unsigned char));
+    queue = (int *)malloc(pixel_count * sizeof(int));
+    if (candidate == NULL || background == NULL || queue == NULL)
+    {
+	free(candidate);
+	free(background);
+	free(queue);
+	draw_atlas_tile(atlas_index, dx, dy);
+	return;
+    }
+
+    for (y = 0; y < source_h; y++)
+	for (x = 0; x < source_w; x++)
+	{
+	    index = y * source_w + x;
+	    pixel = al_get_pixel(atlas, sx + x, sy + y);
+	    al_unmap_rgba(pixel, &r, &g, &b, &a);
+	    candidate[index] = foreground_background_pixel(r, g, b, a);
+	}
+    foreground_mark_edge_background(source_w, source_h, candidate,
+				    background, queue);
+
+    for (y = 0; y < source_h; y++)
+	for (x = 0; x < source_w; x++)
+	{
+	    index = y * source_w + x;
+	    pixel = al_get_pixel(atlas, sx + x, sy + y);
+	    al_unmap_rgba(pixel, &r, &g, &b, &a);
+	    if (foreground_pixel_visible(r, g, b, a)
+		&& !background[index])
+		draw_atlas_tile_foreground_pixel(dx, dy, x, y,
+						 source_w, source_h, pixel);
+	}
+
+    free(candidate);
+    free(background);
+    free(queue);
+}
+
 static int
 resolved_cell_index(const ROGUE_TILE_CELL *cell)
 {
@@ -2442,6 +3643,38 @@ resolved_underlay_index(const ROGUE_TILE_CELL *cell)
     if (cell == NULL)
 	return -1;
     return rogue_tilepack_lookup_index(cell->under_role, cell->under_atlas_index);
+}
+
+static int
+default_floor_index(void)
+{
+    return rogue_tilepack_lookup_index("terrain.floor", 1378);
+}
+
+static void
+draw_default_floor_underlay(int dx, int dy)
+{
+    int underlay_index;
+
+    underlay_index = default_floor_index();
+    if (underlay_index >= 0 && atlas != NULL)
+	draw_atlas_tile_seamless(underlay_index, dx, dy);
+}
+
+static void
+draw_cell_underlay_or_default(ROGUE_TILE_CELL *cell, int dx, int dy)
+{
+    int underlay_index;
+
+    underlay_index = resolved_underlay_index(cell);
+    if (cell != NULL && cell->has_underlay && underlay_index >= 0
+	&& atlas != NULL && atlas_tile_is_visible(underlay_index))
+    {
+	draw_atlas_tile_for_role(underlay_index, cell->under_role, dx, dy);
+	return;
+    }
+
+    draw_default_floor_underlay(dx, dy);
 }
 
 static bool
@@ -2593,8 +3826,14 @@ draw_tile_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
     atlas_index = resolved_cell_index(cell);
     underlay_index = resolved_underlay_index(cell);
 
-    if (cell->has_underlay && underlay_index >= 0 && atlas != NULL)
-	draw_atlas_tile(underlay_index, dx, dy);
+    if (cell->layer == ROGUE_TILE_ACTOR ||
+	cell->layer == ROGUE_TILE_OBJECT)
+	draw_cell_underlay_or_default(cell, dx, dy);
+    else if (cell->has_underlay && underlay_index >= 0 && atlas != NULL)
+	draw_atlas_tile_for_role(underlay_index, cell->under_role, dx, dy);
+
+    if (cell->layer == ROGUE_TILE_ACTOR)
+	return;
 
     if (cell->layer == ROGUE_TILE_EMPTY)
     {
@@ -2604,16 +3843,54 @@ draw_tile_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
 	return;
     }
 
-    if (atlas_index < 0 || atlas == NULL)
+    if (atlas_index < 0 || atlas == NULL
+	|| (cell->layer == ROGUE_TILE_ACTOR
+	    && !atlas_tile_is_visible(atlas_index)))
     {
-	fallback = al_map_rgb(100, 20, 60);
-	al_draw_filled_rectangle(dx, dy, dx + ROGUE_TILE_DRAW_SIZE,
-				 dy + ROGUE_TILE_DRAW_SIZE, fallback);
-	draw_glyph_cell(screen_x, screen_y, cell);
+	if (cell->has_underlay)
+	    draw_glyph_foreground_cell(screen_x, screen_y, cell);
+	else
+	{
+	    fallback = al_map_rgb(100, 20, 60);
+	    al_draw_filled_rectangle(dx, dy, dx + ROGUE_TILE_DRAW_SIZE,
+				     dy + ROGUE_TILE_DRAW_SIZE, fallback);
+	    draw_glyph_cell(screen_x, screen_y, cell);
+	}
 	return;
     }
 
-    draw_atlas_tile(atlas_index, dx, dy);
+    if (cell->layer == ROGUE_TILE_OBJECT)
+	return;
+
+    draw_atlas_tile_for_role(atlas_index, cell->role, dx, dy);
+}
+
+static void
+draw_object_foreground_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
+{
+    int dx, dy;
+    int atlas_index;
+
+    if (cell == NULL || cell->layer != ROGUE_TILE_OBJECT)
+	return;
+
+    if (settings.view_mode == ROGUE_ALLEGRO_VIEW_GLYPHS)
+    {
+	draw_glyph_foreground_cell(screen_x, screen_y, cell);
+	return;
+    }
+
+    atlas_index = resolved_cell_index(cell);
+    if (atlas_index < 0 || atlas == NULL || !atlas_tile_is_visible(atlas_index))
+    {
+	draw_glyph_foreground_cell(screen_x, screen_y, cell);
+	return;
+    }
+
+    dx = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE;
+    dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
+    draw_cell_underlay_or_default(cell, dx, dy);
+    draw_atlas_tile_foreground(atlas_index, dx, dy);
 }
 
 static void
@@ -2632,7 +3909,7 @@ draw_actor_foreground_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
     }
 
     atlas_index = resolved_cell_index(cell);
-    if (atlas_index < 0 || atlas == NULL)
+    if (atlas_index < 0 || atlas == NULL || !atlas_tile_is_visible(atlas_index))
     {
 	draw_glyph_foreground_cell(screen_x, screen_y, cell);
 	return;
@@ -2640,7 +3917,8 @@ draw_actor_foreground_cell(int screen_x, int screen_y, ROGUE_TILE_CELL *cell)
 
     dx = render_origin_x + screen_x * ROGUE_TILE_DRAW_SIZE;
     dy = render_origin_y + screen_y * ROGUE_TILE_DRAW_SIZE;
-    draw_atlas_tile(atlas_index, dx, dy);
+    draw_cell_underlay_or_default(cell, dx, dy);
+    draw_atlas_tile_foreground(atlas_index, dx, dy);
 }
 
 static void
@@ -2669,6 +3947,10 @@ draw_enemy_health_overlay_cell(int screen_x, int screen_y,
     int fill_w;
     int text_w;
     int play_w;
+
+#ifdef ROGUE_ANDROID
+    return;
+#endif
 
     if (!settings.enemy_health_overlay_enabled)
 	return;
@@ -2793,6 +4075,7 @@ draw_stylized_status_line(int width, int y, int armor,
     char str_text[24];
     char arm_text[24];
     char exp_text[32];
+    char vol_text[24];
     int total_width;
     int x;
     ALLEGRO_COLOR hp_color;
@@ -2805,13 +4088,17 @@ draw_stylized_status_line(int width, int y, int armor,
     snprintf(arm_text, sizeof(arm_text), "%d", armor);
     snprintf(exp_text, sizeof(exp_text), "%d/%ld", status->exp_level,
 	     status->exp_points);
+    snprintf(vol_text, sizeof(vol_text), "%d%%", status->volume_percent);
 
     total_width = status_piece_width("Level ", level_text)
 		  + status_piece_width("Gold ", gold_text)
 		  + status_piece_width("HP ", hp_text)
-		  + status_piece_width("ST ", str_text)
 		  + status_piece_width("Arm ", arm_text)
 		  + status_piece_width("Exp ", exp_text);
+    if (status->has_extended_stats)
+	total_width += status_piece_width("Vol ", vol_text);
+    else
+	total_width += status_piece_width("ST ", str_text);
     if (hungry_name != NULL && hungry_name[0] != '\0')
 	total_width += status_piece_width("", hungry_name);
 
@@ -2834,14 +4121,25 @@ draw_stylized_status_line(int width, int y, int armor,
     x = draw_status_piece("Gold ", gold_text, x, y,
 			  al_map_rgb(238, 205, 112));
     x = draw_status_piece("HP ", hp_text, x, y, hp_color);
-    x = draw_status_piece("ST ", str_text, x, y,
-			  al_map_rgb(228, 154, 83));
+    if (!status->has_extended_stats)
+	x = draw_status_piece("ST ", str_text, x, y,
+			      al_map_rgb(228, 154, 83));
     x = draw_status_piece("Arm ", arm_text, x, y,
 			  al_map_rgb(174, 190, 210));
     x = draw_status_piece("Exp ", exp_text, x, y,
 			  al_map_rgb(174, 154, 238));
+    if (status->has_extended_stats)
+	x = draw_status_piece("Vol ", vol_text, x, y,
+			      al_map_rgb(130, 205, 205));
     if (hungry_name != NULL && hungry_name[0] != '\0')
 	draw_status_piece("", hungry_name, x, y, al_map_rgb(228, 154, 83));
+}
+
+static void
+format_ability_pair(char *out, size_t out_size, unsigned int effective,
+		    unsigned int base)
+{
+    snprintf(out, out_size, "%u(%u)", effective, base);
 }
 
 static void
@@ -2852,9 +4150,11 @@ draw_status(void)
     int h;
     int armor;
     char line[256];
+    char second_status_line[256];
     int line_height;
     int first_line_y;
     int second_line_y;
+    int footer_line_y;
     static char *state_name[] = { "", "Hungry", "Weak", "Faint" };
     ROGUE_VARIANT_STATUS status;
 
@@ -2868,17 +4168,47 @@ draw_status(void)
     line_height = al_get_font_line_height(font);
     first_line_y = y + 8;
     second_line_y = first_line_y + line_height + 6;
+    footer_line_y = second_line_y;
+    second_status_line[0] = '\0';
 
     al_draw_filled_rectangle(0, y, w, h,
 			     al_map_rgb(5, 5, 8));
     al_draw_line(0, y, w, y, al_map_rgb(80, 80, 90), 1);
 
-    snprintf(line, sizeof(line),
-	     "Level:%d  Gold:%d  HP:%d(%d)  ST:%u  Arm:%d  Exp:%d/%ld %s",
-	     status.dungeon_level, status.gold, status.hp,
-	     status.max_hit_points,
-	     status.strength, armor, status.exp_level, status.exp_points,
-	     state_name[status.hungry_state]);
+    if (status.has_extended_stats)
+    {
+	char str_text[24];
+	char dex_text[24];
+	char wis_text[24];
+	char con_text[24];
+
+	format_ability_pair(str_text, sizeof(str_text), status.strength,
+			    status.strength_base);
+	format_ability_pair(dex_text, sizeof(dex_text), status.dexterity,
+			    status.dexterity_base);
+	format_ability_pair(wis_text, sizeof(wis_text), status.wisdom,
+			    status.wisdom_base);
+	format_ability_pair(con_text, sizeof(con_text), status.constitution,
+			    status.constitution_base);
+	snprintf(line, sizeof(line),
+		 "Level:%d  Gold:%d  HP:%d(%d)  Arm:%d  Exp:%d/%ld  Vol:%d%% %s",
+		 status.dungeon_level, status.gold, status.hp,
+		 status.max_hit_points, armor, status.exp_level,
+		 status.exp_points, status.volume_percent,
+		 state_name[status.hungry_state]);
+	snprintf(second_status_line, sizeof(second_status_line),
+		 "Str:%s  Dex:%s  Wis:%s  Con:%s  Carry:%d(%d)",
+		 str_text, dex_text, wis_text, con_text,
+		 status.carry_weight, status.carry_capacity);
+	footer_line_y = second_line_y + line_height + 4;
+    }
+    else
+	snprintf(line, sizeof(line),
+		 "Level:%d  Gold:%d  HP:%d(%d)  ST:%u  Arm:%d  Exp:%d/%ld %s",
+		 status.dungeon_level, status.gold, status.hp,
+		 status.max_hit_points,
+		 status.strength, armor, status.exp_level, status.exp_points,
+		 state_name[status.hungry_state]);
 
     if (settings.stylized_bottom_bar_enabled)
 	draw_stylized_status_line(w, first_line_y, armor,
@@ -2887,15 +4217,19 @@ draw_status(void)
     else
 	al_draw_text(font, al_map_rgb(230, 230, 220), w / 2,
 		     first_line_y, ALLEGRO_ALIGN_CENTRE, line);
+    if (second_status_line[0] != '\0')
+	al_draw_text(font, al_map_rgb(210, 220, 225), w / 2,
+		     second_line_y, ALLEGRO_ALIGN_CENTRE,
+		     second_status_line);
     if (!settings.side_panel_log_enabled)
-	al_draw_text(font, al_map_rgb(180, 200, 255), 8, second_line_y,
+	al_draw_text(font, al_map_rgb(180, 200, 255), 8, footer_line_y,
 		     0, status.message);
     if (prompt_active)
 	al_draw_text(font, al_map_rgb(245, 226, 170), w - 8,
-		     second_line_y, ALLEGRO_ALIGN_RIGHT, prompt_text);
+		     footer_line_y, ALLEGRO_ALIGN_RIGHT, prompt_text);
     else
 	al_draw_text(font, al_map_rgb(160, 160, 160), w - 8,
-		     second_line_y, ALLEGRO_ALIGN_RIGHT,
+		     footer_line_y, ALLEGRO_ALIGN_RIGHT,
 		     "F10 tiles  F11 full  F12 settings");
 }
 
@@ -3136,6 +4470,34 @@ next_wrap_len(const char *text, int start, int max_chars)
 	if (text[i] == '.')
 	    return i - start + 1;
 
+    if (end >= len)
+	return len - start;
+
+    split = end;
+    while (split > start && !isspace((unsigned char) text[split]))
+	split--;
+    if (split <= start)
+	split = end;
+
+    return split - start;
+}
+
+static int
+next_space_wrap_len(const char *text, int start, int max_chars)
+{
+    int len;
+    int end;
+    int split;
+
+    len = (int) strlen(text);
+    while (start < len && isspace((unsigned char) text[start]))
+	start++;
+    if (start >= len)
+	return 0;
+
+    end = start + max_chars;
+    if (end > len)
+	end = len;
     if (end >= len)
 	return len - start;
 
@@ -3420,6 +4782,272 @@ draw_side_panel(void)
 	al_draw_text(font, muted, x + 18, y, 0, "No messages yet");
 }
 
+static int
+text_overlay_visible_line_capacity(void)
+{
+    int line_height;
+    int max_lines;
+
+    line_height = al_get_font_line_height(font);
+    if (line_height < 1)
+	line_height = ROGUE_SMALL_FONT_SIZE;
+
+    if (text_overlay_fill_vertical)
+    {
+	max_lines = (display_height() - 160) / (line_height + 2);
+	if (max_lines < 4)
+	    max_lines = 4;
+	return max_lines;
+    }
+
+    return 14;
+}
+
+#ifdef ROGUE_ANDROID
+static int
+mobile_text_overlay_wrap_chars(void)
+{
+    int char_width;
+    int available;
+    int wrap_chars;
+
+    if (!text_overlay_fullscreen)
+	return TEXT_OVERLAY_WRAP_CHARS;
+
+    char_width = font != NULL ? al_get_text_width(font, "M") : 16;
+    if (char_width < 1)
+	char_width = 16;
+    available = display_width() - 48;
+    if (available < char_width)
+	available = char_width;
+    wrap_chars = available / char_width;
+    if (wrap_chars < 32)
+	wrap_chars = 32;
+    if (wrap_chars > TEXT_OVERLAY_WRAP_CHARS)
+	wrap_chars = TEXT_OVERLAY_WRAP_CHARS;
+    return wrap_chars;
+}
+
+static void
+draw_text_overlay_close_button(int x, int y, int w)
+{
+    int size;
+    int pad;
+    ALLEGRO_FONT *label_font;
+
+    size = 52;
+    pad = 14;
+    label_font = small_font != NULL ? small_font : font;
+
+    text_overlay_close_rect.x = x + w - size - pad;
+    text_overlay_close_rect.y = y + pad;
+    text_overlay_close_rect.w = size;
+    text_overlay_close_rect.h = size;
+
+    al_draw_filled_rectangle(text_overlay_close_rect.x,
+			     text_overlay_close_rect.y,
+			     text_overlay_close_rect.x + text_overlay_close_rect.w,
+			     text_overlay_close_rect.y + text_overlay_close_rect.h,
+			     al_map_rgba(8, 10, 18, 225));
+    al_draw_rectangle(text_overlay_close_rect.x + 0.5,
+		      text_overlay_close_rect.y + 0.5,
+		      text_overlay_close_rect.x + text_overlay_close_rect.w - 0.5,
+		      text_overlay_close_rect.y + text_overlay_close_rect.h - 0.5,
+		      al_map_rgb(168, 168, 176), 2);
+    al_draw_text(label_font, al_map_rgb(244, 244, 246),
+		 text_overlay_close_rect.x + text_overlay_close_rect.w / 2,
+		 text_overlay_close_rect.y
+		     + (text_overlay_close_rect.h
+			- al_get_font_line_height(label_font)) / 2,
+		 ALLEGRO_ALIGN_CENTRE, "X");
+}
+
+static bool
+mobile_text_overlay_close_hit(int x, int y)
+{
+    return text_overlay_close_rect.w > 0
+	   && text_overlay_close_rect.h > 0
+	   && x >= text_overlay_close_rect.x
+	   && x < text_overlay_close_rect.x + text_overlay_close_rect.w
+	   && y >= text_overlay_close_rect.y
+	   && y < text_overlay_close_rect.y + text_overlay_close_rect.h;
+}
+
+static void
+draw_text_overlay_chapters_button(int x, int y)
+{
+    int button_w;
+    int button_h;
+    int pad;
+    ALLEGRO_FONT *label_font;
+
+    button_w = 176;
+    button_h = 52;
+    pad = 14;
+    label_font = small_font != NULL ? small_font : font;
+
+    if (!text_overlay_fullscreen || manual_chapter_count <= 0)
+    {
+	text_overlay_chapters_rect.x = 0;
+	text_overlay_chapters_rect.y = 0;
+	text_overlay_chapters_rect.w = 0;
+	text_overlay_chapters_rect.h = 0;
+	return;
+    }
+
+    text_overlay_chapters_rect.x = x + pad;
+    text_overlay_chapters_rect.y = y + pad;
+    text_overlay_chapters_rect.w = button_w;
+    text_overlay_chapters_rect.h = button_h;
+
+    al_draw_filled_rectangle(text_overlay_chapters_rect.x,
+			     text_overlay_chapters_rect.y,
+			     text_overlay_chapters_rect.x
+				 + text_overlay_chapters_rect.w,
+			     text_overlay_chapters_rect.y
+				 + text_overlay_chapters_rect.h,
+			     al_map_rgba(8, 10, 18, 225));
+    al_draw_rectangle(text_overlay_chapters_rect.x + 0.5,
+		      text_overlay_chapters_rect.y + 0.5,
+		      text_overlay_chapters_rect.x
+			  + text_overlay_chapters_rect.w - 0.5,
+		      text_overlay_chapters_rect.y
+			  + text_overlay_chapters_rect.h - 0.5,
+		      al_map_rgb(168, 168, 176), 2);
+    al_draw_text(label_font, al_map_rgb(244, 244, 246),
+		 text_overlay_chapters_rect.x
+		     + text_overlay_chapters_rect.w / 2,
+		 text_overlay_chapters_rect.y
+		     + (text_overlay_chapters_rect.h
+			- al_get_font_line_height(label_font)) / 2,
+		 ALLEGRO_ALIGN_CENTRE, "CHAPTERS");
+}
+
+static bool
+mobile_text_overlay_chapters_hit(int x, int y)
+{
+    return text_overlay_chapters_rect.w > 0
+	   && text_overlay_chapters_rect.h > 0
+	   && x >= text_overlay_chapters_rect.x
+	   && x < text_overlay_chapters_rect.x + text_overlay_chapters_rect.w
+	   && y >= text_overlay_chapters_rect.y
+	   && y < text_overlay_chapters_rect.y + text_overlay_chapters_rect.h;
+}
+
+static void
+mobile_text_overlay_scroll_begin(int touch_id, int y, int touched_line)
+{
+    mobile_text_overlay_touch_id = touch_id;
+    mobile_text_overlay_touch_start_y = y;
+    mobile_text_overlay_touch_start_scroll = text_overlay_scroll;
+    mobile_text_overlay_touch_line = touched_line;
+    mobile_text_overlay_touch_scrolled = FALSE;
+}
+
+static bool
+mobile_text_overlay_scroll_move(int touch_id, int y)
+{
+    int line_height;
+    int delta_pixels;
+    int delta_lines;
+
+    if (touch_id != mobile_text_overlay_touch_id)
+	return FALSE;
+
+    line_height = al_get_font_line_height(font) + 2;
+    if (line_height < 1)
+	line_height = ROGUE_SMALL_FONT_SIZE + 2;
+    delta_pixels = mobile_text_overlay_touch_start_y - y;
+    if (abs(delta_pixels) >= ROGUE_MOBILE_ACTION_SCROLL_THRESHOLD)
+	mobile_text_overlay_touch_scrolled = TRUE;
+    delta_lines = delta_pixels / line_height;
+    text_overlay_scroll = mobile_text_overlay_touch_start_scroll + delta_lines;
+    return TRUE;
+}
+
+static bool
+mobile_text_overlay_scroll_end(int touch_id, bool *was_scrolled,
+			       int *touched_line)
+{
+    if (touch_id != mobile_text_overlay_touch_id)
+	return FALSE;
+
+    if (was_scrolled != NULL)
+	*was_scrolled = mobile_text_overlay_touch_scrolled;
+    if (touched_line != NULL)
+	*touched_line = mobile_text_overlay_touch_line;
+    mobile_text_overlay_touch_id = -1;
+    mobile_text_overlay_touch_line = -1;
+    mobile_text_overlay_touch_scrolled = FALSE;
+    return TRUE;
+}
+
+static int
+mobile_text_overlay_pick_line_at(int x, int y)
+{
+    int window_w;
+    int window_h;
+    int overlay_x;
+    int overlay_y;
+    int overlay_w;
+    int overlay_h;
+    int line_height;
+    int visible_lines;
+    int text_y;
+    int line_offset;
+    int line_index;
+
+    window_w = display_width();
+    window_h = display_height();
+    line_height = al_get_font_line_height(font);
+    visible_lines = text_overlay_line_count;
+    if (visible_lines > text_overlay_visible_line_capacity())
+	visible_lines = text_overlay_visible_line_capacity();
+    if (visible_lines < 1)
+	visible_lines = 1;
+
+    overlay_w = window_w - 160;
+    if (overlay_w < 520)
+	overlay_w = window_w - 48;
+    if (overlay_w > window_w - 48)
+	overlay_w = window_w - 48;
+    if (text_overlay_fullscreen)
+    {
+	overlay_x = 0;
+	overlay_y = mobile_top_safe_height();
+	overlay_w = window_w;
+	overlay_h = window_h - overlay_y;
+    }
+    else
+    {
+	if (text_overlay_fill_vertical)
+	{
+	    overlay_h = window_h - 48;
+	    if (overlay_h < 220)
+		overlay_h = window_h - 16;
+	}
+	else
+	    overlay_h = 96 + visible_lines * (line_height + 2);
+	overlay_x = (window_w - overlay_w) / 2;
+	overlay_y = (window_h - overlay_h) / 2;
+    }
+
+    (void) overlay_h;
+    if (x < overlay_x + 16 || x >= overlay_x + overlay_w - 16)
+	return -1;
+    text_y = overlay_y + 72;
+    if (y < text_y)
+	return -1;
+    line_offset = (y - text_y) / (line_height + 2);
+    if (line_offset < 0 || line_offset >= visible_lines)
+	return -1;
+    line_index = text_overlay_scroll + line_offset;
+    if (line_index < 0 || line_index >= text_overlay_line_count)
+	return -1;
+    return line_index;
+}
+#endif
+
 static void
 draw_text_overlay(void)
 {
@@ -3430,18 +5058,31 @@ draw_text_overlay(void)
     int line_height;
     int visible_lines;
     int text_y;
+    int title_x;
     char more_text[64];
     ALLEGRO_COLOR bg, border, title, text, muted, selected_bg;
 
     if (!text_overlay_active)
+    {
+#ifdef ROGUE_ANDROID
+	text_overlay_close_rect.x = 0;
+	text_overlay_close_rect.y = 0;
+	text_overlay_close_rect.w = 0;
+	text_overlay_close_rect.h = 0;
+	text_overlay_chapters_rect.x = 0;
+	text_overlay_chapters_rect.y = 0;
+	text_overlay_chapters_rect.w = 0;
+	text_overlay_chapters_rect.h = 0;
+#endif
 	return;
+    }
 
     window_w = display_width();
     window_h = display_height();
     line_height = al_get_font_line_height(font);
     visible_lines = text_overlay_line_count;
-    if (visible_lines > 14)
-	visible_lines = 14;
+    if (visible_lines > text_overlay_visible_line_capacity())
+	visible_lines = text_overlay_visible_line_capacity();
     if (visible_lines < 1)
 	visible_lines = 1;
     if (text_overlay_selectable)
@@ -3477,9 +5118,28 @@ draw_text_overlay(void)
 	w = window_w - 48;
     if (w > window_w - 48)
 	w = window_w - 48;
-    h = 96 + visible_lines * (line_height + 2);
-    x = (window_w - w) / 2;
-    y = (window_h - h) / 2;
+#ifdef ROGUE_ANDROID
+    if (text_overlay_fullscreen)
+    {
+	x = 0;
+	y = mobile_top_safe_height();
+	w = window_w;
+	h = window_h - y;
+    }
+    else
+#endif
+    {
+	if (text_overlay_fill_vertical)
+	{
+	    h = window_h - 48;
+	    if (h < 220)
+		h = window_h - 16;
+	}
+	else
+	    h = 96 + visible_lines * (line_height + 2);
+	x = (window_w - w) / 2;
+	y = (window_h - h) / 2;
+    }
 
     bg = al_map_rgba(8, 9, 13, 244);
     border = al_map_rgb(120, 126, 150);
@@ -3491,7 +5151,16 @@ draw_text_overlay(void)
     al_draw_filled_rectangle(x, y, x + w, y + h, bg);
     al_draw_rectangle(x + 0.5, y + 0.5, x + w - 0.5, y + h - 0.5,
 		      border, 2);
-    al_draw_text(font, title, x + 24, y + 18, 0, text_overlay_title);
+    title_x = x + 24;
+#ifdef ROGUE_ANDROID
+    if (text_overlay_fullscreen && manual_chapter_count > 0)
+	title_x = x + 210;
+#endif
+    al_draw_text(font, title, title_x, y + 18, 0, text_overlay_title);
+#ifdef ROGUE_ANDROID
+    draw_text_overlay_chapters_button(x, y);
+    draw_text_overlay_close_button(x, y, w);
+#endif
     al_draw_line(x + 24, y + 58, x + w - 24, y + 58,
 		 al_map_rgb(70, 72, 88), 1);
 
@@ -3569,13 +5238,615 @@ draw_death_overlay(void)
 		 ALLEGRO_ALIGN_CENTRE, death_prompt);
 }
 
+#ifdef ROGUE_ANDROID
+static void
+build_mobile_layout(void)
+{
+    int margin;
+    int controls_top;
+    int controls_h;
+    int dpad_w;
+    int dpad_h;
+    int dpad_x;
+    int dpad_y;
+    int action_x;
+    int action_w;
+    ROGUE_VARIANT_ACTION_CONTEXT variant_context;
+    ROGUE_MOBILE_ACTION_CONTEXT mobile_context;
+
+    margin = mobile_margin();
+    controls_top = mobile_controls_top();
+    controls_h = mobile_movement_height();
+    dpad_h = controls_h;
+    dpad_w = (dpad_h * 311) / 287;
+    if (dpad_w > display_width() * 45 / 100)
+    {
+	dpad_w = display_width() * 45 / 100;
+	dpad_h = (dpad_w * 287) / 311;
+    }
+    dpad_x = margin;
+    dpad_y = controls_top + (controls_h - dpad_h) / 2;
+    action_x = dpad_x + dpad_w + mobile_gap();
+    action_w = display_width() - action_x - margin;
+    if (action_w < display_width() / 2)
+	action_w = display_width() / 2;
+    if (settings.mobile_controls_swapped)
+    {
+	action_x = margin;
+	action_w = display_width() - dpad_w - (margin * 2) - mobile_gap();
+	if (action_w < display_width() / 2)
+	    action_w = display_width() / 2;
+	dpad_x = action_x + action_w + mobile_gap();
+    }
+
+    rogue_mobile_layout_build(&mobile_layout, dpad_x, dpad_y, dpad_w, dpad_h);
+    rogue_variant_action_context(&variant_context);
+    memset(&mobile_context, 0, sizeof(mobile_context));
+    mobile_context.on_stairs = variant_context.on_stairs ? 1 : 0;
+    mobile_context.on_object = variant_context.on_object ? 1 : 0;
+    mobile_context.in_trading_post =
+	variant_context.in_trading_post ? 1 : 0;
+    mobile_context.on_magic_pool = variant_context.on_magic_pool ? 1 : 0;
+    rogue_mobile_action_bar_build_with_context(&mobile_layout, action_x, dpad_y,
+					       action_w, dpad_h,
+					       mobile_action_scroll_y,
+					       rogue_variant_current()->id,
+					       &mobile_context);
+    mobile_action_scroll_y =
+	rogue_mobile_action_scroll_clamp(&mobile_layout, mobile_action_scroll_y);
+}
+
+static void
+draw_mobile_panel(int x, int y, int w, int h)
+{
+    al_draw_filled_rectangle(x, y, x + w, y + h,
+			     al_map_rgb(5, 6, 14));
+    al_draw_rectangle(x + 0.5, y + 0.5, x + w - 0.5, y + h - 0.5,
+		      al_map_rgb(168, 168, 176), 2);
+}
+
+static void
+draw_mobile_stats_line(ALLEGRO_FONT *ui_font, const char *line, int y,
+		       ALLEGRO_COLOR color)
+{
+    al_draw_text(ui_font, color, 22, y, 0, line);
+}
+
+static void
+format_stat_pair(char *out, size_t out_size, unsigned int effective,
+		 unsigned int base)
+{
+    snprintf(out, out_size, "%u(%u)", effective, base);
+}
+
+static void
+draw_mobile_stats(void)
+{
+    ROGUE_VARIANT_STATUS status;
+    ALLEGRO_FONT *ui_font;
+    char line[128];
+    char second_line[128];
+    char third_line[128];
+    int y;
+    int h;
+    int hp_percent;
+    int line_h;
+    static char *state_name[] = { "", "Hungry", "Weak", "Faint" };
+
+    rogue_variant_status(&status);
+    ui_font = (mobile_hud_font != NULL) ? mobile_hud_font : font;
+    line_h = al_get_font_line_height(ui_font);
+    hp_percent = 0;
+    if (status.max_hit_points > 0)
+	hp_percent = (status.hp * 100) / status.max_hit_points;
+    hp_percent = clamp_int(hp_percent, 0, 100);
+
+    y = mobile_top_safe_height();
+    h = mobile_stats_height();
+    draw_mobile_panel(0, y, display_width(), h);
+
+    if (status.has_extended_stats)
+    {
+	char str_text[24];
+	char dex_text[24];
+	char wis_text[24];
+	char con_text[24];
+
+	format_stat_pair(str_text, sizeof(str_text), status.strength,
+			 status.strength_base);
+	format_stat_pair(dex_text, sizeof(dex_text), status.dexterity,
+			 status.dexterity_base);
+	format_stat_pair(wis_text, sizeof(wis_text), status.wisdom,
+			 status.wisdom_base);
+	format_stat_pair(con_text, sizeof(con_text), status.constitution,
+			 status.constitution_base);
+	snprintf(line, sizeof(line),
+		 "LV:%d [%d%%]  HP:%d/%d  DEF:%d  G:%d",
+		 status.dungeon_level, hp_percent, status.hp,
+		 status.max_hit_points, status.armor, status.gold);
+	snprintf(second_line, sizeof(second_line),
+		 "STR:%s  " "DEX:%s  WIS:%s  CON:%s",
+		 str_text, dex_text, wis_text, con_text);
+	snprintf(third_line, sizeof(third_line),
+		 "CARRY:%d/%d  VOL:%d%%  XP:%ld",
+		 status.carry_weight, status.carry_capacity,
+		 status.volume_percent, status.exp_points);
+	if (status.hungry_state > 0 && status.hungry_state < 4)
+	    snprintf(third_line + strlen(third_line),
+		     sizeof(third_line) - strlen(third_line),
+		     "  %s", state_name[status.hungry_state]);
+	draw_mobile_stats_line(ui_font, line, y + 14,
+			       al_map_rgb(244, 244, 246));
+	draw_mobile_stats_line(ui_font, second_line, y + 14 + line_h,
+			       al_map_rgb(224, 232, 246));
+	draw_mobile_stats_line(ui_font, third_line, y + 14 + line_h * 2,
+			       al_map_rgb(204, 214, 232));
+	return;
+    }
+
+    snprintf(line, sizeof(line),
+	     "LV:%d [%d%%]  HP:%d/%d  STR:%u  DEF:%d  G:%d",
+	     status.dungeon_level, hp_percent, status.hp,
+	     status.max_hit_points, status.strength, status.armor,
+	     status.gold);
+    if (al_get_text_width(ui_font, line) > display_width() - 44)
+    {
+	snprintf(line, sizeof(line), "LV:%d HP:%d/%d STR:%u DEF:%d G:%d",
+		 status.dungeon_level, status.hp, status.max_hit_points,
+		 status.strength, status.armor, status.gold);
+	if (al_get_text_width(ui_font, line) > display_width() - 44)
+	    ui_font = font;
+    }
+    snprintf(second_line, sizeof(second_line), "XP:%d/%ld",
+	     status.exp_level, status.exp_points);
+    if (status.hungry_state > 0 && status.hungry_state < 4)
+	snprintf(second_line + strlen(second_line),
+		 sizeof(second_line) - strlen(second_line),
+		 "  %s", state_name[status.hungry_state]);
+    draw_mobile_stats_line(ui_font, line, y + 14, al_map_rgb(244, 244, 246));
+    draw_mobile_stats_line(ui_font, second_line, y + 14 + line_h,
+			   al_map_rgb(204, 214, 232));
+}
+
+static int
+mobile_log_visible_lines(int line_h)
+{
+    int visible_lines;
+
+    if (line_h < 1)
+	line_h = ROGUE_SMALL_FONT_SIZE;
+    visible_lines = (mobile_log_height() - 16) / (line_h + 2);
+    if (visible_lines < ROGUE_MOBILE_LOG_MIN_VISIBLE_LINES)
+	visible_lines = ROGUE_MOBILE_LOG_MIN_VISIBLE_LINES;
+    return visible_lines;
+}
+
+static int
+mobile_log_scroll_max(int visible_lines)
+{
+    int max_scroll;
+
+    max_scroll = message_log_count - visible_lines;
+    if (max_scroll < 0)
+	max_scroll = 0;
+    return max_scroll;
+}
+
+static int
+mobile_log_scroll_clamp(int scroll_y, int visible_lines)
+{
+    int max_scroll;
+
+    max_scroll = mobile_log_scroll_max(visible_lines);
+    if (scroll_y < 0)
+	scroll_y = 0;
+    if (scroll_y > max_scroll)
+	scroll_y = max_scroll;
+    return scroll_y;
+}
+
+static bool
+mobile_log_index_at(int x, int y)
+{
+    int log_x;
+    int log_y;
+    int log_w;
+    int log_h;
+
+    log_x = mobile_margin();
+    log_y = mobile_log_top();
+    log_w = display_width() - mobile_margin() * 2;
+    log_h = mobile_log_height();
+
+    return (bool)(x >= log_x && x < log_x + log_w
+		  && y >= log_y && y < log_y + log_h);
+}
+
+static void
+draw_mobile_log(void)
+{
+    ALLEGRO_FONT *ui_font;
+    int x;
+    int y;
+    int w;
+    int h;
+    int line_h;
+    int max_chars;
+    int char_w;
+    int draw_y;
+    int first;
+    int i;
+    int visible_lines;
+
+    ui_font = (detail_font != NULL) ? detail_font : font;
+    x = mobile_margin();
+    y = mobile_log_top();
+    w = display_width() - mobile_margin() * 2;
+    h = mobile_log_height();
+    line_h = al_get_font_line_height(ui_font);
+    visible_lines = mobile_log_visible_lines(line_h);
+    mobile_log_scroll_y = mobile_log_scroll_clamp(mobile_log_scroll_y,
+						  visible_lines);
+    char_w = al_get_text_width(ui_font, "M");
+    if (char_w <= 0)
+	char_w = 8;
+    max_chars = (w - 18) / char_w;
+    if (max_chars < 8)
+	max_chars = 8;
+
+    draw_mobile_panel(x, y, w, h);
+    first = message_log_count - visible_lines - mobile_log_scroll_y;
+    if (first < 0)
+	first = 0;
+    draw_y = y + 8;
+    if (message_log_count == 0)
+    {
+	al_draw_text(ui_font, al_map_rgb(130, 140, 166), x + 10, draw_y,
+		     0, "No messages yet");
+	return;
+    }
+    for (i = first; i < message_log_count && draw_y < y + h - line_h; i++)
+    {
+	draw_wrapped_log_message(message_log[i], x + 10, &draw_y,
+				 max_chars, line_h,
+				 log_message_color(message_log[i]));
+	draw_y += 2;
+    }
+}
+
+static void
+draw_mobile_action_bar(void)
+{
+    ROGUE_MOBILE_BUTTON *button;
+    ALLEGRO_FONT *ui_font;
+    ALLEGRO_COLOR fill;
+    ALLEGRO_COLOR border;
+    ALLEGRO_COLOR text;
+    int i;
+    const char *split;
+    char first[32];
+    char second[32];
+    int line_h;
+    int clip_x;
+    int clip_y;
+    int clip_w;
+    int clip_h;
+
+    ui_font = (mobile_action_font != NULL) ? mobile_action_font : font;
+    fill = al_map_rgb(10, 13, 28);
+    border = al_map_rgb(166, 166, 172);
+    text = al_map_rgb(242, 242, 244);
+    line_h = al_get_font_line_height(ui_font);
+
+    draw_mobile_panel(mobile_layout.action_viewport.x,
+		      mobile_layout.action_viewport.y,
+		      mobile_layout.action_viewport.w,
+		      mobile_layout.action_viewport.h);
+    al_get_clipping_rectangle(&clip_x, &clip_y, &clip_w, &clip_h);
+    al_set_clipping_rectangle(mobile_layout.action_viewport.x,
+			      mobile_layout.action_viewport.y,
+			      mobile_layout.action_viewport.w,
+			      mobile_layout.action_viewport.h);
+    for (i = 0; i < mobile_layout.action_count; i++)
+    {
+	button = &mobile_layout.actions[i];
+	if (button->rect.y + button->rect.h <= mobile_layout.action_viewport.y ||
+	    button->rect.y >= mobile_layout.action_viewport.y +
+	    mobile_layout.action_viewport.h)
+	    continue;
+	al_draw_filled_rectangle(button->rect.x, button->rect.y,
+				 button->rect.x + button->rect.w,
+				 button->rect.y + button->rect.h, fill);
+	al_draw_rectangle(button->rect.x + 0.5, button->rect.y + 0.5,
+			  button->rect.x + button->rect.w - 0.5,
+			  button->rect.y + button->rect.h - 0.5,
+			  border, 2);
+	split = strchr(button->label, '\n');
+	if (split == NULL)
+	{
+	    al_draw_text(ui_font, text, button->rect.x + button->rect.w / 2,
+			 button->rect.y + button->rect.h / 2 - line_h / 2,
+			 ALLEGRO_ALIGN_CENTRE, button->label);
+	}
+	else
+	{
+	    snprintf(first, sizeof(first), "%.*s",
+		     (int) (split - button->label), button->label);
+	    snprintf(second, sizeof(second), "%s", split + 1);
+	    al_draw_text(ui_font, text, button->rect.x + button->rect.w / 2,
+			 button->rect.y + button->rect.h / 2 - line_h,
+			 ALLEGRO_ALIGN_CENTRE, first);
+	    al_draw_text(ui_font, text, button->rect.x + button->rect.w / 2,
+			 button->rect.y + button->rect.h / 2,
+			 ALLEGRO_ALIGN_CENTRE, second);
+	}
+    }
+    al_set_clipping_rectangle(clip_x, clip_y, clip_w, clip_h);
+}
+
+static void
+draw_mobile_dpad_center_label(const char *label)
+{
+    ROGUE_MOBILE_RECT *center;
+    ALLEGRO_FONT *ui_font;
+    ALLEGRO_COLOR fill;
+    ALLEGRO_COLOR border;
+    ALLEGRO_COLOR text;
+    int line_h;
+
+    if (mobile_layout.button_count <= 4)
+	return;
+
+    center = &mobile_layout.buttons[4].rect;
+    ui_font = (mobile_action_font != NULL) ? mobile_action_font : font;
+    fill = al_map_rgba(6, 8, 18, 238);
+    border = al_map_rgb(168, 168, 176);
+    text = al_map_rgb(244, 244, 246);
+    line_h = al_get_font_line_height(ui_font);
+
+    al_draw_filled_rectangle(center->x + 5, center->y + 5,
+			     center->x + center->w - 5,
+			     center->y + center->h - 5, fill);
+    al_draw_rectangle(center->x + 6.5, center->y + 6.5,
+		      center->x + center->w - 6.5,
+		      center->y + center->h - 6.5, border, 2);
+    al_draw_text(ui_font, text, center->x + center->w / 2,
+		 center->y + center->h / 2 - line_h / 2,
+		 ALLEGRO_ALIGN_CENTRE, label);
+}
+
+static void
+draw_mobile_dpad(void)
+{
+    ROGUE_MOBILE_RECT rect;
+    ALLEGRO_FONT *ui_font;
+    int source_w;
+    int source_h;
+
+    if (mobile_layout.button_count <= 0)
+	return;
+
+    rect.x = mobile_layout.buttons[0].rect.x;
+    rect.y = mobile_layout.buttons[0].rect.y;
+    rect.w = mobile_layout.buttons[2].rect.x + mobile_layout.buttons[2].rect.w
+	     - rect.x;
+    rect.h = mobile_layout.buttons[8].rect.y + mobile_layout.buttons[8].rect.h
+	     - rect.y;
+
+    if (mobile_dpad_bitmap != NULL)
+    {
+	source_w = al_get_bitmap_width(mobile_dpad_bitmap);
+	source_h = al_get_bitmap_height(mobile_dpad_bitmap);
+	al_draw_scaled_bitmap(mobile_dpad_bitmap, 0, 0, source_w, source_h,
+			      rect.x, rect.y, rect.w, rect.h, 0);
+    }
+    else
+	draw_mobile_panel(rect.x, rect.y, rect.w, rect.h);
+
+    ui_font = (mobile_action_font != NULL) ? mobile_action_font : font;
+    (void) ui_font;
+    if (death_overlay_active)
+	draw_mobile_dpad_center_label("ENTER");
+    else
+	draw_mobile_dpad_center_label(text_overlay_active ? "SELECT" : "WAIT");
+}
+
+static void
+draw_mobile_controls(void)
+{
+    build_mobile_layout();
+
+    draw_mobile_stats();
+    draw_mobile_log();
+
+    al_draw_filled_rectangle(0, mobile_controls_top(), display_width(),
+			     display_height(), al_map_rgb(1, 1, 5));
+    draw_mobile_dpad();
+    draw_mobile_action_bar();
+    al_draw_line(0, mobile_controls_top(), display_width(),
+		 mobile_controls_top(), al_map_rgb(168, 168, 176), 2);
+}
+
+static int
+mobile_pinch_slot_for_id(int touch_id)
+{
+    int i;
+
+    for (i = 0; i < 2; i++)
+	if (mobile_pinch_touch_ids[i] == touch_id)
+	    return i;
+    return -1;
+}
+
+static int
+mobile_pinch_distance(void)
+{
+    return abs(mobile_pinch_touch_x[0] - mobile_pinch_touch_x[1])
+	   + abs(mobile_pinch_touch_y[0] - mobile_pinch_touch_y[1]);
+}
+
+static void
+mobile_cancel_action_touch(void)
+{
+    mobile_action_touch_id = -1;
+    mobile_action_touch_index = -1;
+    mobile_action_touch_scrolled = FALSE;
+}
+
+static bool
+mobile_prepare_command_feedback(char command)
+{
+    if (command == 's')
+    {
+	rogue_allegro_record_message("You search.");
+	return TRUE;
+    }
+    return FALSE;
+}
+
+static bool
+handle_mobile_special_action(char command)
+{
+    if (command == ROGUE_MOBILE_COMMAND_MANUALS)
+    {
+	show_manuals_menu();
+	rogue_allegro_render();
+	return TRUE;
+    }
+    if (command == ROGUE_MOBILE_COMMAND_OPTIONS)
+    {
+	show_settings_menu();
+	rogue_allegro_render();
+	return TRUE;
+    }
+    return FALSE;
+}
+
+static bool
+mobile_consume_pinch_render_request(void)
+{
+    double now;
+
+    if (!mobile_pinch_render_requested)
+	return FALSE;
+
+    now = al_get_time();
+    if (mobile_pinch_last_render_at > 0.0
+	&& now - mobile_pinch_last_render_at
+	       < ROGUE_MOBILE_PINCH_RENDER_INTERVAL)
+	return FALSE;
+
+    mobile_pinch_last_render_at = now;
+    mobile_pinch_render_requested = FALSE;
+    return TRUE;
+}
+
+static bool
+mobile_begin_or_update_pinch(void)
+{
+    int distance;
+    int delta;
+    int steps;
+    int target_zoom;
+
+    if (mobile_pinch_touch_ids[0] < 0 || mobile_pinch_touch_ids[1] < 0)
+	return FALSE;
+
+    distance = mobile_pinch_distance();
+    if (distance < 1)
+	distance = 1;
+    if (!mobile_pinch_active)
+    {
+	mobile_pinch_active = TRUE;
+	mobile_pinch_start_distance = distance;
+	mobile_pinch_start_tile_size = ROGUE_TILE_DRAW_SIZE;
+	mobile_pinch_render_requested = TRUE;
+	mobile_pinch_last_render_at = 0.0;
+	mobile_cancel_action_touch();
+	return TRUE;
+    }
+
+    delta = distance - mobile_pinch_start_distance;
+    steps = delta / 24;
+    target_zoom = mobile_pinch_start_tile_size
+		  + steps * ROGUE_TILE_ZOOM_STEP;
+    if (set_zoom(target_zoom))
+	mobile_pinch_render_requested = TRUE;
+    return TRUE;
+}
+
+static bool
+mobile_track_pinch_begin(int touch_id, int x, int y)
+{
+    int slot;
+
+    slot = mobile_pinch_slot_for_id(touch_id);
+    if (slot < 0)
+    {
+	if (mobile_pinch_touch_ids[0] < 0)
+	    slot = 0;
+	else if (mobile_pinch_touch_ids[1] < 0)
+	    slot = 1;
+    }
+    if (slot < 0)
+	return mobile_pinch_active;
+
+    mobile_pinch_touch_ids[slot] = touch_id;
+    mobile_pinch_touch_x[slot] = x;
+    mobile_pinch_touch_y[slot] = y;
+    return mobile_begin_or_update_pinch();
+}
+
+static bool
+mobile_track_pinch_move(int touch_id, int x, int y)
+{
+    int slot;
+
+    slot = mobile_pinch_slot_for_id(touch_id);
+    if (slot < 0)
+	return FALSE;
+
+    mobile_pinch_touch_x[slot] = x;
+    mobile_pinch_touch_y[slot] = y;
+    return mobile_begin_or_update_pinch();
+}
+
+static bool
+mobile_track_pinch_end(int touch_id)
+{
+    int slot;
+    bool was_active;
+
+    slot = mobile_pinch_slot_for_id(touch_id);
+    if (slot < 0)
+	return FALSE;
+
+    was_active = mobile_pinch_active;
+    mobile_pinch_touch_ids[slot] = -1;
+    mobile_pinch_touch_x[slot] = 0;
+    mobile_pinch_touch_y[slot] = 0;
+    mobile_pinch_active = FALSE;
+    mobile_pinch_start_distance = 0;
+    mobile_pinch_start_tile_size = 0;
+    mobile_pinch_render_requested = FALSE;
+    mobile_pinch_last_render_at = 0.0;
+    return was_active;
+}
+#endif
+
 bool
 rogue_allegro_start(bool smoke)
 {
     smoke_mode = smoke;
 
     if (started)
+    {
+#ifdef ROGUE_ANDROID
+	if (stdscr != NULL)
+	    mobile_game_render_ready = TRUE;
+#endif
 	return TRUE;
+    }
 
     init_settings_path();
     load_settings();
@@ -3584,6 +5855,7 @@ rogue_allegro_start(bool smoke)
 	settings.dungeon_gloom_enabled = TRUE;
 	settings.pixel_sharpen_enabled = TRUE;
 	settings.posterize_enabled = TRUE;
+	settings.crt_effect_mode = ROGUE_CRT_DRAMATIC;
     }
 
     if (!al_init())
@@ -3597,6 +5869,14 @@ rogue_allegro_start(bool smoke)
 	allegro_start_error("Allegro keyboard initialization failed.");
 	return FALSE;
     }
+#ifdef ROGUE_ANDROID
+    if (!al_install_touch_input())
+    {
+	allegro_start_error("Allegro touch initialization failed.");
+	return FALSE;
+    }
+    al_install_mouse();
+#endif
 
     al_init_image_addon();
     al_init_font_addon();
@@ -3627,10 +5907,18 @@ rogue_allegro_start(bool smoke)
 
     al_register_event_source(queue, al_get_display_event_source(display));
     al_register_event_source(queue, al_get_keyboard_event_source());
+#ifdef ROGUE_ANDROID
+    al_register_event_source(queue, al_get_touch_input_event_source());
+    if (al_is_mouse_installed())
+	al_register_event_source(queue, al_get_mouse_event_source());
+#endif
 
     rogue_tilepack_load();
     if (!load_current_atlas())
 	return FALSE;
+#ifdef ROGUE_ANDROID
+    load_mobile_dpad_bitmap();
+#endif
 
     font = load_ui_font();
     if (font == NULL)
@@ -3640,9 +5928,47 @@ rogue_allegro_start(bool smoke)
     }
     small_font = load_small_ui_font();
     detail_font = load_detail_ui_font();
+    mobile_hud_font = load_mobile_hud_font();
+    mobile_control_font = load_mobile_control_font();
+    mobile_action_font = load_mobile_action_font();
 
+#ifdef ROGUE_ANDROID
+    mobile_game_render_ready = (bool)(stdscr != NULL);
+#endif
     started = TRUE;
     return TRUE;
+}
+
+void
+rogue_allegro_prepare_game_start(void)
+{
+#ifdef ROGUE_ANDROID
+    ALLEGRO_EVENT event;
+    double deadline;
+
+    if (!started)
+	return;
+
+    deadline = al_get_time() + 0.40;
+    while (al_get_time() < deadline)
+    {
+	while (al_get_next_event(queue, &event))
+	{
+	    if (event.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
+		return;
+	    if (event.type == ALLEGRO_EVENT_DISPLAY_RESIZE)
+		al_acknowledge_resize(display);
+	}
+
+	al_set_target_backbuffer(display);
+	al_clear_to_color(al_map_rgb(0, 0, 0));
+	al_draw_text(font, al_map_rgb(218, 184, 92),
+		     display_width() / 2, display_height() / 2 - 18,
+		     ALLEGRO_ALIGN_CENTRE, "RogueTiles");
+	al_flip_display();
+	al_rest(0.016);
+    }
+#endif
 }
 
 void
@@ -3655,6 +5981,9 @@ rogue_allegro_render(void)
     int top;
     int rows;
     int cols;
+    int old_blender_op;
+    int old_blender_src;
+    int old_blender_dst;
     bool render_to_scene;
     ROGUE_TILE_CELL view[ROGUE_MAX_VIEW_ROWS][ROGUE_MAX_VIEW_COLS];
     ROGUE_TILE_CELL *cell;
@@ -3662,10 +5991,34 @@ rogue_allegro_render(void)
     if (!started)
 	return;
 
+#ifdef ROGUE_ANDROID
+    if (!mobile_game_render_ready)
+    {
+	al_set_target_backbuffer(display);
+	al_clear_to_color(al_map_rgb(0, 0, 0));
+	draw_text_overlay();
+	draw_death_overlay();
+	al_flip_display();
+	return;
+    }
+#endif
+
     rows = view_rows();
     cols = view_cols();
     left = camera_left(cols);
     top = camera_top(rows);
+#ifdef ROGUE_ANDROID
+    render_origin_x = mobile_margin()
+		      + (play_area_width()
+			 - cols * ROGUE_TILE_DRAW_SIZE) / 2;
+    if (render_origin_x < mobile_margin())
+	render_origin_x = mobile_margin();
+    render_origin_y = mobile_play_top()
+		      + (mobile_play_height()
+			 - rows * ROGUE_TILE_DRAW_SIZE) / 2;
+    if (render_origin_y < mobile_play_top())
+	render_origin_y = mobile_play_top();
+#else
     render_origin_x = (play_area_width() - cols * ROGUE_TILE_DRAW_SIZE) / 2;
     if (render_origin_x < 0)
 	render_origin_x = 0;
@@ -3673,11 +6026,13 @@ rogue_allegro_render(void)
 		       - rows * ROGUE_TILE_DRAW_SIZE) / 2;
     if (render_origin_y < 0)
 	render_origin_y = 0;
+#endif
     for (screen_y = 0; screen_y < rows; screen_y++)
 	for (screen_x = 0; screen_x < cols; screen_x++)
 	{
 	    world_x = left + screen_x;
 	    world_y = top + screen_y;
+	    memset(&view[screen_y][screen_x], 0, sizeof(view[screen_y][screen_x]));
 	    rogue_variant_describe_cell(world_y, world_x,
 					&view[screen_y][screen_x]);
 	}
@@ -3690,6 +6045,8 @@ rogue_allegro_render(void)
 	al_set_target_backbuffer(display);
 
     al_clear_to_color(al_map_rgb(0, 0, 0));
+    al_get_blender(&old_blender_op, &old_blender_src, &old_blender_dst);
+    al_set_blender(ALLEGRO_ADD, ALLEGRO_ALPHA, ALLEGRO_INVERSE_ALPHA);
     al_hold_bitmap_drawing(TRUE);
     for (screen_y = 0; screen_y < rows; screen_y++)
 	for (screen_x = 0; screen_x < cols; screen_x++)
@@ -3708,11 +6065,16 @@ rogue_allegro_render(void)
 	}
     al_hold_bitmap_drawing(FALSE);
 
+    for (screen_y = 0; screen_y < rows; screen_y++)
+	for (screen_x = 0; screen_x < cols; screen_x++)
+	    draw_object_foreground_cell(screen_x, screen_y,
+					&view[screen_y][screen_x]);
     draw_blood_splats(left, top, rows, cols);
     for (screen_y = 0; screen_y < rows; screen_y++)
 	for (screen_x = 0; screen_x < cols; screen_x++)
 	    draw_actor_foreground_cell(screen_x, screen_y,
 				       &view[screen_y][screen_x]);
+    al_set_blender(old_blender_op, old_blender_src, old_blender_dst);
     draw_enemy_health_overlays(view, rows, cols);
     if (render_to_scene)
 	save_shader_smoke_bitmap("rogue_scene_before_shader.png",
@@ -3724,8 +6086,12 @@ rogue_allegro_render(void)
     else
 	al_set_target_backbuffer(display);
     draw_visual_effect_overlays();
+#ifdef ROGUE_ANDROID
+    draw_mobile_controls();
+#else
     draw_status();
     draw_side_panel();
+#endif
     draw_text_overlay();
     draw_death_overlay();
     al_flip_display();
@@ -3742,10 +6108,31 @@ rogue_allegro_readchar(void)
     double now;
     double timeout;
     bool got_event;
+    bool render_before_wait;
 
     if (!started)
 	return (char) md_readchar();
 
+#ifdef ROGUE_ANDROID
+    if (android_prompt_response != '\0')
+    {
+	char response;
+
+	response = android_prompt_response;
+	android_prompt_response = '\0';
+	prompt_active = FALSE;
+	prompt_text[0] = '\0';
+	return response;
+    }
+
+    if (!mobile_game_render_ready)
+    {
+	rogue_allegro_render();
+	return '\n';
+    }
+#endif
+
+    render_before_wait = TRUE;
     for (;;)
     {
 	timeout = -1.0;
@@ -3765,7 +6152,9 @@ rogue_allegro_readchar(void)
 	    }
 	}
 
-	rogue_allegro_render();
+	if (render_before_wait)
+	    rogue_allegro_render();
+	render_before_wait = TRUE;
 	if (timeout >= 0.0)
 	    got_event = (bool) al_wait_for_event_timed(queue, &event,
 						      (float) timeout);
@@ -3787,6 +6176,296 @@ rogue_allegro_readchar(void)
 	    continue;
 	}
 
+#ifdef ROGUE_ANDROID
+	if (event.type == ALLEGRO_EVENT_TOUCH_BEGIN)
+	{
+	    int pressed_index;
+
+	    build_mobile_layout();
+	    if (mobile_track_pinch_begin(event.touch.id,
+					 (int) event.touch.x,
+					 (int) event.touch.y))
+	    {
+		if (mobile_consume_pinch_render_request())
+		    rogue_allegro_render();
+		render_before_wait = FALSE;
+		continue;
+	    }
+	    if (mobile_log_index_at((int) event.touch.x, (int) event.touch.y))
+	    {
+		mobile_log_touch_id = event.touch.id;
+		mobile_log_touch_start_y = (int) event.touch.y;
+		mobile_log_touch_start_scroll_y = mobile_log_scroll_y;
+		rogue_allegro_render();
+		continue;
+	    }
+
+	    pressed_index = rogue_mobile_action_index_at(
+		&mobile_layout, (int) event.touch.x, (int) event.touch.y);
+	    if (pressed_index >= 0)
+	    {
+		mobile_action_touch_id = event.touch.id;
+		mobile_action_touch_start_y = (int) event.touch.y;
+		mobile_action_touch_start_scroll_y = mobile_action_scroll_y;
+		mobile_action_touch_index = pressed_index;
+		mobile_action_touch_scrolled = FALSE;
+		rogue_allegro_render();
+		continue;
+	    }
+
+	    pressed_index = rogue_mobile_movement_index_at(
+		&mobile_layout, (int) event.touch.x, (int) event.touch.y);
+	    if (pressed_index >= 0)
+	    {
+		rogue_allegro_render();
+		if (death_overlay_active && pressed_index == 4)
+		    return '\n';
+		return mobile_layout.buttons[pressed_index].command;
+	    }
+	    continue;
+	}
+	if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN &&
+	    event.mouse.button == 1)
+	{
+	    int pressed_index;
+
+	    build_mobile_layout();
+	    if (mobile_log_index_at(event.mouse.x, event.mouse.y))
+	    {
+		mobile_log_touch_id = -3;
+		mobile_log_touch_start_y = event.mouse.y;
+		mobile_log_touch_start_scroll_y = mobile_log_scroll_y;
+		rogue_allegro_render();
+		continue;
+	    }
+	    pressed_index = rogue_mobile_action_index_at(
+		&mobile_layout, event.mouse.x, event.mouse.y);
+	    if (pressed_index >= 0)
+	    {
+		mobile_action_touch_id = -2;
+		mobile_action_touch_start_y = event.mouse.y;
+		mobile_action_touch_start_scroll_y = mobile_action_scroll_y;
+		mobile_action_touch_index = pressed_index;
+		mobile_action_touch_scrolled = FALSE;
+		rogue_allegro_render();
+		continue;
+	    }
+
+	    pressed_index = rogue_mobile_movement_index_at(
+		&mobile_layout, event.mouse.x, event.mouse.y);
+	    if (pressed_index >= 0)
+	    {
+		rogue_allegro_render();
+		if (death_overlay_active && pressed_index == 4)
+		    return '\n';
+		return mobile_layout.buttons[pressed_index].command;
+	    }
+	    continue;
+	}
+	if (event.type == ALLEGRO_EVENT_TOUCH_MOVE)
+	{
+	    if (mobile_track_pinch_move(event.touch.id,
+					(int) event.touch.x,
+					(int) event.touch.y))
+	    {
+		if (mobile_consume_pinch_render_request())
+		    rogue_allegro_render();
+		render_before_wait = FALSE;
+		continue;
+	    }
+	    if (event.touch.id == mobile_log_touch_id)
+	    {
+		ALLEGRO_FONT *log_font;
+		int line_h;
+		int step;
+		int delta_y;
+		int visible_lines;
+		int new_scroll_y;
+
+		log_font = (detail_font != NULL) ? detail_font : font;
+		line_h = al_get_font_line_height(log_font);
+		step = line_h + 2;
+		if (step < 1)
+		    step = 1;
+		delta_y = (int) event.touch.y - mobile_log_touch_start_y;
+		visible_lines = mobile_log_visible_lines(line_h);
+		new_scroll_y = mobile_log_touch_start_scroll_y - delta_y / step;
+		mobile_log_scroll_y =
+		    mobile_log_scroll_clamp(new_scroll_y, visible_lines);
+		rogue_allegro_render();
+		continue;
+	    }
+	    if (event.touch.id == mobile_action_touch_id)
+	    {
+		int delta_y;
+		int new_scroll_y;
+
+		build_mobile_layout();
+		delta_y = (int) event.touch.y - mobile_action_touch_start_y;
+		if (abs(delta_y) > ROGUE_MOBILE_ACTION_SCROLL_THRESHOLD)
+		    mobile_action_touch_scrolled = TRUE;
+		new_scroll_y = mobile_action_touch_start_scroll_y - delta_y;
+		mobile_action_scroll_y =
+		    rogue_mobile_action_scroll_clamp(&mobile_layout,
+						     new_scroll_y);
+		build_mobile_layout();
+		rogue_allegro_render();
+		continue;
+	    }
+	}
+	if (event.type == ALLEGRO_EVENT_MOUSE_AXES)
+	{
+	    if (mobile_log_touch_id == -3)
+	    {
+		ALLEGRO_FONT *log_font;
+		int line_h;
+		int step;
+		int delta_y;
+		int visible_lines;
+		int new_scroll_y;
+
+		log_font = (detail_font != NULL) ? detail_font : font;
+		line_h = al_get_font_line_height(log_font);
+		step = line_h + 2;
+		if (step < 1)
+		    step = 1;
+		delta_y = event.mouse.y - mobile_log_touch_start_y;
+		visible_lines = mobile_log_visible_lines(line_h);
+		new_scroll_y = mobile_log_touch_start_scroll_y - delta_y / step;
+		mobile_log_scroll_y =
+		    mobile_log_scroll_clamp(new_scroll_y, visible_lines);
+		rogue_allegro_render();
+		continue;
+	    }
+	    if (mobile_action_touch_id == -2)
+	    {
+		int delta_y;
+		int new_scroll_y;
+
+		build_mobile_layout();
+		delta_y = event.mouse.y - mobile_action_touch_start_y;
+		if (abs(delta_y) > ROGUE_MOBILE_ACTION_SCROLL_THRESHOLD)
+		    mobile_action_touch_scrolled = TRUE;
+		new_scroll_y = mobile_action_touch_start_scroll_y - delta_y;
+		mobile_action_scroll_y =
+		    rogue_mobile_action_scroll_clamp(&mobile_layout,
+						     new_scroll_y);
+		build_mobile_layout();
+		rogue_allegro_render();
+		continue;
+	    }
+	}
+	if (event.type == ALLEGRO_EVENT_TOUCH_END ||
+	    event.type == ALLEGRO_EVENT_TOUCH_CANCEL)
+	{
+	    if (event.touch.id == mobile_log_touch_id)
+	    {
+		mobile_log_touch_id = -1;
+		rogue_allegro_render();
+		continue;
+	    }
+	    if (mobile_track_pinch_end(event.touch.id))
+	    {
+		rogue_allegro_render();
+		render_before_wait = FALSE;
+		continue;
+	    }
+	    if (event.touch.id == mobile_action_touch_id)
+	    {
+		int delta_y;
+		int new_scroll_y;
+		int released_index;
+		char command;
+
+		build_mobile_layout();
+		delta_y = (int) event.touch.y - mobile_action_touch_start_y;
+		if (abs(delta_y) > ROGUE_MOBILE_ACTION_SCROLL_THRESHOLD)
+		{
+		    mobile_action_touch_scrolled = TRUE;
+		    new_scroll_y = mobile_action_touch_start_scroll_y - delta_y;
+		    mobile_action_scroll_y =
+			rogue_mobile_action_scroll_clamp(&mobile_layout,
+							 new_scroll_y);
+		    build_mobile_layout();
+		}
+		released_index = rogue_mobile_action_index_at(
+		    &mobile_layout, (int) event.touch.x, (int) event.touch.y);
+		command = '\0';
+		if (event.type == ALLEGRO_EVENT_TOUCH_END &&
+		    !mobile_action_touch_scrolled &&
+		    released_index == mobile_action_touch_index &&
+		    released_index >= 0)
+		    command = mobile_layout.actions[released_index].command;
+		mobile_action_touch_id = -1;
+		mobile_action_touch_index = -1;
+		mobile_action_touch_scrolled = FALSE;
+		if (command != '\0')
+		{
+		    rogue_allegro_render();
+		    if (command == ROGUE_MOBILE_COMMAND_CLOSE)
+			return ESCAPE;
+		    if (handle_mobile_special_action(command))
+			continue;
+		    mobile_prepare_command_feedback(command);
+		    return command;
+		}
+		rogue_allegro_render();
+		continue;
+	    }
+	}
+	if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_UP &&
+	    event.mouse.button == 1)
+	{
+	    if (mobile_log_touch_id == -3)
+	    {
+		mobile_log_touch_id = -1;
+		rogue_allegro_render();
+		continue;
+	    }
+	    if (mobile_action_touch_id == -2)
+	    {
+		int delta_y;
+		int new_scroll_y;
+		int released_index;
+		char command;
+
+		build_mobile_layout();
+		delta_y = event.mouse.y - mobile_action_touch_start_y;
+		if (abs(delta_y) > ROGUE_MOBILE_ACTION_SCROLL_THRESHOLD)
+		{
+		    mobile_action_touch_scrolled = TRUE;
+		    new_scroll_y = mobile_action_touch_start_scroll_y - delta_y;
+		    mobile_action_scroll_y =
+			rogue_mobile_action_scroll_clamp(&mobile_layout,
+							 new_scroll_y);
+		    build_mobile_layout();
+		}
+		released_index = rogue_mobile_action_index_at(
+		    &mobile_layout, event.mouse.x, event.mouse.y);
+		command = '\0';
+		if (!mobile_action_touch_scrolled &&
+		    released_index == mobile_action_touch_index &&
+		    released_index >= 0)
+		    command = mobile_layout.actions[released_index].command;
+		mobile_action_touch_id = -1;
+		mobile_action_touch_index = -1;
+		mobile_action_touch_scrolled = FALSE;
+		if (command != '\0')
+		{
+		    rogue_allegro_render();
+		    if (command == ROGUE_MOBILE_COMMAND_CLOSE)
+			return ESCAPE;
+		    if (handle_mobile_special_action(command))
+			continue;
+		    mobile_prepare_command_feedback(command);
+		    return command;
+		}
+		rogue_allegro_render();
+		continue;
+	    }
+	}
+#endif
+
 	if (event.type == ALLEGRO_EVENT_KEY_DOWN)
 	{
 	    if (event.keyboard.keycode == ALLEGRO_KEY_F1)
@@ -3803,6 +6482,7 @@ rogue_allegro_readchar(void)
 		rogue_allegro_render();
 		continue;
 	    }
+#ifndef ROGUE_ANDROID
 	    if (event.keyboard.keycode == ALLEGRO_KEY_F10)
 	    {
 		show_tilepack_menu();
@@ -3810,6 +6490,7 @@ rogue_allegro_readchar(void)
 		rogue_allegro_render();
 		continue;
 	    }
+#endif
 	    if (handle_view_key(event.keyboard.keycode))
 	    {
 		suppress_key_char_keycode = event.keyboard.keycode;
@@ -3873,6 +6554,14 @@ rogue_allegro_show_prompt(const char *prompt)
     if (prompt == NULL || *prompt == '\0')
 	prompt = "Press Space to continue";
 
+#ifdef ROGUE_ANDROID
+    android_prompt_response = contains_text(prompt, "enter") ? '\n' : ' ';
+    prompt_active = FALSE;
+    prompt_text[0] = '\0';
+    rogue_allegro_render();
+    return;
+#endif
+
     snprintf(prompt_text, sizeof(prompt_text), "%s", prompt);
     prompt_active = TRUE;
     rogue_allegro_render();
@@ -3881,6 +6570,9 @@ rogue_allegro_show_prompt(const char *prompt)
 void
 rogue_allegro_clear_prompt(void)
 {
+#ifdef ROGUE_ANDROID
+    android_prompt_response = '\0';
+#endif
     prompt_active = FALSE;
     prompt_text[0] = '\0';
     rogue_allegro_render();
@@ -3915,6 +6607,9 @@ rogue_allegro_record_message(const char *message)
     message_enemy_hp[message_log_count] = pending_enemy_hp;
     message_enemy_max_hp[message_log_count] = pending_enemy_max_hp;
     message_log_count++;
+#ifdef ROGUE_ANDROID
+    mobile_log_scroll_y = 0;
+#endif
     pending_damage_dealt = 0;
     pending_damage_taken = 0;
     pending_enemy_hp = 0;
@@ -3961,6 +6656,8 @@ rogue_allegro_text_overlay_begin(const char *title)
     text_overlay_selected = -1;
     text_overlay_scroll = 0;
     text_overlay_selectable = FALSE;
+    text_overlay_fill_vertical = FALSE;
+    text_overlay_fullscreen = FALSE;
 }
 
 static void
@@ -3981,15 +6678,22 @@ rogue_allegro_text_overlay_add(const char *line)
     int start;
     int len;
     int text_len;
+    int wrap_chars;
 
     if (line == NULL)
 	line = "";
     if (text_overlay_line_count >= ROGUE_OVERLAY_MAX_LINES)
 	return;
 
+    wrap_chars = TEXT_OVERLAY_WRAP_CHARS;
+#ifdef ROGUE_ANDROID
+    if (text_overlay_fullscreen)
+	wrap_chars = mobile_text_overlay_wrap_chars();
+#endif
+
     if (*line == '\0'
 	|| rogue_picker_line_key(line) != '\0'
-	|| (int) strlen(line) <= TEXT_OVERLAY_WRAP_CHARS)
+	|| (int) strlen(line) <= wrap_chars)
     {
 	append_text_overlay_line(line);
 	return;
@@ -4004,7 +6708,7 @@ rogue_allegro_text_overlay_add(const char *line)
 	if (start >= text_len)
 	    break;
 
-	len = next_wrap_len(line, start, TEXT_OVERLAY_WRAP_CHARS);
+	len = next_space_wrap_len(line, start, wrap_chars);
 	if (len <= 0)
 	    break;
 	if (len >= (int) sizeof(segment))
@@ -4015,6 +6719,47 @@ rogue_allegro_text_overlay_add(const char *line)
 	start += len;
     }
 }
+
+#ifdef ROGUE_ANDROID
+static int
+mobile_overlay_pointer_movement_index(int x, int y)
+{
+    build_mobile_layout();
+    return rogue_mobile_movement_index_at(&mobile_layout, x, y);
+}
+
+static int
+mobile_overlay_touch_movement_index(const ALLEGRO_EVENT *event)
+{
+    if (event == NULL)
+	return -1;
+
+    return mobile_overlay_pointer_movement_index((int) event->touch.x,
+						 (int) event->touch.y);
+}
+
+static int
+mobile_overlay_delta_for_movement(int movement_index, int page)
+{
+    switch (movement_index)
+    {
+	case 0:
+	case 2:
+	case 3:
+	    return -page;
+	case 1:
+	    return -1;
+	case 5:
+	case 6:
+	case 8:
+	    return page;
+	case 7:
+	    return 1;
+	default:
+	    return 0;
+    }
+}
+#endif
 
 char
 rogue_allegro_text_overlay_show(const char *prompt)
@@ -4047,8 +6792,8 @@ rogue_allegro_text_overlay_show(const char *prompt)
     while (ch == '\0')
     {
 	visible_lines = text_overlay_line_count;
-	if (visible_lines > 14)
-	    visible_lines = 14;
+	if (visible_lines > text_overlay_visible_line_capacity())
+	    visible_lines = text_overlay_visible_line_capacity();
 	if (visible_lines < 1)
 	    visible_lines = 1;
 	page = visible_lines - 1;
@@ -4088,6 +6833,97 @@ rogue_allegro_text_overlay_show(const char *prompt)
 	    rogue_allegro_render();
 	    continue;
 	}
+#ifdef ROGUE_ANDROID
+	if (event.type == ALLEGRO_EVENT_TOUCH_BEGIN)
+	{
+	    if (mobile_text_overlay_close_hit((int) event.touch.x,
+					      (int) event.touch.y))
+	    {
+		ch = ESCAPE;
+		rogue_allegro_render();
+		continue;
+	    }
+	    if (mobile_text_overlay_chapters_hit((int) event.touch.x,
+						 (int) event.touch.y))
+	    {
+		chapter_choice = show_manual_chapter_picker();
+		chapter_index = tolower((unsigned char)chapter_choice) - 'a';
+		if (chapter_index >= 0
+		    && chapter_index < manual_chapter_count)
+		    text_overlay_scroll = manual_chapter_lines[chapter_index];
+		overlay_scroll_direction = 0;
+		overlay_scroll_keycode = 0;
+		rogue_allegro_render();
+		continue;
+	    }
+	    mobile_text_overlay_scroll_begin(event.touch.id,
+					     (int) event.touch.y, -1);
+	    overlay_scroll_direction = 0;
+	    overlay_scroll_keycode = 0;
+	    rogue_allegro_render();
+	    continue;
+	}
+	if (event.type == ALLEGRO_EVENT_TOUCH_MOVE)
+	{
+	    if (mobile_text_overlay_scroll_move(event.touch.id,
+						(int) event.touch.y))
+	    {
+		overlay_scroll_direction = 0;
+		overlay_scroll_keycode = 0;
+		rogue_allegro_render();
+	    }
+	    continue;
+	}
+	if (event.type == ALLEGRO_EVENT_TOUCH_END ||
+	    event.type == ALLEGRO_EVENT_TOUCH_CANCEL)
+	{
+	    if (mobile_text_overlay_scroll_end(event.touch.id, NULL, NULL))
+		rogue_allegro_render();
+	    continue;
+	}
+	if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN &&
+	    event.mouse.button == 1)
+	{
+	    int movement_index;
+	    int delta;
+
+	    if (mobile_text_overlay_close_hit(event.mouse.x, event.mouse.y))
+	    {
+		ch = ESCAPE;
+		rogue_allegro_render();
+		continue;
+	    }
+	    if (mobile_text_overlay_chapters_hit(event.mouse.x, event.mouse.y))
+	    {
+		chapter_choice = show_manual_chapter_picker();
+		chapter_index = tolower((unsigned char)chapter_choice) - 'a';
+		if (chapter_index >= 0
+		    && chapter_index < manual_chapter_count)
+		    text_overlay_scroll = manual_chapter_lines[chapter_index];
+		overlay_scroll_direction = 0;
+		overlay_scroll_keycode = 0;
+		rogue_allegro_render();
+		continue;
+	    }
+	    movement_index = mobile_overlay_pointer_movement_index(
+		event.mouse.x, event.mouse.y);
+	    if (movement_index >= 0)
+	    {
+		if (movement_index == 4)
+		    ch = '\n';
+		else
+		{
+		    delta = mobile_overlay_delta_for_movement(movement_index,
+							     page);
+		    text_overlay_scroll += delta;
+		    overlay_scroll_direction = 0;
+		    overlay_scroll_keycode = 0;
+		}
+		rogue_allegro_render();
+	    }
+	    continue;
+	}
+#endif
 	if (event.type == ALLEGRO_EVENT_KEY_UP)
 	{
 	    if (event.keyboard.keycode == overlay_scroll_keycode)
@@ -4211,8 +7047,8 @@ rogue_allegro_text_overlay_pick(const char *prompt)
     while (chosen == '\0')
     {
 	visible_lines = text_overlay_line_count;
-	if (visible_lines > 14)
-	    visible_lines = 14;
+	if (visible_lines > text_overlay_visible_line_capacity())
+	    visible_lines = text_overlay_visible_line_capacity();
 	if (visible_lines < 1)
 	    visible_lines = 1;
 	page = visible_lines - 1;
@@ -4232,6 +7068,144 @@ rogue_allegro_text_overlay_pick(const char *prompt)
 	    rogue_allegro_render();
 	    continue;
 	}
+#ifdef ROGUE_ANDROID
+	if (event.type == ALLEGRO_EVENT_TOUCH_BEGIN)
+	{
+	    int movement_index;
+	    int delta;
+	    int tapped_line;
+
+	    if (mobile_text_overlay_close_hit((int) event.touch.x,
+					      (int) event.touch.y))
+	    {
+		chosen = ESCAPE;
+		rogue_allegro_render();
+		continue;
+	    }
+	    tapped_line = mobile_text_overlay_pick_line_at((int) event.touch.x,
+							   (int) event.touch.y);
+	    if (tapped_line >= 0)
+	    {
+		mobile_text_overlay_scroll_begin(event.touch.id,
+						 (int) event.touch.y,
+						 tapped_line);
+		rogue_allegro_render();
+		continue;
+	    }
+	    movement_index = mobile_overlay_touch_movement_index(&event);
+	    if (movement_index >= 0)
+	    {
+		if (movement_index == 4)
+		{
+		    if (text_overlay_selected >= 0)
+		    {
+			selected_key = rogue_picker_line_key(
+			    text_overlay_lines[text_overlay_selected]);
+			if (selected_key != '\0')
+			    chosen = selected_key;
+		    }
+		}
+		else
+		{
+		    delta = mobile_overlay_delta_for_movement(movement_index,
+							     page);
+		    if (delta != 0)
+			text_overlay_selected = rogue_picker_move_selection(
+			    text_overlay_selected, text_overlay_line_count,
+			    delta);
+		}
+		rogue_allegro_render();
+	    }
+	    else
+	    {
+		mobile_text_overlay_scroll_begin(event.touch.id,
+						 (int) event.touch.y, -1);
+		rogue_allegro_render();
+	    }
+	    continue;
+	}
+	if (event.type == ALLEGRO_EVENT_TOUCH_MOVE)
+	{
+	    if (mobile_text_overlay_scroll_move(event.touch.id,
+						(int) event.touch.y))
+		rogue_allegro_render();
+	    continue;
+	}
+	if (event.type == ALLEGRO_EVENT_TOUCH_END ||
+	    event.type == ALLEGRO_EVENT_TOUCH_CANCEL)
+	{
+	    bool was_scrolled;
+	    int touched_line;
+
+	    if (mobile_text_overlay_scroll_end(event.touch.id, &was_scrolled,
+					       &touched_line))
+	    {
+		if (event.type == ALLEGRO_EVENT_TOUCH_END
+		    && !was_scrolled && touched_line >= 0)
+		{
+		    text_overlay_selected = touched_line;
+		    selected_key = rogue_picker_line_key(
+			text_overlay_lines[text_overlay_selected]);
+		    if (selected_key != '\0')
+			chosen = selected_key;
+		}
+		rogue_allegro_render();
+	    }
+	    continue;
+	}
+	if (event.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN &&
+	    event.mouse.button == 1)
+	{
+	    int movement_index;
+	    int delta;
+	    int tapped_line;
+
+	    if (mobile_text_overlay_close_hit(event.mouse.x, event.mouse.y))
+	    {
+		chosen = ESCAPE;
+		rogue_allegro_render();
+		continue;
+	    }
+	    tapped_line = mobile_text_overlay_pick_line_at(event.mouse.x,
+							   event.mouse.y);
+	    if (tapped_line >= 0)
+	    {
+		text_overlay_selected = tapped_line;
+		selected_key = rogue_picker_line_key(
+		    text_overlay_lines[text_overlay_selected]);
+		if (selected_key != '\0')
+		    chosen = selected_key;
+		rogue_allegro_render();
+		continue;
+	    }
+	    movement_index = mobile_overlay_pointer_movement_index(
+		event.mouse.x, event.mouse.y);
+	    if (movement_index >= 0)
+	    {
+		if (movement_index == 4)
+		{
+		    if (text_overlay_selected >= 0)
+		    {
+			selected_key = rogue_picker_line_key(
+			    text_overlay_lines[text_overlay_selected]);
+			if (selected_key != '\0')
+			    chosen = selected_key;
+		    }
+		}
+		else
+		{
+		    delta = mobile_overlay_delta_for_movement(movement_index,
+							     page);
+		    if (delta != 0)
+			text_overlay_selected = rogue_picker_move_selection(
+			    text_overlay_selected, text_overlay_line_count,
+			    delta);
+		}
+		rogue_allegro_render();
+	    }
+	    continue;
+	}
+#endif
 
 	if (event.type == ALLEGRO_EVENT_KEY_DOWN)
 	{
@@ -4336,6 +7310,8 @@ rogue_allegro_text_overlay_clear(void)
     text_overlay_selected = -1;
     text_overlay_scroll = 0;
     text_overlay_selectable = FALSE;
+    text_overlay_fill_vertical = FALSE;
+    text_overlay_fullscreen = FALSE;
 }
 
 bool
@@ -4540,6 +7516,12 @@ rogue_allegro_shutdown(void)
 	al_destroy_font(small_font);
     if (detail_font != NULL && detail_font != font)
 	al_destroy_font(detail_font);
+    if (mobile_hud_font != NULL && mobile_hud_font != font)
+	al_destroy_font(mobile_hud_font);
+    if (mobile_control_font != NULL && mobile_control_font != font)
+	al_destroy_font(mobile_control_font);
+    if (mobile_action_font != NULL && mobile_action_font != font)
+	al_destroy_font(mobile_action_font);
     if (font != NULL)
 	al_destroy_font(font);
     if (gloom_shader != NULL)
@@ -4552,6 +7534,7 @@ rogue_allegro_shutdown(void)
 	al_destroy_bitmap(scene_source_bitmap);
     if (atlas != NULL)
 	al_destroy_bitmap(atlas);
+    clear_atlas_visibility_cache();
     if (queue != NULL)
 	al_destroy_event_queue(queue);
     if (display != NULL)
@@ -4560,6 +7543,9 @@ rogue_allegro_shutdown(void)
     font = NULL;
     detail_font = NULL;
     small_font = NULL;
+    mobile_hud_font = NULL;
+    mobile_control_font = NULL;
+    mobile_action_font = NULL;
     gloom_shader = NULL;
     postprocess_shader = NULL;
     scene_bitmap = NULL;

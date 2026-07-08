@@ -110,7 +110,11 @@ class CombatDamageLogTests(unittest.TestCase):
         ]
         self.assertIn("cell->layer != ROGUE_TILE_ACTOR", foreground)
         self.assertIn("draw_glyph_foreground_cell", foreground)
-        self.assertNotIn("underlay", foreground)
+        self.assertIn("draw_cell_underlay_or_default(cell, dx, dy);", foreground)
+        self.assertLess(
+            foreground.index("draw_cell_underlay_or_default(cell, dx, dy);"),
+            foreground.index("draw_atlas_tile_foreground(atlas_index, dx, dy);"),
+        )
 
     def test_wall_thickness_is_a_persisted_setting(self):
         allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
@@ -194,9 +198,17 @@ class CombatDamageLogTests(unittest.TestCase):
         self.assertIn("--tiles-shader-smoke", frontend_c)
         self.assertIn("shader_smoke_requested", frontend_c)
         self.assertIn("rogue_allegro_enable_shader_smoke", frontend_c)
+        shader_smoke_block = allegro_c[
+            allegro_c.index("if (shader_smoke_mode)"):
+            allegro_c.index("if (!al_init())")
+        ]
         self.assertIn("shader_smoke_mode", allegro_c)
         self.assertIn("settings.pixel_sharpen_enabled = TRUE", allegro_c)
         self.assertIn("settings.posterize_enabled = TRUE", allegro_c)
+        self.assertIn(
+            "settings.crt_effect_mode = ROGUE_CRT_DRAMATIC",
+            shader_smoke_block,
+        )
         self.assertIn("rogue_scene_before_shader.png", allegro_c)
         self.assertIn("rogue_scene_source_shader.png", allegro_c)
         self.assertIn("rogue_scene_after_postprocess.png", allegro_c)
@@ -285,6 +297,103 @@ class CombatDamageLogTests(unittest.TestCase):
             render.index("save_shader_smoke_bitmap"),
             render.index("draw_scene_with_gloom_shader();"),
         )
+
+    def test_readme_lists_crt_effect_shader_setting(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("CRT Effect", readme)
+        self.assertIn("Off/Subtle/Balanced/Dramatic", readme)
+
+    def test_crt_effect_modes_are_persisted_and_menu_driven(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        self.assertIn("ROGUE_CRT_OFF", allegro_c)
+        self.assertIn("ROGUE_CRT_SUBTLE", allegro_c)
+        self.assertIn("ROGUE_CRT_BALANCED", allegro_c)
+        self.assertIn("ROGUE_CRT_DRAMATIC", allegro_c)
+        self.assertIn("crt_effect_mode", allegro_c)
+        self.assertIn('"crtEffect"', allegro_c)
+        self.assertIn("crt_effect_label", allegro_c)
+        self.assertIn("cycle_crt_effect_mode", allegro_c)
+        self.assertIn("CRT Effect", allegro_c)
+
+        settings_struct = allegro_c[
+            allegro_c.index("typedef struct rogue_allegro_settings {"):
+            allegro_c.index("} ROGUE_ALLEGRO_SETTINGS;")
+        ]
+        settings_initializer = allegro_c[
+            allegro_c.index("static ROGUE_ALLEGRO_SETTINGS settings = {"):
+            allegro_c.index("#define ROGUE_TILE_DRAW_SIZE")
+        ]
+        settings_fields = [
+            line.strip().split()[-1].rstrip(";")
+            for line in settings_struct.splitlines()
+            if line.strip().endswith(";")
+        ]
+        settings_values = [
+            line.strip().rstrip(",")
+            for line in settings_initializer.splitlines()
+            if line.strip()
+            and not line.strip().startswith("static ")
+            and line.strip() != "};"
+        ]
+        settings_defaults = dict(zip(settings_fields, settings_values))
+        self.assertEqual(len(settings_fields), len(settings_values))
+        self.assertEqual("FALSE", settings_defaults["posterize_enabled"])
+        self.assertEqual("ROGUE_CRT_OFF", settings_defaults["crt_effect_mode"])
+
+        settings_menu = allegro_c[
+            allegro_c.index("show_shader_settings_menu"):
+            allegro_c.index("show_tilepack_menu")
+        ]
+        self.assertIn('"f) CRT Effect: %s"', settings_menu)
+        self.assertIn("crt_effect_label(settings.crt_effect_mode)", settings_menu)
+        self.assertIn("cycle_crt_effect_mode();", settings_menu)
+        self.assertIn("save_settings();", settings_menu)
+
+        cycle = allegro_c[
+            allegro_c.index("cycle_crt_effect_mode"):
+            allegro_c.index("static bool\npostprocess_enabled")
+        ]
+        self.assertIn("ROGUE_CRT_SUBTLE", cycle)
+        self.assertIn("ROGUE_CRT_BALANCED", cycle)
+        self.assertIn("ROGUE_CRT_DRAMATIC", cycle)
+        self.assertIn("ROGUE_CRT_OFF", cycle)
+
+    def test_crt_effect_participates_in_postprocess_pipeline(self):
+        allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")
+
+        postprocess_enabled = allegro_c[
+            allegro_c.index("postprocess_enabled"):
+            allegro_c.index("postprocess_pixel_shader_source")
+        ]
+        self.assertIn("settings.crt_effect_mode != ROGUE_CRT_OFF", postprocess_enabled)
+
+        shader_source = allegro_c[
+            allegro_c.index("postprocess_pixel_shader_source"):
+            allegro_c.index("gloom_pixel_shader_source")
+        ]
+        self.assertIn("u_crt_effect_mode", shader_source)
+        self.assertIn("u_crt_scanline_strength", shader_source)
+        self.assertIn("u_crt_vignette_strength", shader_source)
+        self.assertIn("u_crt_curvature", shader_source)
+        self.assertIn("u_crt_rgb_offset", shader_source)
+        self.assertIn("sample_uv", shader_source)
+        self.assertIn("scanline", shader_source)
+
+        postprocess_draw = allegro_c[
+            allegro_c.index("draw_scene_with_postprocess_shader"):
+            allegro_c.index("draw_scene_with_gloom_shader")
+        ]
+        self.assertIn("crt_sample_coordinates", postprocess_draw)
+        self.assertIn("crt_scanline_factor", postprocess_draw)
+        self.assertIn("crt_vignette_factor", postprocess_draw)
+        self.assertIn("crt_rgb_offset_pixels", postprocess_draw)
+        self.assertIn("settings.crt_effect_mode", postprocess_draw)
+        self.assertIn("write_locked_rgba(target_lock, x, y, r, g, b, a);", postprocess_draw)
+        self.assertIn("read_locked_rgba(source_lock, sample_x,", postprocess_draw)
+        self.assertIn("sample_y > 0 ? sample_y - 1 : sample_y", postprocess_draw)
+        self.assertIn("sample_x + 1 < scene_bitmap_width", postprocess_draw)
 
     def test_postprocess_shader_uses_allegro_default_vertex_shader(self):
         allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")

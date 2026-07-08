@@ -1,6 +1,6 @@
 # RogueTiles
 
-RogueTiles is a Windows-friendly fork of Rogue 5.4.4 with an optional Allegro 5 tile frontend, custom tile sets, visual settings, and a packaged tile picker. The classic terminal Rogue path is still present, but the downloadable build is meant to be extract-and-play.
+RogueTiles is a Windows-friendly Rogue collection with an optional Allegro 5 tile frontend, custom tile sets, visual settings, and a packaged tile picker. The classic terminal Rogue path is still present, but the downloadable build is meant to be extract-and-play.
 
 Original Rogue was created by Michael Toy, Ken Arnold, and Glenn Wichman. This fork vendors public-domain RL Tiles assets from `statico/rltiles` and keeps attribution in `assets/rltiles/ATTRIBUTION.txt`.
 
@@ -18,8 +18,10 @@ The release zip includes the game executable, required DLLs, RL Tiles assets, ru
 
 `RogueTiles.exe` includes a startup version picker.
 
-- **Rogue 5.4.4**: the default RogueTiles ruleset with full tile rendering, in-window ASCII mode, custom tile packs, settings, shaders, and visual effects.
+- **Rogue 5.4.4**: the default RogueTiles ruleset, based on the later classic Unix lineage with the broadest command/menu surface in this collection.
 - **Rogue 5.2.1**: bundled from the BSD-style restoration source archive. This first adapter runs from the same executable and uses the shared tile frontend for the dungeon, status bar, camera, and input path.
+- **Rogue 3.6.2**: bundled from the BSD-style early public Unix source archive. This version is much closer to the first widely released Rogue experience, with an older monster table, leaner command set, and bundled period manual/guide text.
+- **Super-Rogue 9.0.1**: bundled from the redistributable Super-Rogue source archive. This expanded variant adds a wider dungeon/status layout, extended attributes, pack volume/carry stats, extra commands such as dip, and a bundled Super-Rogue tutorial guide.
 
 The picker shows each version's era, lineage, license/distribution status, tile support, and feature notes before you start.
 
@@ -72,6 +74,7 @@ Shader settings:
 - Low HP Pulse: adds a low-health warning pulse.
 - Pixel Sharpen: sharpens the rendered scene.
 - Posterize: reduces color levels for a chunkier pixel-art look.
+- CRT Effect: cycles Off/Subtle/Balanced/Dramatic CRT-style scanlines, vignette, curvature, and color separation.
 
 All visual settings are optional and do not change Rogue gameplay rules.
 
@@ -154,6 +157,26 @@ The zip is written to:
 dist\RogueTiles-windows-x64.zip
 ```
 
+## Building Locally For Android
+
+The Android build is a graphics-only developer APK. It lives beside the Windows build and does not include `TilePicker.exe` or the desktop tile editor.
+
+Before building, add an Android Gradle wrapper under `android\` and place the Allegro Android artifacts listed in `android\vendor\allegro\README.md`.
+
+Build the debug APK:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-android-debug.ps1
+```
+
+The debug APK is written to:
+
+```text
+android\app\build\outputs\apk\debug\app-debug.apk
+```
+
+The first Android slice uses the default RogueTiles ruleset, bundled default tiles, and touch controls for movement, wait, look, and descend.
+
 ## GitHub Release Builds
 
 This repo includes a Windows release workflow at `.github/workflows/release-windows.yml`.
@@ -165,12 +188,21 @@ It runs on:
 
 On a tag such as `v0.1.0-alpha`, the workflow builds and uploads `RogueTiles-windows-x64.zip` to the GitHub Release. That zip is the file to upload to itch.io.
 
+Current release highlights:
+
+- Adds Super-Rogue 9.0.1 as a selectable game variant with tile rendering, extended HUD stats, GUI menu coverage, and bundled guide text.
+- Improves in-game manual reading with a taller F1 reader, chapter selection, and cleaner formatting for nroff-style guide files.
+- Expands custom tile pack support across variants, including variant-specific monster assignments in the tile picker.
+- Fixes several tile frontend polish issues, including Super-Rogue wide-map rendering, hidden object bleed-through, missing actor fallbacks, shader rendering, blood layering, and packaged runtime assets.
+
 ## Developer Checks
 
 Useful validation commands:
 
 ```powershell
 python tests\test_combat_damage_log.py
+python tests\test_variant_metadata.py
+python tests\test_variant_tile_mapping.py
 python tests\test_tilepack_writer.py
 python tests\test_tile_picker_packaged.py
 python tests\test_tile_picker_generation.py

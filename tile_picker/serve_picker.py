@@ -17,7 +17,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from . import build_picker, generate_tile_mapping, tilepack_writer
-from .role_catalog import role_by_id
+from .role_catalog import role_by_id, set_variant_atlas, set_variant_monster_atlas
 
 
 ACTIVE_SOURCE = Path("tile_picker/data/active_tile_source.json")
@@ -73,13 +73,32 @@ def apply_rltiles_mapping(root: Path, payload: dict[str, Any]) -> dict[str, Any]
     tiles = validate_tiles(payload)
     mapping_path = root / "assets" / "rltiles" / "rogue-rltiles-map.json"
     mapping = read_json(mapping_path)
-    roles = role_by_id()
+    roles = role_by_id(mapping)
 
     for role_id, atlas_name in tiles.items():
         role = roles.get(role_id)
         if role is None or role.role == "terrain.empty":
             continue
+        if role.group in ("variantTerrain", "variantTraps") and role.key.count(".") == 1:
+            variant_id, key = role.key.split(".", 1)
+            set_variant_atlas(
+                mapping,
+                role.group,
+                variant_id,
+                key,
+                str(atlas_name) if atlas_name else None,
+            )
+            continue
         if role.role.startswith("monster."):
+            if role.key.count(".") == 1:
+                variant_id, glyph = role.key.split(".", 1)
+                set_variant_monster_atlas(
+                    mapping,
+                    variant_id,
+                    glyph,
+                    str(atlas_name) if atlas_name else None,
+                )
+                continue
             entry = mapping.setdefault("monsters", {}).setdefault(role.key, {})
         else:
             entry = mapping.setdefault(role.group, {}).setdefault(role.key, {})

@@ -18,6 +18,21 @@
 #include "variant.h"
 
 int rogue52_main(int argc, char **argv, char **envp);
+int rogue36_main(int argc, char **argv, char **envp);
+int srogue90_main(int argc, char **argv, char **envp);
+
+static void
+prepare_rogue36_shared_state(void)
+{
+    /*
+     * MinGW emits .refptr globals for some 3.6.2 data references that are
+     * not renamed by the variant objcopy pass. Seed the live root hunger
+     * state so the 3.6.2 stomach daemon does not start at zero food.
+     */
+    food_left = HUNGERTIME;
+    hungry_state = 0;
+    no_food = 0;
+}
 
 /*
  * main:
@@ -41,14 +56,30 @@ main(int argc, char **argv, char **envp)
     {
 	if (!rogue_frontend_start())
 	    my_exit(1);
+#ifdef ROGUE_ANDROID_DEFAULT_ONLY
+	rogue_frontend_prepare_game_start();
+#endif
+#ifndef ROGUE_ANDROID_DEFAULT_ONLY
 	if (!rogue_frontend_choose_variant())
 	    my_exit(1);
+#endif
     }
 
+#ifndef ROGUE_ANDROID_DEFAULT_ONLY
     if (rogue_variant_is_current("rogue52"))
     {
 	return rogue52_main(argc, argv, envp);
     }
+    if (rogue_variant_is_current("rogue36"))
+    {
+	prepare_rogue36_shared_state();
+	return rogue36_main(argc, argv, envp);
+    }
+    if (rogue_variant_is_current("srogue90"))
+    {
+	return srogue90_main(argc, argv, envp);
+    }
+#endif
 
 #ifdef MASTER
     /*

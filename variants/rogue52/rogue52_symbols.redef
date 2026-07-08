@@ -369,6 +369,7 @@ total rogue52_total
 total_winner rogue52_total_winner
 tr_name rogue52_tr_name
 treas_room rogue52_treas_room
+tstp rogue52_tstp
 turn_see rogue52_turn_see
 turnref rogue52_turnref
 u_level rogue52_u_level

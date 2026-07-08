@@ -25,18 +25,19 @@ typedef struct rogue_tile_cell {
     const char *role;
     const char *atlas_key;
     int atlas_index;
-    bool has_underlay;
+    int has_underlay;
     char under_glyph;
     const char *under_role;
     const char *under_atlas_key;
     int under_atlas_index;
     const char *name;
-    bool seen;
-    bool visible;
+    int seen;
+    int visible;
 } ROGUE_TILE_CELL;
 
 void rogue_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
 void rogue52_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
+void rogue36_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
 const char *rogue_tile_layer_name(ROGUE_TILE_LAYER layer);
 
 #endif

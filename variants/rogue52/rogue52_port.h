@@ -9,9 +9,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef ROGUE_ANDROID
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+static int _fmode;
+#else
 #include <direct.h>
 #include <io.h>
 #include <process.h>
+#endif
 
 #ifndef PATH_MAX
 #define PATH_MAX 260
@@ -45,7 +55,9 @@
 #define getgid() 0
 #define setuid(uid) 0
 #define setgid(gid) 0
+#ifndef ROGUE_ANDROID
 #define getpid _getpid
+#endif
 #define kill(pid, sig) 0
 #define alarm(seconds) 0
 

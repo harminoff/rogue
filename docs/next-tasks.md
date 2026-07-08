@@ -19,3 +19,7 @@ These are the remaining follow-up tasks after the Rogue 5.2.1 variant and varian
 - [x] Confirm custom tile packs can override variant roles such as `monster.rogue52.M`.
 - [ ] Run a manual Rogue 5.2.1 tile-mode session through movement, combat, stairs, inventory, and at least one prompt-driven item action.
 - [x] Package and smoke test `dist\RogueTiles` after each GUI coverage slice.
+
+## Android Follow-Ups
+
+- [ ] Consider inventory-aware mobile action filtering, such as hiding `QUAFF`, `READ`, or `WEAR` when the current variant pack has no usable item of that class.

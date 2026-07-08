@@ -11,6 +11,8 @@
         "group": "terrain",
         "key": "empty",
         "glyph": " ",
+        "scope": "global",
+        "variantId": null,
         "label": "Empty",
         "name": "empty",
         "currentRltilesName": null,
@@ -21,6 +23,8 @@
         "group": "terrain",
         "key": "floor",
         "glyph": ".",
+        "scope": "global",
+        "variantId": null,
         "label": "Floor",
         "name": "floor",
         "currentRltilesName": "floor_of_a_room",
@@ -31,6 +35,8 @@
         "group": "terrain",
         "key": "passage",
         "glyph": "#",
+        "scope": "global",
+        "variantId": null,
         "label": "Passage",
         "name": "passage",
         "currentRltilesName": "corridor",
@@ -41,6 +47,8 @@
         "group": "terrain",
         "key": "door",
         "glyph": "+",
+        "scope": "global",
+        "variantId": null,
         "label": "Door",
         "name": "door",
         "currentRltilesName": "dngn_closed_door",
@@ -51,6 +59,8 @@
         "group": "terrain",
         "key": "vertical_wall",
         "glyph": "|",
+        "scope": "global",
+        "variantId": null,
         "label": "Vertical wall",
         "name": "vertical wall",
         "currentRltilesName": "dngn_rock_wall_00",
@@ -61,6 +71,8 @@
         "group": "terrain",
         "key": "horizontal_wall",
         "glyph": "-",
+        "scope": "global",
+        "variantId": null,
         "label": "Horizontal wall",
         "name": "horizontal wall",
         "currentRltilesName": "dngn_rock_wall_00",
@@ -71,6 +83,8 @@
         "group": "terrain",
         "key": "stairs_down",
         "glyph": "%",
+        "scope": "global",
+        "variantId": null,
         "label": "Stairs down",
         "name": "stairs down",
         "currentRltilesName": "staircase_down",
@@ -81,6 +95,8 @@
         "group": "terrain",
         "key": "known_trap",
         "glyph": "^",
+        "scope": "global",
+        "variantId": null,
         "label": "Known trap",
         "name": "known trap",
         "currentRltilesName": "dngn_trap_mechanical",
@@ -91,6 +107,8 @@
         "group": "objects",
         "key": "gold",
         "glyph": "*",
+        "scope": "global",
+        "variantId": null,
         "label": "Gold",
         "name": "gold",
         "currentRltilesName": "gold_piece",
@@ -101,6 +119,8 @@
         "group": "objects",
         "key": "potion",
         "glyph": "!",
+        "scope": "global",
+        "variantId": null,
         "label": "Potion",
         "name": "potion",
         "currentRltilesName": "bubbly",
@@ -111,6 +131,8 @@
         "group": "objects",
         "key": "scroll",
         "glyph": "?",
+        "scope": "global",
+        "variantId": null,
         "label": "Scroll",
         "name": "scroll",
         "currentRltilesName": "vellum",
@@ -121,6 +143,8 @@
         "group": "objects",
         "key": "magic",
         "glyph": "$",
+        "scope": "global",
+        "variantId": null,
         "label": "Magic detection marker",
         "name": "magic",
         "currentRltilesName": "i-magic",
@@ -131,6 +155,8 @@
         "group": "objects",
         "key": "food",
         "glyph": ":",
+        "scope": "global",
+        "variantId": null,
         "label": "Food",
         "name": "food",
         "currentRltilesName": "food_ration",
@@ -141,6 +167,8 @@
         "group": "objects",
         "key": "weapon",
         "glyph": ")",
+        "scope": "global",
+        "variantId": null,
         "label": "Weapon",
         "name": "weapon",
         "currentRltilesName": "long_sword",
@@ -151,6 +179,8 @@
         "group": "objects",
         "key": "armor",
         "glyph": "]",
+        "scope": "global",
+        "variantId": null,
         "label": "Armor",
         "name": "armor",
         "currentRltilesName": "leather_armor",
@@ -161,6 +191,8 @@
         "group": "objects",
         "key": "amulet",
         "glyph": ",",
+        "scope": "global",
+        "variantId": null,
         "label": "Amulet",
         "name": "amulet of Yendor",
         "currentRltilesName": "amulet_of_yendor",
@@ -171,6 +203,8 @@
         "group": "objects",
         "key": "ring",
         "glyph": "=",
+        "scope": "global",
+        "variantId": null,
         "label": "Ring",
         "name": "ring",
         "currentRltilesName": "ring_green",
@@ -181,6 +215,8 @@
         "group": "objects",
         "key": "stick",
         "glyph": "/",
+        "scope": "global",
+        "variantId": null,
         "label": "Wand or staff",
         "name": "wand or staff",
         "currentRltilesName": "staff00",
@@ -191,6 +227,8 @@
         "group": "actors",
         "key": "player",
         "glyph": "@",
+        "scope": "global",
+        "variantId": null,
         "label": "Player",
         "name": "player",
         "currentRltilesName": "human",
@@ -201,6 +239,8 @@
         "group": "monsters",
         "key": "A",
         "glyph": "A",
+        "scope": "global",
+        "variantId": null,
         "label": "Aquator",
         "name": "aquator",
         "currentRltilesName": "water_elemental",
@@ -211,6 +251,8 @@
         "group": "monsters",
         "key": "B",
         "glyph": "B",
+        "scope": "global",
+        "variantId": null,
         "label": "Bat",
         "name": "bat",
         "currentRltilesName": "bat",
@@ -221,6 +263,8 @@
         "group": "monsters",
         "key": "C",
         "glyph": "C",
+        "scope": "global",
+        "variantId": null,
         "label": "Centaur",
         "name": "centaur",
         "currentRltilesName": "plains_centaur",
@@ -231,6 +275,8 @@
         "group": "monsters",
         "key": "D",
         "glyph": "D",
+        "scope": "global",
+        "variantId": null,
         "label": "Dragon",
         "name": "dragon",
         "currentRltilesName": "green_dragon",
@@ -241,6 +287,8 @@
         "group": "monsters",
         "key": "E",
         "glyph": "E",
+        "scope": "global",
+        "variantId": null,
         "label": "Emu",
         "name": "emu",
         "currentRltilesName": "chickatrice",
@@ -251,6 +299,8 @@
         "group": "monsters",
         "key": "F",
         "glyph": "F",
+        "scope": "global",
+        "variantId": null,
         "label": "Venus Flytrap",
         "name": "venus flytrap",
         "currentRltilesName": "plant",
@@ -261,6 +311,8 @@
         "group": "monsters",
         "key": "G",
         "glyph": "G",
+        "scope": "global",
+        "variantId": null,
         "label": "Griffin",
         "name": "griffin",
         "currentRltilesName": "griffon",
@@ -271,6 +323,8 @@
         "group": "monsters",
         "key": "H",
         "glyph": "H",
+        "scope": "global",
+        "variantId": null,
         "label": "Hobgoblin",
         "name": "hobgoblin",
         "currentRltilesName": "hobgoblin",
@@ -281,6 +335,8 @@
         "group": "monsters",
         "key": "I",
         "glyph": "I",
+        "scope": "global",
+        "variantId": null,
         "label": "Ice Monster",
         "name": "ice monster",
         "currentRltilesName": "ice_beast",
@@ -291,6 +347,8 @@
         "group": "monsters",
         "key": "J",
         "glyph": "J",
+        "scope": "global",
+        "variantId": null,
         "label": "Jabberwock",
         "name": "jabberwock",
         "currentRltilesName": "jabberwock",
@@ -301,6 +359,8 @@
         "group": "monsters",
         "key": "K",
         "glyph": "K",
+        "scope": "global",
+        "variantId": null,
         "label": "Kestrel",
         "name": "kestrel",
         "currentRltilesName": "bat",
@@ -311,6 +371,8 @@
         "group": "monsters",
         "key": "L",
         "glyph": "L",
+        "scope": "global",
+        "variantId": null,
         "label": "Leprechaun",
         "name": "leprechaun",
         "currentRltilesName": "leprechaun",
@@ -321,6 +383,8 @@
         "group": "monsters",
         "key": "M",
         "glyph": "M",
+        "scope": "global",
+        "variantId": null,
         "label": "Medusa",
         "name": "medusa",
         "currentRltilesName": "medusa",
@@ -331,6 +395,8 @@
         "group": "monsters",
         "key": "N",
         "glyph": "N",
+        "scope": "global",
+        "variantId": null,
         "label": "Nymph",
         "name": "nymph",
         "currentRltilesName": "wood_nymph",
@@ -341,6 +407,8 @@
         "group": "monsters",
         "key": "O",
         "glyph": "O",
+        "scope": "global",
+        "variantId": null,
         "label": "Orc",
         "name": "orc",
         "currentRltilesName": "orc",
@@ -351,6 +419,8 @@
         "group": "monsters",
         "key": "P",
         "glyph": "P",
+        "scope": "global",
+        "variantId": null,
         "label": "Phantom",
         "name": "phantom",
         "currentRltilesName": "phantom",
@@ -361,6 +431,8 @@
         "group": "monsters",
         "key": "Q",
         "glyph": "Q",
+        "scope": "global",
+        "variantId": null,
         "label": "Quagga",
         "name": "quagga",
         "currentRltilesName": "horse",
@@ -371,6 +443,8 @@
         "group": "monsters",
         "key": "R",
         "glyph": "R",
+        "scope": "global",
+        "variantId": null,
         "label": "Rattlesnake",
         "name": "rattlesnake",
         "currentRltilesName": "snake",
@@ -381,6 +455,8 @@
         "group": "monsters",
         "key": "S",
         "glyph": "S",
+        "scope": "global",
+        "variantId": null,
         "label": "Snake",
         "name": "snake",
         "currentRltilesName": "snake",
@@ -391,6 +467,8 @@
         "group": "monsters",
         "key": "T",
         "glyph": "T",
+        "scope": "global",
+        "variantId": null,
         "label": "Troll",
         "name": "troll",
         "currentRltilesName": "troll",
@@ -401,6 +479,8 @@
         "group": "monsters",
         "key": "U",
         "glyph": "U",
+        "scope": "global",
+        "variantId": null,
         "label": "Black Unicorn",
         "name": "black unicorn",
         "currentRltilesName": "black_unicorn",
@@ -411,6 +491,8 @@
         "group": "monsters",
         "key": "V",
         "glyph": "V",
+        "scope": "global",
+        "variantId": null,
         "label": "Vampire",
         "name": "vampire",
         "currentRltilesName": "vampire",
@@ -421,6 +503,8 @@
         "group": "monsters",
         "key": "W",
         "glyph": "W",
+        "scope": "global",
+        "variantId": null,
         "label": "Wraith",
         "name": "wraith",
         "currentRltilesName": "wraith",
@@ -431,6 +515,8 @@
         "group": "monsters",
         "key": "X",
         "glyph": "X",
+        "scope": "global",
+        "variantId": null,
         "label": "Xeroc",
         "name": "xeroc",
         "currentRltilesName": "small_mimic",
@@ -441,6 +527,8 @@
         "group": "monsters",
         "key": "Y",
         "glyph": "Y",
+        "scope": "global",
+        "variantId": null,
         "label": "Yeti",
         "name": "yeti",
         "currentRltilesName": "yeti",
@@ -451,8 +539,1450 @@
         "group": "monsters",
         "key": "Z",
         "glyph": "Z",
+        "scope": "global",
+        "variantId": null,
         "label": "Zombie",
         "name": "zombie",
+        "currentRltilesName": "human_zombie",
+        "currentRltilesIndex": 520
+      },
+      {
+        "role": "trap.trapdoor",
+        "group": "traps",
+        "key": "trapdoor",
+        "glyph": ">",
+        "scope": "global",
+        "variantId": null,
+        "label": "Trapdoor",
+        "name": "trapdoor",
+        "currentRltilesName": "trap_door",
+        "currentRltilesIndex": 1464
+      },
+      {
+        "role": "trap.arrow",
+        "group": "traps",
+        "key": "arrow",
+        "glyph": "{",
+        "scope": "global",
+        "variantId": null,
+        "label": "Arrow trap",
+        "name": "arrow trap",
+        "currentRltilesName": "arrow_trap",
+        "currentRltilesIndex": 1452
+      },
+      {
+        "role": "trap.sleeping_gas",
+        "group": "traps",
+        "key": "sleeping_gas",
+        "glyph": "$",
+        "scope": "global",
+        "variantId": null,
+        "label": "Sleeping gas trap",
+        "name": "sleeping gas trap",
+        "currentRltilesName": "sleeping_gas_trap",
+        "currentRltilesIndex": 1458
+      },
+      {
+        "role": "trap.bear",
+        "group": "traps",
+        "key": "bear",
+        "glyph": "}",
+        "scope": "global",
+        "variantId": null,
+        "label": "Bear trap",
+        "name": "bear trap",
+        "currentRltilesName": "bear_trap",
+        "currentRltilesIndex": 1456
+      },
+      {
+        "role": "trap.teleport",
+        "group": "traps",
+        "key": "teleport",
+        "glyph": "~",
+        "scope": "global",
+        "variantId": null,
+        "label": "Teleport trap",
+        "name": "teleport trap",
+        "currentRltilesName": "teleportation_trap",
+        "currentRltilesIndex": 1465
+      },
+      {
+        "role": "trap.poison_dart",
+        "group": "traps",
+        "key": "poison_dart",
+        "glyph": "`",
+        "scope": "global",
+        "variantId": null,
+        "label": "Poison dart trap",
+        "name": "poison dart trap",
+        "currentRltilesName": "dart_trap",
+        "currentRltilesIndex": 1453
+      },
+      {
+        "role": "terrain.srogue90.magic_pool",
+        "group": "terrain",
+        "key": "srogue90.magic_pool",
+        "glyph": "\"",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "Super-Rogue Magic Pool",
+        "name": "magic pool",
+        "currentRltilesName": "dngn_sparkling_fountain",
+        "currentRltilesIndex": 1413
+      },
+      {
+        "role": "terrain.srogue90.secret_door",
+        "group": "terrain",
+        "key": "srogue90.secret_door",
+        "glyph": "&",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "Super-Rogue Revealed Secret Door",
+        "name": "revealed secret door",
+        "currentRltilesName": "dngn_closed_door",
+        "currentRltilesIndex": 1367
+      },
+      {
+        "role": "terrain.srogue90.trading_post",
+        "group": "terrain",
+        "key": "srogue90.trading_post",
+        "glyph": "^",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "Super-Rogue Trading Post",
+        "name": "trading post",
+        "currentRltilesName": "dngn_enter_shop",
+        "currentRltilesIndex": 1385
+      },
+      {
+        "role": "trap.srogue90.arrow",
+        "group": "traps",
+        "key": "srogue90.arrow",
+        "glyph": "{",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "Super-Rogue Arrow Trap",
+        "name": "arrow trap",
+        "currentRltilesName": "arrow_trap",
+        "currentRltilesIndex": 1452
+      },
+      {
+        "role": "trap.srogue90.bear",
+        "group": "traps",
+        "key": "srogue90.bear",
+        "glyph": "}",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "Super-Rogue Bear Trap",
+        "name": "bear trap",
+        "currentRltilesName": "bear_trap",
+        "currentRltilesIndex": 1456
+      },
+      {
+        "role": "trap.srogue90.maze",
+        "group": "traps",
+        "key": "srogue90.maze",
+        "glyph": "\\",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "Super-Rogue Maze Trap",
+        "name": "maze trap",
+        "currentRltilesName": "magic_trap",
+        "currentRltilesIndex": 1470
+      },
+      {
+        "role": "trap.srogue90.poison_dart",
+        "group": "traps",
+        "key": "srogue90.poison_dart",
+        "glyph": "`",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "Super-Rogue Poison Dart Trap",
+        "name": "poison dart trap",
+        "currentRltilesName": "dart_trap",
+        "currentRltilesIndex": 1453
+      },
+      {
+        "role": "trap.srogue90.sleeping_gas",
+        "group": "traps",
+        "key": "srogue90.sleeping_gas",
+        "glyph": "$",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "Super-Rogue Sleeping Gas Trap",
+        "name": "sleeping gas trap",
+        "currentRltilesName": "sleeping_gas_trap",
+        "currentRltilesIndex": 1458
+      },
+      {
+        "role": "trap.srogue90.teleport",
+        "group": "traps",
+        "key": "srogue90.teleport",
+        "glyph": "~",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "Super-Rogue Teleport Trap",
+        "name": "teleport trap",
+        "currentRltilesName": "teleportation_trap",
+        "currentRltilesIndex": 1465
+      },
+      {
+        "role": "trap.srogue90.trapdoor",
+        "group": "traps",
+        "key": "srogue90.trapdoor",
+        "glyph": ">",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "Super-Rogue Trapdoor",
+        "name": "trapdoor",
+        "currentRltilesName": "trap_door",
+        "currentRltilesIndex": 1464
+      },
+      {
+        "role": "monster.rogue36.A",
+        "group": "monsters",
+        "key": "rogue36.A",
+        "glyph": "A",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 A: Giant Ant",
+        "name": "giant ant",
+        "currentRltilesName": "queen_ant",
+        "currentRltilesIndex": 173
+      },
+      {
+        "role": "monster.rogue36.B",
+        "group": "monsters",
+        "key": "rogue36.B",
+        "glyph": "B",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 B: Bat",
+        "name": "bat",
+        "currentRltilesName": "bat",
+        "currentRltilesIndex": 434
+      },
+      {
+        "role": "monster.rogue36.C",
+        "group": "monsters",
+        "key": "rogue36.C",
+        "glyph": "C",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 C: Centaur",
+        "name": "centaur",
+        "currentRltilesName": "plains_centaur",
+        "currentRltilesIndex": 229
+      },
+      {
+        "role": "monster.rogue36.D",
+        "group": "monsters",
+        "key": "rogue36.D",
+        "glyph": "D",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 D: Dragon",
+        "name": "dragon",
+        "currentRltilesName": "green_dragon",
+        "currentRltilesIndex": 108
+      },
+      {
+        "role": "monster.rogue36.E",
+        "group": "monsters",
+        "key": "rogue36.E",
+        "glyph": "E",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 E: Floating Eye",
+        "name": "floating eye",
+        "currentRltilesName": "floating_eye",
+        "currentRltilesIndex": 132
+      },
+      {
+        "role": "monster.rogue36.F",
+        "group": "monsters",
+        "key": "rogue36.F",
+        "glyph": "F",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 F: Violet Fungi",
+        "name": "violet fungi",
+        "currentRltilesName": "violet_fungus",
+        "currentRltilesIndex": 462
+      },
+      {
+        "role": "monster.rogue36.G",
+        "group": "monsters",
+        "key": "rogue36.G",
+        "glyph": "G",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 G: Gnome",
+        "name": "gnome",
+        "currentRltilesName": "gnome",
+        "currentRltilesIndex": 463
+      },
+      {
+        "role": "monster.rogue36.H",
+        "group": "monsters",
+        "key": "rogue36.H",
+        "glyph": "H",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 H: Hobgoblin",
+        "name": "hobgoblin",
+        "currentRltilesName": "hobgoblin",
+        "currentRltilesIndex": 386
+      },
+      {
+        "role": "monster.rogue36.I",
+        "group": "monsters",
+        "key": "rogue36.I",
+        "glyph": "I",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 I: Invisible Stalker",
+        "name": "invisible stalker",
+        "currentRltilesName": "stalker",
+        "currentRltilesIndex": 455
+      },
+      {
+        "role": "monster.rogue36.J",
+        "group": "monsters",
+        "key": "rogue36.J",
+        "glyph": "J",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 J: Jackal",
+        "name": "jackal",
+        "currentRltilesName": "jackal",
+        "currentRltilesIndex": 268
+      },
+      {
+        "role": "monster.rogue36.K",
+        "group": "monsters",
+        "key": "rogue36.K",
+        "glyph": "K",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 K: Kobold",
+        "name": "kobold",
+        "currentRltilesName": "big_kobold",
+        "currentRltilesIndex": 152
+      },
+      {
+        "role": "monster.rogue36.L",
+        "group": "monsters",
+        "key": "rogue36.L",
+        "glyph": "L",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 L: Leprechaun",
+        "name": "leprechaun",
+        "currentRltilesName": "leprechaun",
+        "currentRltilesIndex": 378
+      },
+      {
+        "role": "monster.rogue36.M",
+        "group": "monsters",
+        "key": "rogue36.M",
+        "glyph": "M",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 M: Mimic",
+        "name": "mimic",
+        "currentRltilesName": "small_mimic",
+        "currentRltilesIndex": 379
+      },
+      {
+        "role": "monster.rogue36.N",
+        "group": "monsters",
+        "key": "rogue36.N",
+        "glyph": "N",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 N: Nymph",
+        "name": "nymph",
+        "currentRltilesName": "wood_nymph",
+        "currentRltilesIndex": 382
+      },
+      {
+        "role": "monster.rogue36.O",
+        "group": "monsters",
+        "key": "rogue36.O",
+        "glyph": "O",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 O: Orc",
+        "name": "orc",
+        "currentRltilesName": "orc",
+        "currentRltilesIndex": 387
+      },
+      {
+        "role": "monster.rogue36.P",
+        "group": "monsters",
+        "key": "rogue36.P",
+        "glyph": "P",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 P: Purple Worm",
+        "name": "purple worm",
+        "currentRltilesName": "purple_worm",
+        "currentRltilesIndex": 424
+      },
+      {
+        "role": "monster.rogue36.Q",
+        "group": "monsters",
+        "key": "rogue36.Q",
+        "glyph": "Q",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 Q: Quasit",
+        "name": "quasit",
+        "currentRltilesName": "quasit",
+        "currentRltilesIndex": 300
+      },
+      {
+        "role": "monster.rogue36.R",
+        "group": "monsters",
+        "key": "rogue36.R",
+        "glyph": "R",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 R: Rust Monster",
+        "name": "rust monster",
+        "currentRltilesName": "rust_monster",
+        "currentRltilesIndex": 497
+      },
+      {
+        "role": "monster.rogue36.S",
+        "group": "monsters",
+        "key": "rogue36.S",
+        "glyph": "S",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 S: Snake",
+        "name": "snake",
+        "currentRltilesName": "snake",
+        "currentRltilesIndex": 183
+      },
+      {
+        "role": "monster.rogue36.T",
+        "group": "monsters",
+        "key": "rogue36.T",
+        "glyph": "T",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 T: Troll",
+        "name": "troll",
+        "currentRltilesName": "troll",
+        "currentRltilesIndex": 189
+      },
+      {
+        "role": "monster.rogue36.U",
+        "group": "monsters",
+        "key": "rogue36.U",
+        "glyph": "U",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 U: Umber Hulk",
+        "name": "umber hulk",
+        "currentRltilesName": "umber_hulk",
+        "currentRltilesIndex": 505
+      },
+      {
+        "role": "monster.rogue36.V",
+        "group": "monsters",
+        "key": "rogue36.V",
+        "glyph": "V",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 V: Vampire",
+        "name": "vampire",
+        "currentRltilesName": "vampire",
+        "currentRltilesIndex": 194
+      },
+      {
+        "role": "monster.rogue36.W",
+        "group": "monsters",
+        "key": "rogue36.W",
+        "glyph": "W",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 W: Wraith",
+        "name": "wraith",
+        "currentRltilesName": "wraith",
+        "currentRltilesIndex": 202
+      },
+      {
+        "role": "monster.rogue36.X",
+        "group": "monsters",
+        "key": "rogue36.X",
+        "glyph": "X",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 X: Xorn",
+        "name": "xorn",
+        "currentRltilesName": "xorn",
+        "currentRltilesIndex": 509
+      },
+      {
+        "role": "monster.rogue36.Y",
+        "group": "monsters",
+        "key": "rogue36.Y",
+        "glyph": "Y",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 Y: Yeti",
+        "name": "yeti",
+        "currentRltilesName": "yeti",
+        "currentRltilesIndex": 513
+      },
+      {
+        "role": "monster.rogue36.Z",
+        "group": "monsters",
+        "key": "rogue36.Z",
+        "glyph": "Z",
+        "scope": "variant",
+        "variantId": "rogue36",
+        "label": "rogue36 Z: Zombie",
+        "name": "zombie",
+        "currentRltilesName": "human_zombie",
+        "currentRltilesIndex": 520
+      },
+      {
+        "role": "monster.rogue52.A",
+        "group": "monsters",
+        "key": "rogue52.A",
+        "glyph": "A",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 A: Giant Ant",
+        "name": "giant ant",
+        "currentRltilesName": "queen_ant",
+        "currentRltilesIndex": 173
+      },
+      {
+        "role": "monster.rogue52.B",
+        "group": "monsters",
+        "key": "rogue52.B",
+        "glyph": "B",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 B: Bat",
+        "name": "bat",
+        "currentRltilesName": "bat",
+        "currentRltilesIndex": 434
+      },
+      {
+        "role": "monster.rogue52.C",
+        "group": "monsters",
+        "key": "rogue52.C",
+        "glyph": "C",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 C: Centaur",
+        "name": "centaur",
+        "currentRltilesName": "plains_centaur",
+        "currentRltilesIndex": 229
+      },
+      {
+        "role": "monster.rogue52.D",
+        "group": "monsters",
+        "key": "rogue52.D",
+        "glyph": "D",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 D: Dragon",
+        "name": "dragon",
+        "currentRltilesName": "green_dragon",
+        "currentRltilesIndex": 108
+      },
+      {
+        "role": "monster.rogue52.E",
+        "group": "monsters",
+        "key": "rogue52.E",
+        "glyph": "E",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 E: Floating Eye",
+        "name": "floating eye",
+        "currentRltilesName": "floating_eye",
+        "currentRltilesIndex": 132
+      },
+      {
+        "role": "monster.rogue52.F",
+        "group": "monsters",
+        "key": "rogue52.F",
+        "glyph": "F",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 F: Violet Fungi",
+        "name": "violet fungi",
+        "currentRltilesName": "violet_fungus",
+        "currentRltilesIndex": 462
+      },
+      {
+        "role": "monster.rogue52.G",
+        "group": "monsters",
+        "key": "rogue52.G",
+        "glyph": "G",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 G: Gnome",
+        "name": "gnome",
+        "currentRltilesName": "gnome",
+        "currentRltilesIndex": 463
+      },
+      {
+        "role": "monster.rogue52.H",
+        "group": "monsters",
+        "key": "rogue52.H",
+        "glyph": "H",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 H: Hobgoblin",
+        "name": "hobgoblin",
+        "currentRltilesName": "hobgoblin",
+        "currentRltilesIndex": 386
+      },
+      {
+        "role": "monster.rogue52.I",
+        "group": "monsters",
+        "key": "rogue52.I",
+        "glyph": "I",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 I: Invisible Stalker",
+        "name": "invisible stalker",
+        "currentRltilesName": "stalker",
+        "currentRltilesIndex": 455
+      },
+      {
+        "role": "monster.rogue52.J",
+        "group": "monsters",
+        "key": "rogue52.J",
+        "glyph": "J",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 J: Jackal",
+        "name": "jackal",
+        "currentRltilesName": "jackal",
+        "currentRltilesIndex": 268
+      },
+      {
+        "role": "monster.rogue52.K",
+        "group": "monsters",
+        "key": "rogue52.K",
+        "glyph": "K",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 K: Kobold",
+        "name": "kobold",
+        "currentRltilesName": "big_kobold",
+        "currentRltilesIndex": 152
+      },
+      {
+        "role": "monster.rogue52.L",
+        "group": "monsters",
+        "key": "rogue52.L",
+        "glyph": "L",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 L: Leprechaun",
+        "name": "leprechaun",
+        "currentRltilesName": "leprechaun",
+        "currentRltilesIndex": 378
+      },
+      {
+        "role": "monster.rogue52.M",
+        "group": "monsters",
+        "key": "rogue52.M",
+        "glyph": "M",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 M: Mimic",
+        "name": "mimic",
+        "currentRltilesName": "small_mimic",
+        "currentRltilesIndex": 379
+      },
+      {
+        "role": "monster.rogue52.N",
+        "group": "monsters",
+        "key": "rogue52.N",
+        "glyph": "N",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 N: Nymph",
+        "name": "nymph",
+        "currentRltilesName": "wood_nymph",
+        "currentRltilesIndex": 382
+      },
+      {
+        "role": "monster.rogue52.O",
+        "group": "monsters",
+        "key": "rogue52.O",
+        "glyph": "O",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 O: Orc",
+        "name": "orc",
+        "currentRltilesName": "orc",
+        "currentRltilesIndex": 387
+      },
+      {
+        "role": "monster.rogue52.P",
+        "group": "monsters",
+        "key": "rogue52.P",
+        "glyph": "P",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 P: Purple Worm",
+        "name": "purple worm",
+        "currentRltilesName": "purple_worm",
+        "currentRltilesIndex": 424
+      },
+      {
+        "role": "monster.rogue52.Q",
+        "group": "monsters",
+        "key": "rogue52.Q",
+        "glyph": "Q",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 Q: Quasit",
+        "name": "quasit",
+        "currentRltilesName": "quasit",
+        "currentRltilesIndex": 300
+      },
+      {
+        "role": "monster.rogue52.R",
+        "group": "monsters",
+        "key": "rogue52.R",
+        "glyph": "R",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 R: Rust Monster",
+        "name": "rust monster",
+        "currentRltilesName": "rust_monster",
+        "currentRltilesIndex": 497
+      },
+      {
+        "role": "monster.rogue52.S",
+        "group": "monsters",
+        "key": "rogue52.S",
+        "glyph": "S",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 S: Snake",
+        "name": "snake",
+        "currentRltilesName": "snake",
+        "currentRltilesIndex": 183
+      },
+      {
+        "role": "monster.rogue52.T",
+        "group": "monsters",
+        "key": "rogue52.T",
+        "glyph": "T",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 T: Troll",
+        "name": "troll",
+        "currentRltilesName": "troll",
+        "currentRltilesIndex": 189
+      },
+      {
+        "role": "monster.rogue52.U",
+        "group": "monsters",
+        "key": "rogue52.U",
+        "glyph": "U",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 U: Umber Hulk",
+        "name": "umber hulk",
+        "currentRltilesName": "umber_hulk",
+        "currentRltilesIndex": 505
+      },
+      {
+        "role": "monster.rogue52.V",
+        "group": "monsters",
+        "key": "rogue52.V",
+        "glyph": "V",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 V: Vampire",
+        "name": "vampire",
+        "currentRltilesName": "vampire",
+        "currentRltilesIndex": 194
+      },
+      {
+        "role": "monster.rogue52.W",
+        "group": "monsters",
+        "key": "rogue52.W",
+        "glyph": "W",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 W: Wraith",
+        "name": "wraith",
+        "currentRltilesName": "wraith",
+        "currentRltilesIndex": 202
+      },
+      {
+        "role": "monster.rogue52.X",
+        "group": "monsters",
+        "key": "rogue52.X",
+        "glyph": "X",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 X: Xorn",
+        "name": "xorn",
+        "currentRltilesName": "xorn",
+        "currentRltilesIndex": 509
+      },
+      {
+        "role": "monster.rogue52.Y",
+        "group": "monsters",
+        "key": "rogue52.Y",
+        "glyph": "Y",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 Y: Yeti",
+        "name": "yeti",
+        "currentRltilesName": "yeti",
+        "currentRltilesIndex": 513
+      },
+      {
+        "role": "monster.rogue52.Z",
+        "group": "monsters",
+        "key": "rogue52.Z",
+        "glyph": "Z",
+        "scope": "variant",
+        "variantId": "rogue52",
+        "label": "rogue52 Z: Zombie",
+        "name": "zombie",
+        "currentRltilesName": "human_zombie",
+        "currentRltilesIndex": 520
+      },
+      {
+        "role": "monster.srogue90.A",
+        "group": "monsters",
+        "key": "srogue90.A",
+        "glyph": "A",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 A: Giant Ant",
+        "name": "giant ant",
+        "currentRltilesName": "queen_ant",
+        "currentRltilesIndex": 173
+      },
+      {
+        "role": "monster.srogue90.B",
+        "group": "monsters",
+        "key": "srogue90.B",
+        "glyph": "B",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 B: Bat",
+        "name": "bat",
+        "currentRltilesName": "bat",
+        "currentRltilesIndex": 434
+      },
+      {
+        "role": "monster.srogue90.C",
+        "group": "monsters",
+        "key": "srogue90.C",
+        "glyph": "C",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 C: Centaur",
+        "name": "centaur",
+        "currentRltilesName": "plains_centaur",
+        "currentRltilesIndex": 229
+      },
+      {
+        "role": "monster.srogue90.D",
+        "group": "monsters",
+        "key": "srogue90.D",
+        "glyph": "D",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 D: Red Dragon",
+        "name": "red dragon",
+        "currentRltilesName": "red_dragon",
+        "currentRltilesIndex": 452
+      },
+      {
+        "role": "monster.srogue90.E",
+        "group": "monsters",
+        "key": "srogue90.E",
+        "glyph": "E",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 E: Floating Eye",
+        "name": "floating eye",
+        "currentRltilesName": "floating_eye",
+        "currentRltilesIndex": 132
+      },
+      {
+        "role": "monster.srogue90.F",
+        "group": "monsters",
+        "key": "srogue90.F",
+        "glyph": "F",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 F: Violet Fungi",
+        "name": "violet fungi",
+        "currentRltilesName": "violet_fungus",
+        "currentRltilesIndex": 462
+      },
+      {
+        "role": "monster.srogue90.G",
+        "group": "monsters",
+        "key": "srogue90.G",
+        "glyph": "G",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 G: Gnome",
+        "name": "gnome",
+        "currentRltilesName": "gnome",
+        "currentRltilesIndex": 463
+      },
+      {
+        "role": "monster.srogue90.H",
+        "group": "monsters",
+        "key": "srogue90.H",
+        "glyph": "H",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 H: Hobgoblin",
+        "name": "hobgoblin",
+        "currentRltilesName": "hobgoblin",
+        "currentRltilesIndex": 386
+      },
+      {
+        "role": "monster.srogue90.I",
+        "group": "monsters",
+        "key": "srogue90.I",
+        "glyph": "I",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 I: Invisible Stalker",
+        "name": "invisible stalker",
+        "currentRltilesName": "stalker",
+        "currentRltilesIndex": 455
+      },
+      {
+        "role": "monster.srogue90.J",
+        "group": "monsters",
+        "key": "srogue90.J",
+        "glyph": "J",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 J: Jackal",
+        "name": "jackal",
+        "currentRltilesName": "jackal",
+        "currentRltilesIndex": 268
+      },
+      {
+        "role": "monster.srogue90.K",
+        "group": "monsters",
+        "key": "srogue90.K",
+        "glyph": "K",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 K: Kobold",
+        "name": "kobold",
+        "currentRltilesName": "big_kobold",
+        "currentRltilesIndex": 152
+      },
+      {
+        "role": "monster.srogue90.L",
+        "group": "monsters",
+        "key": "srogue90.L",
+        "glyph": "L",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 L: Leprechaun",
+        "name": "leprechaun",
+        "currentRltilesName": "leprechaun",
+        "currentRltilesIndex": 378
+      },
+      {
+        "role": "monster.srogue90.M",
+        "group": "monsters",
+        "key": "srogue90.M",
+        "glyph": "M",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 M: Mimic",
+        "name": "mimic",
+        "currentRltilesName": "small_mimic",
+        "currentRltilesIndex": 379
+      },
+      {
+        "role": "monster.srogue90.N",
+        "group": "monsters",
+        "key": "srogue90.N",
+        "glyph": "N",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 N: Nymph",
+        "name": "nymph",
+        "currentRltilesName": "wood_nymph",
+        "currentRltilesIndex": 382
+      },
+      {
+        "role": "monster.srogue90.O",
+        "group": "monsters",
+        "key": "srogue90.O",
+        "glyph": "O",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 O: Orc",
+        "name": "orc",
+        "currentRltilesName": "orc",
+        "currentRltilesIndex": 387
+      },
+      {
+        "role": "monster.srogue90.P",
+        "group": "monsters",
+        "key": "srogue90.P",
+        "glyph": "P",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 P: Purple Worm",
+        "name": "purple worm",
+        "currentRltilesName": "purple_worm",
+        "currentRltilesIndex": 424
+      },
+      {
+        "role": "monster.srogue90.Q",
+        "group": "monsters",
+        "key": "srogue90.Q",
+        "glyph": "Q",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 Q: Quasit",
+        "name": "quasit",
+        "currentRltilesName": "quasit",
+        "currentRltilesIndex": 300
+      },
+      {
+        "role": "monster.srogue90.R",
+        "group": "monsters",
+        "key": "srogue90.R",
+        "glyph": "R",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 R: Rust Monster",
+        "name": "rust monster",
+        "currentRltilesName": "rust_monster",
+        "currentRltilesIndex": 497
+      },
+      {
+        "role": "monster.srogue90.S",
+        "group": "monsters",
+        "key": "srogue90.S",
+        "glyph": "S",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 S: Snake",
+        "name": "snake",
+        "currentRltilesName": "snake",
+        "currentRltilesIndex": 183
+      },
+      {
+        "role": "monster.srogue90.T",
+        "group": "monsters",
+        "key": "srogue90.T",
+        "glyph": "T",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 T: Troll",
+        "name": "troll",
+        "currentRltilesName": "troll",
+        "currentRltilesIndex": 189
+      },
+      {
+        "role": "monster.srogue90.U",
+        "group": "monsters",
+        "key": "srogue90.U",
+        "glyph": "U",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 U: Umber Hulk",
+        "name": "umber hulk",
+        "currentRltilesName": "umber_hulk",
+        "currentRltilesIndex": 505
+      },
+      {
+        "role": "monster.srogue90.V",
+        "group": "monsters",
+        "key": "srogue90.V",
+        "glyph": "V",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 V: Vampire",
+        "name": "vampire",
+        "currentRltilesName": "vampire",
+        "currentRltilesIndex": 194
+      },
+      {
+        "role": "monster.srogue90.W",
+        "group": "monsters",
+        "key": "srogue90.W",
+        "glyph": "W",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 W: Wraith",
+        "name": "wraith",
+        "currentRltilesName": "wraith",
+        "currentRltilesIndex": 202
+      },
+      {
+        "role": "monster.srogue90.X",
+        "group": "monsters",
+        "key": "srogue90.X",
+        "glyph": "X",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 X: Xorn",
+        "name": "xorn",
+        "currentRltilesName": "xorn",
+        "currentRltilesIndex": 509
+      },
+      {
+        "role": "monster.srogue90.Y",
+        "group": "monsters",
+        "key": "srogue90.Y",
+        "glyph": "Y",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 Y: Yeti",
+        "name": "yeti",
+        "currentRltilesName": "yeti",
+        "currentRltilesIndex": 513
+      },
+      {
+        "role": "monster.srogue90.Z",
+        "group": "monsters",
+        "key": "srogue90.Z",
+        "glyph": "Z",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 Z: Zombie",
+        "name": "zombie",
+        "currentRltilesName": "human_zombie",
+        "currentRltilesIndex": 520
+      },
+      {
+        "role": "monster.srogue90.a",
+        "group": "monsters",
+        "key": "srogue90.a",
+        "glyph": "a",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 a: Anhkheg",
+        "name": "anhkheg",
+        "currentRltilesName": "giant_beetle",
+        "currentRltilesIndex": 98
+      },
+      {
+        "role": "monster.srogue90.b",
+        "group": "monsters",
+        "key": "srogue90.b",
+        "glyph": "b",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 b: Giant Beetle",
+        "name": "giant beetle",
+        "currentRltilesName": "giant_beetle",
+        "currentRltilesIndex": 98
+      },
+      {
+        "role": "monster.srogue90.c",
+        "group": "monsters",
+        "key": "srogue90.c",
+        "glyph": "c",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 c: Cockatrice",
+        "name": "cockatrice",
+        "currentRltilesName": "cockatrice",
+        "currentRltilesIndex": 339
+      },
+      {
+        "role": "monster.srogue90.d",
+        "group": "monsters",
+        "key": "srogue90.d",
+        "glyph": "d",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 d: Bone Devil",
+        "name": "bone devil",
+        "currentRltilesName": "bone_devil",
+        "currentRltilesIndex": 560
+      },
+      {
+        "role": "monster.srogue90.e",
+        "group": "monsters",
+        "key": "srogue90.e",
+        "glyph": "e",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 e: Elasmosaurus",
+        "name": "elasmosaurus",
+        "currentRltilesName": "giant_lizard",
+        "currentRltilesIndex": 273
+      },
+      {
+        "role": "monster.srogue90.f",
+        "group": "monsters",
+        "key": "srogue90.f",
+        "glyph": "f",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 f: Killer Frog",
+        "name": "killer frog",
+        "currentRltilesName": "giant_frog",
+        "currentRltilesIndex": 128
+      },
+      {
+        "role": "monster.srogue90.g",
+        "group": "monsters",
+        "key": "srogue90.g",
+        "glyph": "g",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 g: Green Dragon",
+        "name": "green dragon",
+        "currentRltilesName": "green_dragon",
+        "currentRltilesIndex": 108
+      },
+      {
+        "role": "monster.srogue90.h",
+        "group": "monsters",
+        "key": "srogue90.h",
+        "glyph": "h",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 h: Hell Hound",
+        "name": "hell hound",
+        "currentRltilesName": "hell_hound",
+        "currentRltilesIndex": 262
+      },
+      {
+        "role": "monster.srogue90.i",
+        "group": "monsters",
+        "key": "srogue90.i",
+        "glyph": "i",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 i: Imp",
+        "name": "imp",
+        "currentRltilesName": "imp",
+        "currentRltilesIndex": 45
+      },
+      {
+        "role": "monster.srogue90.j",
+        "group": "monsters",
+        "key": "srogue90.j",
+        "glyph": "j",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 j: Jaguar",
+        "name": "jaguar",
+        "currentRltilesName": "jaguar",
+        "currentRltilesIndex": 357
+      },
+      {
+        "role": "monster.srogue90.k",
+        "group": "monsters",
+        "key": "srogue90.k",
+        "glyph": "k",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 k: Koppleganger",
+        "name": "koppleganger",
+        "currentRltilesName": "doppelganger",
+        "currentRltilesIndex": 533
+      },
+      {
+        "role": "monster.srogue90.l",
+        "group": "monsters",
+        "key": "srogue90.l",
+        "glyph": "l",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 l: Lonchu",
+        "name": "lonchu",
+        "currentRltilesName": "shadow_imp",
+        "currentRltilesIndex": 49
+      },
+      {
+        "role": "monster.srogue90.m",
+        "group": "monsters",
+        "key": "srogue90.m",
+        "glyph": "m",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 m: Minotaur",
+        "name": "minotaur",
+        "currentRltilesName": "minotaur",
+        "currentRltilesIndex": 281
+      },
+      {
+        "role": "monster.srogue90.n",
+        "group": "monsters",
+        "key": "srogue90.n",
+        "glyph": "n",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 n: Neotyugh",
+        "name": "neotyugh",
+        "currentRltilesName": "abomination_small",
+        "currentRltilesIndex": 322
+      },
+      {
+        "role": "monster.srogue90.o",
+        "group": "monsters",
+        "key": "srogue90.o",
+        "glyph": "o",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 o: Ogre",
+        "name": "ogre",
+        "currentRltilesName": "ogre",
+        "currentRltilesIndex": 168
+      },
+      {
+        "role": "monster.srogue90.p",
+        "group": "monsters",
+        "key": "srogue90.p",
+        "glyph": "p",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 p: Pseudo Dragon",
+        "name": "pseudo dragon",
+        "currentRltilesName": "baby_red_dragon",
+        "currentRltilesIndex": 442
+      },
+      {
+        "role": "monster.srogue90.q",
+        "group": "monsters",
+        "key": "srogue90.q",
+        "glyph": "q",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 q: Quellit",
+        "name": "quellit",
+        "currentRltilesName": "blue_devil",
+        "currentRltilesIndex": 30
+      },
+      {
+        "role": "monster.srogue90.r",
+        "group": "monsters",
+        "key": "srogue90.r",
+        "glyph": "r",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 r: Rhynosphinx",
+        "name": "rhynosphinx",
+        "currentRltilesName": "sphinx",
+        "currentRltilesIndex": 139
+      },
+      {
+        "role": "monster.srogue90.s",
+        "group": "monsters",
+        "key": "srogue90.s",
+        "glyph": "s",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 s: Shadow",
+        "name": "shadow",
+        "currentRltilesName": "shadow_wraith",
+        "currentRltilesIndex": 198
+      },
+      {
+        "role": "monster.srogue90.t",
+        "group": "monsters",
+        "key": "srogue90.t",
+        "glyph": "t",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 t: Titanothere",
+        "name": "titanothere",
+        "currentRltilesName": "titanothere",
+        "currentRltilesIndex": 400
+      },
+      {
+        "role": "monster.srogue90.u",
+        "group": "monsters",
+        "key": "srogue90.u",
+        "glyph": "u",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 u: Ulodyte",
+        "name": "ulodyte",
+        "currentRltilesName": "troll",
+        "currentRltilesIndex": 189
+      },
+      {
+        "role": "monster.srogue90.v",
+        "group": "monsters",
+        "key": "srogue90.v",
+        "glyph": "v",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 v: Vrock",
+        "name": "vrock",
+        "currentRltilesName": "vrock",
+        "currentRltilesIndex": 558
+      },
+      {
+        "role": "monster.srogue90.w",
+        "group": "monsters",
+        "key": "srogue90.w",
+        "glyph": "w",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 w: Wuccubi",
+        "name": "wuccubi",
+        "currentRltilesName": "succubus",
+        "currentRltilesIndex": 553
+      },
+      {
+        "role": "monster.srogue90.x",
+        "group": "monsters",
+        "key": "srogue90.x",
+        "glyph": "x",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 x: Xonoclon",
+        "name": "xonoclon",
+        "currentRltilesName": "xorn",
+        "currentRltilesIndex": 509
+      },
+      {
+        "role": "monster.srogue90.y",
+        "group": "monsters",
+        "key": "srogue90.y",
+        "glyph": "y",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 y: Yeenoghu",
+        "name": "yeenoghu",
+        "currentRltilesName": "yeenoghu",
+        "currentRltilesIndex": 562
+      },
+      {
+        "role": "monster.srogue90.z",
+        "group": "monsters",
+        "key": "srogue90.z",
+        "glyph": "z",
+        "scope": "variant",
+        "variantId": "srogue90",
+        "label": "srogue90 z: Zemure",
+        "name": "zemure",
         "currentRltilesName": "human_zombie",
         "currentRltilesIndex": 520
       }
@@ -10306,7 +11836,9 @@
     "notes": [
       "This file maps Rogue semantics to rltiles atlas keys.",
       "The upstream rltiles JSON is an atlas manifest, not gameplay semantics.",
-      "Map-visible object categories stay generic so tile rendering does not reveal hidden item identity."
+      "Map-visible object categories stay generic so tile rendering does not reveal hidden item identity.",
+      "Use variantTerrain and variantTraps for variant-only map features or glyphs whose meaning differs by variant.",
+      "New variants should add a complete A-Z entry under variantMonsters.<variant-id> when their monster alphabet differs from the base Rogue 5.4.4 table."
     ],
     "terrain": {
       "empty": {
@@ -10374,6 +11906,64 @@
       "mysterious": {
         "id": 7,
         "atlas": "dngn_trap_magical"
+      }
+    },
+    "variantTerrain": {
+      "srogue90": {
+        "magic_pool": {
+          "glyph": "\"",
+          "name": "magic pool",
+          "atlas": "dngn_sparkling_fountain"
+        },
+        "trading_post": {
+          "glyph": "^",
+          "name": "trading post",
+          "atlas": "dngn_enter_shop"
+        },
+        "secret_door": {
+          "glyph": "&",
+          "name": "revealed secret door",
+          "atlas": "dngn_closed_door"
+        }
+      }
+    },
+    "variantTraps": {
+      "srogue90": {
+        "maze": {
+          "glyph": "\\",
+          "name": "maze trap",
+          "atlas": "magic_trap"
+        },
+        "trapdoor": {
+          "glyph": ">",
+          "name": "trapdoor",
+          "atlas": "trap_door"
+        },
+        "arrow": {
+          "glyph": "{",
+          "name": "arrow trap",
+          "atlas": "arrow_trap"
+        },
+        "sleeping_gas": {
+          "glyph": "$",
+          "name": "sleeping gas trap",
+          "atlas": "sleeping_gas_trap"
+        },
+        "bear": {
+          "glyph": "}",
+          "name": "bear trap",
+          "atlas": "bear_trap"
+        },
+        "teleport": {
+          "glyph": "~",
+          "name": "teleport trap",
+          "atlas": "teleportation_trap"
+        },
+        "poison_dart": {
+          "glyph": "`",
+          "name": "poison dart trap",
+          "atlas": "dart_trap"
+        }
       }
     },
     "objects": {
@@ -10534,6 +12124,502 @@
         "name": "zombie",
         "atlas": "human_zombie"
       }
+    },
+    "variantMonsters": {
+      "rogue36": {
+        "A": {
+          "name": "giant ant",
+          "atlas": "queen_ant",
+          "note": "giant_ant sprite is nearly black on the dungeon background"
+        },
+        "B": {
+          "name": "bat",
+          "atlas": "bat"
+        },
+        "C": {
+          "name": "centaur",
+          "atlas": "plains_centaur"
+        },
+        "D": {
+          "name": "dragon",
+          "atlas": "green_dragon"
+        },
+        "E": {
+          "name": "floating eye",
+          "atlas": "floating_eye"
+        },
+        "F": {
+          "name": "violet fungi",
+          "atlas": "violet_fungus"
+        },
+        "G": {
+          "name": "gnome",
+          "atlas": "gnome"
+        },
+        "H": {
+          "name": "hobgoblin",
+          "atlas": "hobgoblin"
+        },
+        "I": {
+          "name": "invisible stalker",
+          "atlas": "stalker",
+          "note": "rltiles key is stalker"
+        },
+        "J": {
+          "name": "jackal",
+          "atlas": "jackal"
+        },
+        "K": {
+          "name": "kobold",
+          "atlas": "big_kobold",
+          "note": "kobold sprite is nearly black on the dungeon background"
+        },
+        "L": {
+          "name": "leprechaun",
+          "atlas": "leprechaun"
+        },
+        "M": {
+          "name": "mimic",
+          "atlas": "small_mimic"
+        },
+        "N": {
+          "name": "nymph",
+          "atlas": "wood_nymph"
+        },
+        "O": {
+          "name": "orc",
+          "atlas": "orc"
+        },
+        "P": {
+          "name": "purple worm",
+          "atlas": "purple_worm"
+        },
+        "Q": {
+          "name": "quasit",
+          "atlas": "quasit"
+        },
+        "R": {
+          "name": "rust monster",
+          "atlas": "rust_monster"
+        },
+        "S": {
+          "name": "snake",
+          "atlas": "snake"
+        },
+        "T": {
+          "name": "troll",
+          "atlas": "troll"
+        },
+        "U": {
+          "name": "umber hulk",
+          "atlas": "umber_hulk"
+        },
+        "V": {
+          "name": "vampire",
+          "atlas": "vampire"
+        },
+        "W": {
+          "name": "wraith",
+          "atlas": "wraith"
+        },
+        "X": {
+          "name": "xorn",
+          "atlas": "xorn"
+        },
+        "Y": {
+          "name": "yeti",
+          "atlas": "yeti"
+        },
+        "Z": {
+          "name": "zombie",
+          "atlas": "human_zombie"
+        }
+      },
+      "rogue52": {
+        "A": {
+          "name": "giant ant",
+          "atlas": "queen_ant",
+          "note": "giant_ant sprite is nearly black on the dungeon background"
+        },
+        "B": {
+          "name": "bat",
+          "atlas": "bat"
+        },
+        "C": {
+          "name": "centaur",
+          "atlas": "plains_centaur"
+        },
+        "D": {
+          "name": "dragon",
+          "atlas": "green_dragon"
+        },
+        "E": {
+          "name": "floating eye",
+          "atlas": "floating_eye"
+        },
+        "F": {
+          "name": "violet fungi",
+          "atlas": "violet_fungus"
+        },
+        "G": {
+          "name": "gnome",
+          "atlas": "gnome"
+        },
+        "H": {
+          "name": "hobgoblin",
+          "atlas": "hobgoblin"
+        },
+        "I": {
+          "name": "invisible stalker",
+          "atlas": "stalker",
+          "note": "rltiles key is stalker"
+        },
+        "J": {
+          "name": "jackal",
+          "atlas": "jackal"
+        },
+        "K": {
+          "name": "kobold",
+          "atlas": "big_kobold",
+          "note": "kobold sprite is nearly black on the dungeon background"
+        },
+        "L": {
+          "name": "leprechaun",
+          "atlas": "leprechaun"
+        },
+        "M": {
+          "name": "mimic",
+          "atlas": "small_mimic"
+        },
+        "N": {
+          "name": "nymph",
+          "atlas": "wood_nymph"
+        },
+        "O": {
+          "name": "orc",
+          "atlas": "orc"
+        },
+        "P": {
+          "name": "purple worm",
+          "atlas": "purple_worm"
+        },
+        "Q": {
+          "name": "quasit",
+          "atlas": "quasit"
+        },
+        "R": {
+          "name": "rust monster",
+          "atlas": "rust_monster"
+        },
+        "S": {
+          "name": "snake",
+          "atlas": "snake"
+        },
+        "T": {
+          "name": "troll",
+          "atlas": "troll"
+        },
+        "U": {
+          "name": "umber hulk",
+          "atlas": "umber_hulk"
+        },
+        "V": {
+          "name": "vampire",
+          "atlas": "vampire"
+        },
+        "W": {
+          "name": "wraith",
+          "atlas": "wraith"
+        },
+        "X": {
+          "name": "xorn",
+          "atlas": "xorn"
+        },
+        "Y": {
+          "name": "yeti",
+          "atlas": "yeti"
+        },
+        "Z": {
+          "name": "zombie",
+          "atlas": "human_zombie"
+        }
+      },
+      "srogue90": [
+        {
+          "glyph": "A",
+          "name": "giant ant",
+          "atlas": "queen_ant",
+          "note": "giant_ant sprite is nearly black on the dungeon background; Super-Rogue also uses A for Asmodeus as a special late monster"
+        },
+        {
+          "glyph": "B",
+          "name": "bat",
+          "atlas": "bat"
+        },
+        {
+          "glyph": "C",
+          "name": "centaur",
+          "atlas": "plains_centaur"
+        },
+        {
+          "glyph": "D",
+          "name": "red dragon",
+          "atlas": "red_dragon"
+        },
+        {
+          "glyph": "E",
+          "name": "floating eye",
+          "atlas": "floating_eye"
+        },
+        {
+          "glyph": "F",
+          "name": "violet fungi",
+          "atlas": "violet_fungus"
+        },
+        {
+          "glyph": "G",
+          "name": "gnome",
+          "atlas": "gnome"
+        },
+        {
+          "glyph": "H",
+          "name": "hobgoblin",
+          "atlas": "hobgoblin"
+        },
+        {
+          "glyph": "I",
+          "name": "invisible stalker",
+          "atlas": "stalker",
+          "note": "rltiles key is stalker"
+        },
+        {
+          "glyph": "J",
+          "name": "jackal",
+          "atlas": "jackal"
+        },
+        {
+          "glyph": "K",
+          "name": "kobold",
+          "atlas": "big_kobold",
+          "note": "kobold sprite is nearly black on the dungeon background"
+        },
+        {
+          "glyph": "L",
+          "name": "leprechaun",
+          "atlas": "leprechaun"
+        },
+        {
+          "glyph": "M",
+          "name": "mimic",
+          "atlas": "small_mimic"
+        },
+        {
+          "glyph": "N",
+          "name": "nymph",
+          "atlas": "wood_nymph"
+        },
+        {
+          "glyph": "O",
+          "name": "orc",
+          "atlas": "orc"
+        },
+        {
+          "glyph": "P",
+          "name": "purple worm",
+          "atlas": "purple_worm"
+        },
+        {
+          "glyph": "Q",
+          "name": "quasit",
+          "atlas": "quasit"
+        },
+        {
+          "glyph": "R",
+          "name": "rust monster",
+          "atlas": "rust_monster"
+        },
+        {
+          "glyph": "S",
+          "name": "snake",
+          "atlas": "snake"
+        },
+        {
+          "glyph": "T",
+          "name": "troll",
+          "atlas": "troll"
+        },
+        {
+          "glyph": "U",
+          "name": "umber hulk",
+          "atlas": "umber_hulk"
+        },
+        {
+          "glyph": "V",
+          "name": "vampire",
+          "atlas": "vampire"
+        },
+        {
+          "glyph": "W",
+          "name": "wraith",
+          "atlas": "wraith"
+        },
+        {
+          "glyph": "X",
+          "name": "xorn",
+          "atlas": "xorn"
+        },
+        {
+          "glyph": "Y",
+          "name": "yeti",
+          "atlas": "yeti"
+        },
+        {
+          "glyph": "Z",
+          "name": "zombie",
+          "atlas": "human_zombie"
+        },
+        {
+          "glyph": "a",
+          "name": "anhkheg",
+          "atlas": "giant_beetle",
+          "note": "no anhkheg atlas key; armored burrower closest fit"
+        },
+        {
+          "glyph": "b",
+          "name": "giant beetle",
+          "atlas": "giant_beetle"
+        },
+        {
+          "glyph": "c",
+          "name": "cockatrice",
+          "atlas": "cockatrice"
+        },
+        {
+          "glyph": "d",
+          "name": "bone devil",
+          "atlas": "bone_devil"
+        },
+        {
+          "glyph": "e",
+          "name": "elasmosaurus",
+          "atlas": "giant_lizard",
+          "note": "no elasmosaurus atlas key"
+        },
+        {
+          "glyph": "f",
+          "name": "killer frog",
+          "atlas": "giant_frog"
+        },
+        {
+          "glyph": "g",
+          "name": "green dragon",
+          "atlas": "green_dragon"
+        },
+        {
+          "glyph": "h",
+          "name": "hell hound",
+          "atlas": "hell_hound"
+        },
+        {
+          "glyph": "i",
+          "name": "imp",
+          "atlas": "imp"
+        },
+        {
+          "glyph": "j",
+          "name": "jaguar",
+          "atlas": "jaguar"
+        },
+        {
+          "glyph": "k",
+          "name": "koppleganger",
+          "atlas": "doppelganger",
+          "note": "Super-Rogue spelling differs from rltiles"
+        },
+        {
+          "glyph": "l",
+          "name": "lonchu",
+          "atlas": "shadow_imp",
+          "note": "no lonchu atlas key"
+        },
+        {
+          "glyph": "m",
+          "name": "minotaur",
+          "atlas": "minotaur"
+        },
+        {
+          "glyph": "n",
+          "name": "neotyugh",
+          "atlas": "abomination_small",
+          "note": "no neotyugh/otyugh atlas key"
+        },
+        {
+          "glyph": "o",
+          "name": "ogre",
+          "atlas": "ogre"
+        },
+        {
+          "glyph": "p",
+          "name": "pseudo dragon",
+          "atlas": "baby_red_dragon"
+        },
+        {
+          "glyph": "q",
+          "name": "quellit",
+          "atlas": "blue_devil",
+          "note": "no quellit atlas key"
+        },
+        {
+          "glyph": "r",
+          "name": "rhynosphinx",
+          "atlas": "sphinx",
+          "note": "closest sphinx atlas key"
+        },
+        {
+          "glyph": "s",
+          "name": "shadow",
+          "atlas": "shadow_wraith"
+        },
+        {
+          "glyph": "t",
+          "name": "titanothere",
+          "atlas": "titanothere"
+        },
+        {
+          "glyph": "u",
+          "name": "ulodyte",
+          "atlas": "troll",
+          "note": "no ulodyte atlas key"
+        },
+        {
+          "glyph": "v",
+          "name": "vrock",
+          "atlas": "vrock"
+        },
+        {
+          "glyph": "w",
+          "name": "wuccubi",
+          "atlas": "succubus",
+          "note": "closest succubus-style atlas key"
+        },
+        {
+          "glyph": "x",
+          "name": "xonoclon",
+          "atlas": "xorn",
+          "note": "no xonoclon atlas key"
+        },
+        {
+          "glyph": "y",
+          "name": "yeenoghu",
+          "atlas": "yeenoghu"
+        },
+        {
+          "glyph": "z",
+          "name": "zemure",
+          "atlas": "human_zombie",
+          "note": "no zemure atlas key"
+        }
+      ]
     }
   }
 }

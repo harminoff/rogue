@@ -14,6 +14,7 @@ typedef enum rogue_frontend_kind {
 
 bool rogue_frontend_init(int *argc, char **argv);
 bool rogue_frontend_start(void);
+void rogue_frontend_prepare_game_start(void);
 bool rogue_frontend_choose_variant(void);
 void rogue_frontend_render(void);
 char rogue_frontend_readchar(void);

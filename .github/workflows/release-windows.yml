@@ -115,6 +115,12 @@ jobs:
 
           Download RogueTiles-windows-x64.zip, extract it, and run RogueTiles.exe.
           TilePicker.exe is included for custom tile set editing.
+
+          Added in this release:
+          - Super-Rogue 9.0.1 selectable from the startup game picker, with tile rendering, extended HUD stats, GUI menus, and bundled guide text.
+          - Improved F1 manuals/guides with a taller reader, chapter select, and cleaner Super-Rogue guide formatting.
+          - Expanded tile picker/runtime tile pack support for variant-specific monster mappings and multiple custom tile sets.
+          - Tile frontend polish for wide maps, hidden-object visibility, actor fallbacks, shaders, blood layering, fullscreen/zoom, and packaged runtime assets.
           "@
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {

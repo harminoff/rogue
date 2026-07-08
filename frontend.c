@@ -21,6 +21,7 @@ static bool launcher_restart_requested = FALSE;
 
 #ifdef ROGUE_ENABLE_ALLEGRO
 bool rogue_allegro_start(bool smoke);
+void rogue_allegro_prepare_game_start(void);
 const char *rogue_allegro_choose_variant(void);
 void rogue_allegro_enable_shader_smoke(void);
 void rogue_allegro_render(void);
@@ -128,9 +129,15 @@ rogue_frontend_init(int *argc, char **argv)
 {
     int read_idx, write_idx;
 
+#ifdef ROGUE_ANDROID
+    tiles_requested = TRUE;
+#endif
+
+#ifndef ROGUE_ANDROID
     if (argv != NULL && argv[0] != NULL
 	&& rogue_frontend_default_tiles_for_executable(argv[0]))
 	tiles_requested = TRUE;
+#endif
 
     write_idx = 1;
     for (read_idx = 1; read_idx < *argc; read_idx++)
@@ -187,6 +194,15 @@ rogue_frontend_start(void)
 #endif
 
     return TRUE;
+}
+
+void
+rogue_frontend_prepare_game_start(void)
+{
+#ifdef ROGUE_ENABLE_ALLEGRO
+    if (frontend_kind == ROGUE_FRONTEND_ALLEGRO)
+	rogue_allegro_prepare_game_start();
+#endif
 }
 
 bool

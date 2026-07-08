@@ -46,6 +46,9 @@
 
 #include <curses.h>
 #include "extern.h"
+#ifdef ROGUE_ANDROID
+#include "rogue_platform.h"
+#endif
 
 #if defined(HAVE_SYS_TYPES)
 #include <sys/types.h>
@@ -364,6 +367,9 @@ md_chmod(char *filename, int mode)
 void
 md_normaluser()
 {
+#ifdef ROGUE_ANDROID
+    return;
+#else
 #if defined(HAVE_GETGID) && defined(HAVE_GETUID)
 	gid_t realgid = getgid();
 	uid_t realuid = getuid();
@@ -394,6 +400,7 @@ md_normaluser()
 	exit(1);
     }
 #endif
+#endif
 }
 
 int
@@ -421,6 +428,9 @@ md_getusername()
 {
     static char login[80];
     char *l = NULL;
+#ifdef ROGUE_ANDROID
+    l = "Rogue";
+#else
 #ifdef _WIN32
     LPSTR mybuffer;
     DWORD size = UNLEN + 1;
@@ -435,6 +445,7 @@ md_getusername()
     pw = getpwuid(getuid());
 
     l = pw->pw_name;
+#endif
 #endif
 
     if ((l == NULL) || (*l == '\0'))
@@ -455,6 +466,10 @@ md_gethomedir()
     static char homedir[PATH_MAX];
     char *h = NULL;
     size_t len;
+#ifdef ROGUE_ANDROID
+    rogue_platform_user_path("", homedir, sizeof(homedir));
+    return homedir;
+#endif
 #if defined(_WIN32)
     TCHAR szPath[PATH_MAX];
 #endif

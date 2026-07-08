@@ -4,11 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <curses.h>
+#include "rogue_platform.h"
 #include "tilepack.h"
 #include "generated/rogue_tile_mapping.h"
 
-#define ROGUE_TILEPACK_MAX_TEXT 262144
-#define ROGUE_TILEPACK_MAX_ENTRIES 128
+#define ROGUE_TILEPACK_MAX_ENTRIES 512
 
 static ROGUE_TILEPACK_ENTRY entries[ROGUE_TILEPACK_MAX_ENTRIES];
 static int entry_count = 0;
@@ -18,39 +18,8 @@ static int source_width = 32;
 static int source_height = 32;
 static char status_text[256] = "built-in generated tile mapping";
 static char current_pack_id[64] = "generated";
+static bool generated_fallback_safe = TRUE;
 static bool loaded = FALSE;
-
-static char *
-read_text_file(const char *path)
-{
-    FILE *file;
-    long size;
-    char *text;
-
-    file = fopen(path, "rb");
-    if (file == NULL)
-	return NULL;
-
-    fseek(file, 0, SEEK_END);
-    size = ftell(file);
-    if (size < 0 || size > ROGUE_TILEPACK_MAX_TEXT)
-    {
-	fclose(file);
-	return NULL;
-    }
-
-    fseek(file, 0, SEEK_SET);
-    text = (char *) calloc((size_t) size + 1, 1);
-    if (text == NULL)
-    {
-	fclose(file);
-	return NULL;
-    }
-
-    fread(text, 1, (size_t) size, file);
-    fclose(file);
-    return text;
-}
 
 static const char *
 skip_ws(const char *p)
@@ -126,6 +95,36 @@ json_int_field(const char *json, const char *key, int *out)
 
     *out = atoi(p);
     return TRUE;
+}
+
+static bool
+json_bool_field(const char *json, const char *key, bool *out)
+{
+    char pattern[96];
+    const char *p;
+
+    snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+    p = strstr(json, pattern);
+    if (p == NULL)
+	return FALSE;
+
+    p = strchr(p + strlen(pattern), ':');
+    if (p == NULL)
+	return FALSE;
+
+    p = skip_ws(p + 1);
+    if (strncmp(p, "true", 4) == 0)
+    {
+	*out = TRUE;
+	return TRUE;
+    }
+    if (strncmp(p, "false", 5) == 0)
+    {
+	*out = FALSE;
+	return TRUE;
+    }
+
+    return FALSE;
 }
 
 static const char *
@@ -225,9 +224,14 @@ tilepack_json_summary(const char *tilepack_path, char *label,
     char *json;
     char image_name[256];
     char mapping_name[256];
+    char resolved_tilepack_path[512];
+    const char *display_path;
     int width, height, columns;
 
-    json = read_text_file(tilepack_path);
+    display_path = rogue_platform_asset_path(tilepack_path,
+					     resolved_tilepack_path,
+					     sizeof(resolved_tilepack_path));
+    json = rogue_platform_read_text_file(tilepack_path);
     if (json == NULL)
 	return FALSE;
 
@@ -246,7 +250,7 @@ tilepack_json_summary(const char *tilepack_path, char *label,
     if (!json_string_field(json, "name", label, label_size)
 	|| label[0] == '\0')
     {
-	strncpy(label, tilepack_path, label_size - 1);
+	strncpy(label, display_path, label_size - 1);
 	label[label_size - 1] = '\0';
     }
 
@@ -300,6 +304,7 @@ reset_to_generated(void)
     atlas_columns = rogue_tile_atlas_columns();
     source_width = rogue_tile_atlas_source_width();
     source_height = rogue_tile_atlas_source_height();
+    generated_fallback_safe = TRUE;
     strncpy(current_pack_id, "generated", sizeof(current_pack_id) - 1);
     current_pack_id[sizeof(current_pack_id) - 1] = '\0';
 }
@@ -397,9 +402,11 @@ load_tilepack_file(const char *tilepack_path, const char *pack_id)
     char dir[512];
     char image_name[256];
     char mapping_name[256];
+    char pack_name[128];
     char mapping_path[512];
+    bool allow_generated_fallback;
 
-    tilepack_json = read_text_file(tilepack_path);
+    tilepack_json = rogue_platform_read_text_file(tilepack_path);
     if (tilepack_json == NULL)
 	return FALSE;
 
@@ -415,11 +422,19 @@ load_tilepack_file(const char *tilepack_path, const char *pack_id)
 	return FALSE;
     }
 
+    if (!json_string_field(tilepack_json, "name", pack_name,
+			   sizeof(pack_name)))
+	pack_name[0] = '\0';
+    if (!json_bool_field(tilepack_json, "fallbackToGenerated",
+			 &allow_generated_fallback))
+	allow_generated_fallback = (bool)(strcmp(pack_name,
+						 "Default RL Tiles") == 0);
+
     dirname_of(tilepack_path, dir, sizeof(dir));
     join_path(dir, image_name, atlas_path, sizeof(atlas_path));
     join_path(dir, mapping_name, mapping_path, sizeof(mapping_path));
 
-    mapping_json = read_text_file(mapping_path);
+    mapping_json = rogue_platform_read_text_file(mapping_path);
     if (mapping_json == NULL)
     {
 	free(tilepack_json);
@@ -428,6 +443,7 @@ load_tilepack_file(const char *tilepack_path, const char *pack_id)
 
     entry_count = 0;
     parse_mapping_roles(mapping_json);
+    generated_fallback_safe = allow_generated_fallback;
     if (pack_id != NULL && *pack_id != '\0')
     {
 	strncpy(current_pack_id, pack_id, sizeof(current_pack_id) - 1);
@@ -490,6 +506,7 @@ rogue_tilepack_list(ROGUE_TILEPACK_CHOICE *choices, int max_choices)
 {
     DIR *dir;
     struct dirent *entry;
+    char tilepacks_path[512];
     int count;
 
     if (choices == NULL || max_choices <= 0)
@@ -500,7 +517,8 @@ rogue_tilepack_list(ROGUE_TILEPACK_CHOICE *choices, int max_choices)
     add_choice(choices, &count, max_choices, "active");
     add_choice(choices, &count, max_choices, "default");
 
-    dir = opendir("tilepacks");
+    dir = opendir(rogue_platform_asset_path("tilepacks", tilepacks_path,
+					    sizeof(tilepacks_path)));
     if (dir == NULL)
 	return count;
 
@@ -554,12 +572,20 @@ rogue_tilepack_lookup_index(const char *role, int fallback_index)
     int i;
 
     rogue_tilepack_load();
+#ifdef ROGUE_ANDROID
+    return fallback_index;
+#endif
     if (role == NULL)
 	return fallback_index;
 
     for (i = 0; i < entry_count; i++)
-	if (strcmp(entries[i].role, role) == 0 && entries[i].index >= 0)
+	if (entries[i].role[0] != '\0'
+	    && strcmp(entries[i].role, role) == 0
+	    && entries[i].index >= 0)
 	    return entries[i].index;
+
+    if (!generated_fallback_safe)
+	return -1;
 
     return fallback_index;
 }
@@ -570,11 +596,14 @@ rogue_tilepack_lookup_name(const char *role, const char *fallback_name)
     int i;
 
     rogue_tilepack_load();
+#ifdef ROGUE_ANDROID
+    return fallback_name;
+#endif
     if (role == NULL)
 	return fallback_name;
 
     for (i = 0; i < entry_count; i++)
-	if (strcmp(entries[i].role, role) == 0)
+	if (entries[i].role[0] != '\0' && strcmp(entries[i].role, role) == 0)
 	    return entries[i].name;
 
     return fallback_name;

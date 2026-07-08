@@ -49,6 +49,9 @@
 #include <curses.h>
 #include "extern.h"
 #include "frontend.h"
+#ifdef ROGUE_ANDROID
+#include "rogue_platform.h"
+#endif
 
 #define NOOP(x) (x += 0)
 
@@ -101,7 +104,14 @@ void
 open_score()
 {
 #ifdef SCOREFILE
+#ifdef ROGUE_ANDROID
+    char scorefile_buf[PATH_MAX];
+    char *scorefile = (char *) rogue_platform_user_path(SCOREFILE,
+							scorefile_buf,
+							sizeof(scorefile_buf));
+#else
     char *scorefile = SCOREFILE;
+#endif
      /* 
       * We drop setgid privileges after opening the score file, so subsequent 
       * open()'s will fail.  Just reuse the earlier filehandle. 
@@ -382,7 +392,14 @@ lock_sc()
 #if defined(SCOREFILE) && defined(LOCKFILE)
     int cnt;
     static struct stat sbuf;
+#ifdef ROGUE_ANDROID
+    char lockfile_buf[PATH_MAX];
+    char *lockfile = (char *) rogue_platform_user_path(LOCKFILE,
+						       lockfile_buf,
+						       sizeof(lockfile_buf));
+#else
     char *lockfile = LOCKFILE;
+#endif
 
 over:
     if ((lfd=fopen(lockfile, "w+")) != NULL)
@@ -456,10 +473,18 @@ void
 unlock_sc()
 {
 #if defined(SCOREFILE) && defined(LOCKFILE)
+#ifdef ROGUE_ANDROID
+    char lockfile_buf[PATH_MAX];
+    char *lockfile = (char *) rogue_platform_user_path(LOCKFILE,
+						       lockfile_buf,
+						       sizeof(lockfile_buf));
+#else
+    char *lockfile = LOCKFILE;
+#endif
     if (lfd != NULL)
         fclose(lfd);
     lfd = NULL;
-    md_unlink(LOCKFILE);
+    md_unlink(lockfile);
 #endif
 }
 

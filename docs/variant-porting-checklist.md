@@ -26,6 +26,9 @@ Use this checklist whenever adding a new Rogue engine variant.
 
 - Keep terrain, traps, objects, and player roles shared unless the variant changes their glyph semantics.
 - Keep map-visible item categories generic unless the game has already revealed the identity to the player.
+- Use shared `terrain`, `traps`, `objects`, `actors`, and base `monsters` as the global defaults for the tile picker.
+- Add variant-only map features under `variantTerrain.<variant-id>` or `variantTraps.<variant-id>` when a variant adds new visible terrain/trap glyphs or reuses a shared glyph with different meaning.
+- The tile picker should expose Global / Shared roles separately from per-variant override roles. Variant-specific roles fall back to shared/generated mappings when a custom tile pack does not assign them.
 - If the variant monster alphabet differs from Rogue 5.4.4, add a complete A-Z section to `assets/rltiles/rogue-rltiles-map.json`:
 
 ```json
@@ -38,7 +41,8 @@ Use this checklist whenever adding a new Rogue engine variant.
 
 - Prefer exact RLTiles atlas keys. If no exact key exists, use the closest visual fit and add a `note`.
 - Update or confirm `scripts/validate-rltiles.ps1` verifies 26 entries for every variant.
-- Confirm `tile_picker` exposes `monster.<variant-id>.<letter>` roles so custom tile packs can override variant-specific monsters.
+- Confirm `tile_picker` exposes variant-specific roles such as `monster.<variant-id>.<letter>`, `terrain.<variant-id>.<feature>`, and `trap.<variant-id>.<trap>` so custom tile packs can override variant-specific art.
+- Do not add hidden potion, scroll, ring, wand, or weapon subtype tiles unless the renderer can prove the player already knows that identity.
 
 ## GUI Coverage
 
