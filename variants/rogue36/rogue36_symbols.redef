@@ -372,6 +372,7 @@ total rogue36_total
 total_winner rogue36_total_winner
 tr_name rogue36_tr_name
 treas_room rogue36_treas_room
+tstp rogue36_tstp
 turn_see rogue36_turn_see
 turnref rogue36_turnref
 u_level rogue36_u_level

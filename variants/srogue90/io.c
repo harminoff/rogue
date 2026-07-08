@@ -70,16 +70,21 @@ endmsg()
 {
 	strcpy(huh, msgbuf);
 	if (mpos > 0) {
-		wmove(cw, 0, mpos);
-		waddstr(cw, morestr);
-		draw(cw);
-		wait_for(cw, ' ');
+		if (!rogue_frontend_is_tiles()) {
+			wmove(cw, 0, mpos);
+			waddstr(cw, morestr);
+			draw(cw);
+			wait_for(cw, ' ');
+		}
 	}
+	rogue_frontend_record_message(msgbuf);
 	mvwaddstr(cw, 0, 0, msgbuf);
 	wclrtoeol(cw);
 	mpos = newpos;
 	newpos = 0;
 	draw(cw);
+	if (rogue_frontend_is_tiles())
+		rogue_frontend_render();
 }
 
 /*

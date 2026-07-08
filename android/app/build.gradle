@@ -15,7 +15,6 @@ android {
 
         externalNativeBuild {
             cmake {
-                cFlags '-std=gnu89', '-DROGUE_ANDROID', '-DROGUE_ANDROID_DEFAULT_ONLY', '-DROGUE_ENABLE_ALLEGRO', '-DALLSCORES', '-DSCOREFILE="rogue54.scr"', '-DLOCKFILE="rogue54.lck"'
                 arguments '-DANDROID_STL=c++_shared'
             }
         }
@@ -28,6 +27,12 @@ android {
     externalNativeBuild {
         cmake {
             path 'src/main/cpp/CMakeLists.txt'
+        }
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging true
         }
     }
 }

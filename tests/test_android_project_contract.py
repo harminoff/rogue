@@ -33,16 +33,20 @@ def test_android_project_files_exist():
     assert missing == []
 
 
-def test_android_build_uses_cmake_and_default_only_native_flag():
+def test_android_build_uses_cmake_and_bundled_variant_native_sources():
     build_gradle = read("android/app/build.gradle")
     cmake = read("android/app/src/main/cpp/CMakeLists.txt")
     assert "externalNativeBuild" in build_gradle
     assert "src/main/cpp/CMakeLists.txt" in build_gradle
     assert re.search(r"\bROGUE_ANDROID\b", cmake)
-    assert "ROGUE_ANDROID_DEFAULT_ONLY" in cmake
+    assert "ROGUE_ANDROID_DEFAULT_ONLY" not in cmake
     assert "allegro_frontend.c" in cmake
     assert "mobile_controls.c" in cmake
     assert "rogue_platform.c" in cmake
+    assert "add_rogue_variant_objects(rogue52" in cmake
+    assert "add_rogue_variant_objects(rogue36" in cmake
+    assert "add_rogue_variant_objects(srogue90" in cmake
+    assert "android_variant_bridge_stubs.c" not in cmake
 
 
 def test_android_app_excludes_tile_editor_artifacts():
@@ -67,6 +71,8 @@ def test_android_app_excludes_tile_editor_artifacts():
 
 def test_android_activity_loads_allegro_and_roguetiles_library():
     activity = read("android/app/src/main/java/com/roguetiles/RogueTilesActivity.java")
+    platform = read("rogue_platform.c")
+    header = read("rogue_platform.h")
     assert "extends AllegroActivity" in activity
     assert 'System.loadLibrary("allegro")' in activity
     assert 'System.loadLibrary("allegro_image")' in activity
@@ -76,6 +82,14 @@ def test_android_activity_loads_allegro_and_roguetiles_library():
     assert 'System.loadLibrary("roguetiles")' in activity
     assert 'super("libroguetiles.so")' in activity
     assert "nativeConfigureStorage" in activity
+    assert "nativeConfigureSafeArea" in activity
+    assert "WindowInsets" in activity
+    assert "DisplayCutout" in activity
+    assert "getSafeInsetTop()" in activity
+    assert "setOnApplyWindowInsetsListener" in activity
+    assert "Java_com_roguetiles_RogueTilesActivity_nativeConfigureSafeArea" in platform
+    assert "rogue_platform_configure_safe_area" in platform
+    assert "rogue_platform_android_safe_top_inset" in header
 
 
 def test_android_debug_build_requires_project_gradle_wrapper():
@@ -99,7 +113,36 @@ def test_android_asset_sync_clears_stale_bundled_assets_before_copying():
     assert "target.delete()" in asset_sync
 
 
-def test_android_cmake_uses_default_ruleset_only():
+def test_android_asset_sync_includes_readable_manuals():
+    sync_script = read("scripts/sync-android-assets.ps1")
+    asset_sync = read("android/app/src/main/java/com/roguetiles/AndroidAssetSync.java")
+
+    assert 'New-Item -ItemType Directory -Force (Join-Path $assetRoot "variants")' in sync_script
+    assert 'Copy-Item -LiteralPath (Join-Path $repoRoot "variants\\rogue52\\rogue.6")' in sync_script
+    assert 'Copy-Item -LiteralPath (Join-Path $repoRoot "variants\\rogue36\\rogue.r")' in sync_script
+    assert 'Copy-Item -LiteralPath (Join-Path $repoRoot "variants\\srogue90\\rogue.nr")' in sync_script
+    assert 'Copy-Item -LiteralPath (Join-Path $repoRoot "rogue54.doc")' in sync_script
+    assert 'copyTree(context.getAssets(), "variants", root);' in asset_sync
+
+
+def test_android_curses_new_windows_have_separate_backing_storage():
+    curses = read("android/app/src/main/cpp/android_curses.c")
+    cell_at_body = curses[curses.index("cell_at(WINDOW *win"):
+                          curses.index("static void\nwindow_fill")]
+    newwin_body = curses[curses.index("newwin(int rows, int cols"):
+                         curses.index("WINDOW *\nsubwin")]
+    delwin_body = curses[curses.index("delwin(WINDOW *win)"):
+                         curses.index("int\nmvwin")]
+
+    assert "win->owns_cells" in cell_at_body
+    assert "return &win->cells[y * win->cols + x];" in cell_at_body
+    assert "win->owns_cells = 1;" in newwin_body
+    assert "calloc((size_t) rows * (size_t) cols" in newwin_body
+    assert "win->cells == NULL" in newwin_body
+    assert "free(win->cells);" in delwin_body
+
+
+def test_android_cmake_uses_default_ruleset_and_playable_variants():
     cmake = read("android/app/src/main/cpp/CMakeLists.txt")
     base_sources = [
         "vers.c",
@@ -147,6 +190,11 @@ def test_android_cmake_uses_default_ruleset_only():
     ]
     for source in base_sources:
         assert source in cmake
-    assert "variants/rogue52" not in cmake
-    assert "variants/rogue36" not in cmake
-    assert "variants/srogue90" not in cmake
+    variant_sources = [
+        "rogue52_port.c",
+        "rogue36_port.c",
+        "srogue90_port.c",
+        "_symbols.redef",
+    ]
+    for source in variant_sources:
+        assert source in cmake

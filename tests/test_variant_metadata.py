@@ -83,6 +83,18 @@ class VariantMetadataTest(unittest.TestCase):
         self.assertIn("variants/rogue36/rogue.6", variant_text)
         self.assertIn("variants/rogue36/rogue.r", variant_text)
         self.assertIn("variants/rogue52/rogue.6", variant_text)
+        self.assertTrue((ROOT / "rogue54.6").exists())
+        self.assertTrue((ROOT / "rogue54.doc").exists())
+        self.assertTrue((ROOT / "variants" / "rogue36" / "rogue.6").exists())
+        self.assertTrue((ROOT / "variants" / "rogue36" / "rogue.r").exists())
+        self.assertTrue((ROOT / "variants" / "rogue52" / "rogue.6").exists())
+        self.assertTrue((ROOT / "variants" / "srogue90" / "rogue.nr").exists())
+        open_manual_body = frontend_text[
+            frontend_text.index("open_manual_file"):
+            frontend_text.index("manual_has_local_text")
+        ]
+        self.assertIn("rogue_platform_asset_path", open_manual_body)
+        self.assertIn("open_manual_file(manual->readable_path", frontend_text)
         package_text = (ROOT / "scripts" / "package-windows.ps1").read_text(encoding="utf-8")
         self.assertIn("rogue54.6", package_text)
         self.assertIn("rogue54.doc", package_text)
@@ -160,7 +172,8 @@ class VariantMetadataTest(unittest.TestCase):
         self.assertIn("return LINES > 3 ? LINES - 3 : LINES", port_text)
         self.assertIn("srogue90_bridge_volume_percent", port_text)
         self.assertIn("return cansee(y, x) ? TRUE : FALSE", port_text)
-        self.assertIn("glyph != ' ' && !srogue90_bridge_player_is_blind()", tiles_text)
+        self.assertIn("&& !srogue90_bridge_player_is_blind()", tiles_text)
+        self.assertIn("&& srogue90_bridge_cansee(y, x)", tiles_text)
         self.assertIn("object_visible = (bool)(glyph_is_object && visible)", tiles_text)
         self.assertIn("status->has_extended_stats = TRUE", tiles_text)
         self.assertIn("status->dexterity = srogue90_bridge_dexterity()", tiles_text)
@@ -236,6 +249,14 @@ class VariantMetadataTest(unittest.TestCase):
         self.assertIn("tile_pick_genocide_monster", monsters_text)
         self.assertIn('rogue_frontend_text_overlay_begin("Genocide")', monsters_text)
         self.assertIn("rogue_frontend_text_overlay_begin(message)", io_text)
+
+    def test_super_rogue_messages_are_forwarded_to_tile_log(self):
+        io_text = (ROOT / "variants" / "srogue90" / "io.c").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("rogue_frontend_record_message(msgbuf)", io_text)
+        self.assertIn("rogue_frontend_render()", io_text)
 
     def test_rogue36_save_score_death_and_win_use_gui_overlays_in_tile_mode(self):
         save_text = (ROOT / "variants" / "rogue36" / "save.c").read_text(

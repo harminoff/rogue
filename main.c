@@ -56,8 +56,13 @@ main(int argc, char **argv, char **envp)
     {
 	if (!rogue_frontend_start())
 	    my_exit(1);
+#ifdef ROGUE_ANDROID_DEFAULT_ONLY
+	rogue_frontend_prepare_game_start();
+#endif
+#ifndef ROGUE_ANDROID_DEFAULT_ONLY
 	if (!rogue_frontend_choose_variant())
 	    my_exit(1);
+#endif
     }
 
 #ifndef ROGUE_ANDROID_DEFAULT_ONLY

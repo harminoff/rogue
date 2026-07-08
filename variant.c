@@ -14,6 +14,7 @@ int rogue52_variant_level_number(void);
 int rogue52_variant_map_rows(void);
 int rogue52_variant_map_cols(void);
 bool rogue52_variant_cell_walkable(int y, int x);
+void rogue52_variant_action_context(ROGUE_VARIANT_ACTION_CONTEXT *context);
 void rogue52_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
 void rogue36_variant_status(ROGUE_VARIANT_STATUS *status);
 void rogue36_variant_hero_position(int *y, int *x);
@@ -21,6 +22,7 @@ int rogue36_variant_level_number(void);
 int rogue36_variant_map_rows(void);
 int rogue36_variant_map_cols(void);
 bool rogue36_variant_cell_walkable(int y, int x);
+void rogue36_variant_action_context(ROGUE_VARIANT_ACTION_CONTEXT *context);
 void rogue36_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
 void srogue90_variant_status(ROGUE_VARIANT_STATUS *status);
 void srogue90_variant_hero_position(int *y, int *x);
@@ -28,7 +30,9 @@ int srogue90_variant_level_number(void);
 int srogue90_variant_map_rows(void);
 int srogue90_variant_map_cols(void);
 bool srogue90_variant_cell_walkable(int y, int x);
+void srogue90_variant_action_context(ROGUE_VARIANT_ACTION_CONTEXT *context);
 void srogue90_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell);
+void rogue54_variant_action_context(ROGUE_VARIANT_ACTION_CONTEXT *context);
 
 static const ROGUE_VARIANT_INFO variants[] = {
     {
@@ -366,6 +370,33 @@ rogue_variant_status(ROGUE_VARIANT_STATUS *status)
     status->exp_points = pstats.s_exp;
     status->hungry_state = hungry_state;
     status->message = huh;
+}
+
+void
+rogue_variant_action_context(ROGUE_VARIANT_ACTION_CONTEXT *context)
+{
+    if (context == NULL)
+	return;
+
+    memset(context, 0, sizeof(*context));
+
+    if (rogue_variant_is_current("rogue52"))
+    {
+	rogue52_variant_action_context(context);
+	return;
+    }
+    if (rogue_variant_is_current("rogue36"))
+    {
+	rogue36_variant_action_context(context);
+	return;
+    }
+    if (rogue_variant_is_current("srogue90"))
+    {
+	srogue90_variant_action_context(context);
+	return;
+    }
+
+    rogue54_variant_action_context(context);
 }
 
 void

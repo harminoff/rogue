@@ -338,3 +338,9 @@ srogue90_bridge_object_type_at(int y, int x)
 
     return '\0';
 }
+
+int
+srogue90_bridge_level_type(void)
+{
+    return levtype;
+}

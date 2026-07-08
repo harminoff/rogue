@@ -572,11 +572,16 @@ rogue_tilepack_lookup_index(const char *role, int fallback_index)
     int i;
 
     rogue_tilepack_load();
+#ifdef ROGUE_ANDROID
+    return fallback_index;
+#endif
     if (role == NULL)
 	return fallback_index;
 
     for (i = 0; i < entry_count; i++)
-	if (strcmp(entries[i].role, role) == 0 && entries[i].index >= 0)
+	if (entries[i].role[0] != '\0'
+	    && strcmp(entries[i].role, role) == 0
+	    && entries[i].index >= 0)
 	    return entries[i].index;
 
     if (!generated_fallback_safe)
@@ -591,11 +596,14 @@ rogue_tilepack_lookup_name(const char *role, const char *fallback_name)
     int i;
 
     rogue_tilepack_load();
+#ifdef ROGUE_ANDROID
+    return fallback_name;
+#endif
     if (role == NULL)
 	return fallback_name;
 
     for (i = 0; i < entry_count; i++)
-	if (strcmp(entries[i].role, role) == 0)
+	if (entries[i].role[0] != '\0' && strcmp(entries[i].role, role) == 0)
 	    return entries[i].name;
 
     return fallback_name;

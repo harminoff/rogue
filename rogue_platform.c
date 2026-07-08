@@ -13,6 +13,10 @@
 
 static char asset_root[ROGUE_PLATFORM_MAX_PATH] = "";
 static char user_root[ROGUE_PLATFORM_MAX_PATH] = "";
+static int safe_area_left = 0;
+static int safe_area_top = 0;
+static int safe_area_right = 0;
+static int safe_area_bottom = 0;
 
 static void
 copy_root(char *target, const char *source)
@@ -103,6 +107,27 @@ rogue_platform_read_text_file(const char *relative_path)
     return text;
 }
 
+static int
+clamp_nonnegative(int value)
+{
+    return value < 0 ? 0 : value;
+}
+
+void
+rogue_platform_configure_safe_area(int left, int top, int right, int bottom)
+{
+    safe_area_left = clamp_nonnegative(left);
+    safe_area_top = clamp_nonnegative(top);
+    safe_area_right = clamp_nonnegative(right);
+    safe_area_bottom = clamp_nonnegative(bottom);
+}
+
+int
+rogue_platform_android_safe_top_inset(void)
+{
+    return safe_area_top;
+}
+
 #ifdef ROGUE_ANDROID
 JNIEXPORT void JNICALL
 Java_com_roguetiles_RogueTilesActivity_nativeConfigureStorage(
@@ -141,5 +166,15 @@ Java_com_roguetiles_RogueTilesActivity_nativeConfigureStorage(
 				      asset_root_chars);
     if (user_root_chars != NULL)
 	(*env)->ReleaseStringUTFChars(env, user_root_jstring, user_root_chars);
+}
+
+JNIEXPORT void JNICALL
+Java_com_roguetiles_RogueTilesActivity_nativeConfigureSafeArea(
+    JNIEnv *env, jclass clazz, jint left, jint top, jint right, jint bottom)
+{
+    (void) env;
+    (void) clazz;
+    rogue_platform_configure_safe_area((int) left, (int) top, (int) right,
+				       (int) bottom);
 }
 #endif

@@ -17,6 +17,9 @@ final class AndroidAssetSync {
         deleteTree(root);
         copyTree(context.getAssets(), "assets", root);
         copyTree(context.getAssets(), "tilepacks", root);
+        copyTree(context.getAssets(), "variants", root);
+        copyTree(context.getAssets(), "rogue54.6", root);
+        copyTree(context.getAssets(), "rogue54.doc", root);
         return root;
     }
 

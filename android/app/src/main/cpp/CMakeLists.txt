@@ -3,7 +3,117 @@ project(roguetiles_android C)
 
 set(REPO_ROOT ${CMAKE_CURRENT_LIST_DIR}/../../../../..)
 
+set(ROGUE52_CFILES
+    vers.c extern.c armor.c chase.c command.c daemon.c
+    daemons.c fight.c init.c io.c list.c main.c mach_dep.c misc.c
+    monsters.c move.c new_level.c options.c pack.c passages.c
+    potions.c rings.c rip.c rooms.c save.c scrolls.c state.c
+    sticks.c things.c weapons.c wizard.c xcrypt.c rogue52_port.c
+)
+set(ROGUE36_CFILES
+    vers.c armor.c chase.c command.c daemon.c
+    daemons.c fight.c init.c io.c list.c main.c misc.c
+    monsters.c move.c newlevel.c options.c pack.c passages.c
+    potions.c rings.c rip.c rooms.c save.c scrolls.c state.c
+    sticks.c things.c weapons.c wizard.c xcrypt.c rogue36_port.c
+)
+set(SROGUE90_CFILES
+    vers.c armor.c chase.c command.c daemon.c daemons.c disply.c
+    encumb.c fight.c global.c init.c io.c list.c main.c misc.c
+    monsters.c move.c new_leve.c options.c pack.c passages.c
+    potions.c pstats.c rings.c rip.c rooms.c save.c scrolls.c
+    state.c sticks.c things.c trader.c weapons.c wizard.c xcrypt.c
+    srogue90_port.c
+)
+
+set(ROGUE_VARIANT_TOOLCHAIN_FLAGS -fPIC)
+if(CMAKE_C_COMPILER_TARGET)
+    list(APPEND ROGUE_VARIANT_TOOLCHAIN_FLAGS --target=${CMAKE_C_COMPILER_TARGET})
+endif()
+if(CMAKE_SYSROOT)
+    list(APPEND ROGUE_VARIANT_TOOLCHAIN_FLAGS --sysroot=${CMAKE_SYSROOT})
+endif()
+
+function(add_rogue_variant_objects variant score_file lock_file)
+    string(TOUPPER ${variant} variant_upper)
+    set(variant_dir ${REPO_ROOT}/variants/${variant})
+    set(build_dir ${CMAKE_CURRENT_BINARY_DIR}/${variant})
+    set(redef ${variant_dir}/${variant}_symbols.redef)
+    set(expanded_redef ${build_dir}/${variant}_symbols.expanded.redef)
+    set(config_header ${build_dir}/${variant}_android_config.h)
+
+    file(MAKE_DIRECTORY ${build_dir})
+    file(WRITE ${config_header}
+        "#ifndef ${variant_upper}_ANDROID_CONFIG_H\n"
+        "#define ${variant_upper}_ANDROID_CONFIG_H\n"
+        "#define SCOREFILE \"${score_file}\"\n"
+        "#define LOCKFILE \"${lock_file}\"\n"
+        "#endif\n"
+    )
+
+    add_custom_command(
+        OUTPUT ${expanded_redef}
+        COMMAND ${CMAKE_COMMAND}
+            -DINPUT=${redef}
+            -DOUTPUT=${expanded_redef}
+            -DPREFIX=${variant}
+            -P ${CMAKE_CURRENT_LIST_DIR}/expand_variant_redef.cmake
+        DEPENDS ${redef} ${CMAKE_CURRENT_LIST_DIR}/expand_variant_redef.cmake
+        VERBATIM
+    )
+
+    set(objects)
+    foreach(source_file IN LISTS ${variant_upper}_CFILES)
+        set(source ${variant_dir}/${source_file})
+        get_filename_component(source_name ${source_file} NAME)
+        set(object ${build_dir}/${source_name}.o)
+
+        add_custom_command(
+            OUTPUT ${object}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${build_dir}
+            COMMAND ${CMAKE_C_COMPILER}
+                ${ROGUE_VARIANT_TOOLCHAIN_FLAGS}
+                -std=gnu89
+                -fcommon
+                -Wno-return-type
+                -Wno-deprecated-non-prototype
+                -DROGUE_ANDROID
+                -DROGUE_VARIANT_HIDE_UNISTD
+                -I${CMAKE_CURRENT_LIST_DIR}
+                -I${variant_dir}/port
+                -I${variant_dir}
+                -include ${config_header}
+                -include ${variant_dir}/${variant}_port.h
+                -c ${source}
+                -o ${object}
+            COMMAND ${CMAKE_OBJCOPY}
+                --redefine-syms ${expanded_redef}
+                ${object}
+            DEPENDS
+                ${source}
+                ${expanded_redef}
+                ${variant_dir}/${variant}_port.h
+                ${variant_dir}/port/pwd.h
+                ${variant_dir}/port/termios.h
+            VERBATIM
+        )
+
+        set_source_files_properties(${object} PROPERTIES
+            EXTERNAL_OBJECT TRUE
+            GENERATED TRUE
+        )
+        list(APPEND objects ${object})
+    endforeach()
+
+    set(${variant}_objects ${objects} PARENT_SCOPE)
+endfunction()
+
+add_rogue_variant_objects(rogue52 rogue52.scr rogue52.lck)
+add_rogue_variant_objects(rogue36 rogue36.scr rogue36.lck)
+add_rogue_variant_objects(srogue90 srogue90.scr srogue90.lck)
+
 add_library(roguetiles SHARED
+    android_curses.c
     ${REPO_ROOT}/vers.c
     ${REPO_ROOT}/extern.c
     ${REPO_ROOT}/armor.c
@@ -46,9 +156,13 @@ add_library(roguetiles SHARED
     ${REPO_ROOT}/weapons.c
     ${REPO_ROOT}/wizard.c
     ${REPO_ROOT}/xcrypt.c
+    ${rogue52_objects}
+    ${rogue36_objects}
+    ${srogue90_objects}
 )
 
 target_include_directories(roguetiles PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
     ${REPO_ROOT}
     ${REPO_ROOT}/generated
     ${REPO_ROOT}/android/vendor/allegro/include
@@ -56,7 +170,6 @@ target_include_directories(roguetiles PRIVATE
 
 target_compile_definitions(roguetiles PRIVATE
     ROGUE_ANDROID
-    ROGUE_ANDROID_DEFAULT_ONLY
     ROGUE_ENABLE_ALLEGRO
     ALLSCORES
     SCOREFILE="rogue54.scr"

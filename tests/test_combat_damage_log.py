@@ -110,7 +110,11 @@ class CombatDamageLogTests(unittest.TestCase):
         ]
         self.assertIn("cell->layer != ROGUE_TILE_ACTOR", foreground)
         self.assertIn("draw_glyph_foreground_cell", foreground)
-        self.assertNotIn("underlay", foreground)
+        self.assertIn("draw_cell_underlay_or_default(cell, dx, dy);", foreground)
+        self.assertLess(
+            foreground.index("draw_cell_underlay_or_default(cell, dx, dy);"),
+            foreground.index("draw_atlas_tile_foreground(atlas_index, dx, dy);"),
+        )
 
     def test_wall_thickness_is_a_persisted_setting(self):
         allegro_c = (ROOT / "allegro_frontend.c").read_text(encoding="utf-8")

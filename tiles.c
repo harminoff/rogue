@@ -22,6 +22,8 @@
 #define ROGUE36_MAXCOLS 80
 #define SROGUE90_MAXLINES 32
 #define SROGUE90_MAXCOLS 256
+#define SROGUE90_POSTLEV 1
+#define SROGUE90_POOL '"'
 
 extern int rogue52_bridge_hero_y(void);
 extern int rogue52_bridge_hero_x(void);
@@ -106,6 +108,7 @@ extern int srogue90_bridge_see_monst(void *monster);
 extern char srogue90_bridge_monster_type(void *monster);
 extern char srogue90_bridge_monster_disguise(void *monster);
 extern char srogue90_bridge_object_type_at(int y, int x);
+extern int srogue90_bridge_level_type(void);
 
 static void
 set_empty_cell(int y, int x, ROGUE_TILE_CELL *cell)
@@ -261,6 +264,15 @@ static bool
 monster_has_disguise(char disguise, char monster_type)
 {
     return (bool)(disguise != '\0' && disguise != monster_type);
+}
+
+static void
+normalize_stale_player_glyph(char *glyph, char terrain_glyph)
+{
+    if (glyph == NULL)
+	return;
+    if (*glyph == PLAYER)
+	*glyph = terrain_glyph;
 }
 
 static void
@@ -739,7 +751,7 @@ rogue36_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
 		   && !rogue36_bridge_player_is_blind()
 		   && rogue36_bridge_cansee(y, x)));
     object_visible = (bool)(object_glyph != '\0' && visible);
-    seen = (bool)(glyph != ' ' && !glyph_is_object);
+    seen = FALSE;
 
     if (visible || seen)
 	known_cells[y][x] = TRUE;
@@ -761,6 +773,8 @@ rogue36_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
 	cell->visible = TRUE;
 	return;
     }
+
+    normalize_stale_player_glyph(&glyph, terrain_glyph);
 
     monster = rogue36_bridge_monster_at(y, x);
     if (visible && monster != NULL && monster_glyph != ' '
@@ -901,9 +915,11 @@ srogue90_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
     glyph_is_object = (object_glyph != '\0' && glyph == object_glyph);
     visible = ((srogue90_bridge_hero_y() == y
 		&& srogue90_bridge_hero_x() == x)
-	       || (glyph != ' ' && !srogue90_bridge_player_is_blind()));
+	       || (glyph != ' '
+		   && !srogue90_bridge_player_is_blind()
+		   && srogue90_bridge_cansee(y, x)));
     object_visible = (bool)(glyph_is_object && visible);
-    seen = (bool)(glyph != ' ' && !glyph_is_object);
+    seen = FALSE;
 
     if (visible || seen)
 	known_cells[y][x] = TRUE;
@@ -926,6 +942,8 @@ srogue90_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
 	cell->visible = TRUE;
 	return;
     }
+
+    normalize_stale_player_glyph(&glyph, terrain_glyph);
 
     monster = srogue90_bridge_monster_at(y, x);
     if (visible && monster != NULL && monster_glyph != ' '
@@ -981,6 +999,16 @@ srogue90_tile_describe_cell(int y, int x, ROGUE_TILE_CELL *cell)
 }
 
 void
+rogue54_variant_action_context(ROGUE_VARIANT_ACTION_CONTEXT *context)
+{
+    if (context == NULL)
+	return;
+
+    context->on_stairs = (bool)(chat(hero.y, hero.x) == STAIRS);
+    context->on_object = (bool)(object_at(hero.y, hero.x) != NULL);
+}
+
+void
 rogue52_variant_status(ROGUE_VARIANT_STATUS *status)
 {
     if (status == NULL)
@@ -1005,6 +1033,21 @@ rogue52_variant_hero_position(int *y, int *x)
 	*y = rogue52_bridge_hero_y();
     if (x != NULL)
 	*x = rogue52_bridge_hero_x();
+}
+
+void
+rogue52_variant_action_context(ROGUE_VARIANT_ACTION_CONTEXT *context)
+{
+    int y;
+    int x;
+
+    if (context == NULL)
+	return;
+
+    y = rogue52_bridge_hero_y();
+    x = rogue52_bridge_hero_x();
+    context->on_stairs = (bool)(rogue52_bridge_chat(y, x) == STAIRS);
+    context->on_object = (bool)(rogue52_bridge_object_type_at(y, x) != '\0');
 }
 
 int
@@ -1095,6 +1138,21 @@ rogue36_variant_hero_position(int *y, int *x)
 	*y = rogue36_bridge_hero_y();
     if (x != NULL)
 	*x = rogue36_bridge_hero_x();
+}
+
+void
+rogue36_variant_action_context(ROGUE_VARIANT_ACTION_CONTEXT *context)
+{
+    int y;
+    int x;
+
+    if (context == NULL)
+	return;
+
+    y = rogue36_bridge_hero_y();
+    x = rogue36_bridge_hero_x();
+    context->on_stairs = (bool)(rogue36_bridge_terrain_ch(y, x) == STAIRS);
+    context->on_object = (bool)(rogue36_bridge_object_type_at(y, x) != '\0');
 }
 
 int
@@ -1214,6 +1272,26 @@ srogue90_variant_hero_position(int *y, int *x)
 	*y = srogue90_bridge_hero_y();
     if (x != NULL)
 	*x = srogue90_bridge_hero_x();
+}
+
+void
+srogue90_variant_action_context(ROGUE_VARIANT_ACTION_CONTEXT *context)
+{
+    char terrain;
+    int y;
+    int x;
+
+    if (context == NULL)
+	return;
+
+    y = srogue90_bridge_hero_y();
+    x = srogue90_bridge_hero_x();
+    terrain = srogue90_bridge_terrain_ch(y, x);
+    context->on_stairs = (bool)(terrain == STAIRS);
+    context->on_object = (bool)(srogue90_bridge_object_type_at(y, x) != '\0');
+    context->in_trading_post =
+	(bool)(srogue90_bridge_level_type() == SROGUE90_POSTLEV);
+    context->on_magic_pool = (bool)(terrain == SROGUE90_POOL);
 }
 
 int
