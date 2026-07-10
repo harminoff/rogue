@@ -1,4 +1,4 @@
-name: Windows Release
+name: Release Builds
 
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ on:
       - "v*"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build-windows:
@@ -98,10 +98,79 @@ jobs:
           path: dist\RogueTiles-windows-x64.zip
           if-no-files-found: error
 
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/') || inputs.create_release == 'true'
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build dependencies
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "cmake;3.22.1" "ndk;26.1.10909125"
+
+      - name: Validate bundled Allegro artifacts
+        shell: pwsh
+        run: ./scripts/check-android-allegro.ps1
+
+      - name: Sync Android assets
+        shell: pwsh
+        run: ./scripts/sync-android-assets.ps1
+
+      - name: Build Android debug APK
+        working-directory: android
+        run: bash ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Prepare Android artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item android/app/build/outputs/apk/debug/app-debug.apk dist/RogueTiles-android-debug.apk
+
+      - name: Upload Android APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RogueTiles-android-debug
+          path: dist/RogueTiles-android-debug.apk
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs:
+      - build-windows
+      - build-android
+    if: startsWith(github.ref, 'refs/tags/') || inputs.create_release == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download Windows package
+        uses: actions/download-artifact@v5
+        with:
+          name: RogueTiles-windows-x64
+          path: dist
+
+      - name: Download Android package
+        uses: actions/download-artifact@v5
+        with:
+          name: RogueTiles-android-debug
+          path: dist
+
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: pwsh
         run: |
           $tag = "${{ github.ref_name }}"
           if ("${{ github.event_name }}" -eq "workflow_dispatch") {
@@ -111,9 +180,10 @@ jobs:
             $tag = "${{ inputs.release_tag }}"
           }
           $notes = @"
-          RogueTiles Windows build.
+          RogueTiles desktop and Android builds.
 
           Download RogueTiles-windows-x64.zip, extract it, and run RogueTiles.exe.
+          Download RogueTiles-android-debug.apk to install the touch-control Android build.
           TilePicker.exe is included for custom tile set editing.
 
           Added in this release:
@@ -124,8 +194,22 @@ jobs:
           "@
           gh release view $tag *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag dist\RogueTiles-windows-x64.zip --target "${{ github.sha }}" --title "RogueTiles $tag" --notes $notes
+            $releaseArgs = @(
+              "release", "create", $tag,
+              "dist/RogueTiles-windows-x64.zip",
+              "dist/RogueTiles-android-debug.apk",
+              "--target", "${{ github.sha }}",
+              "--title", "RogueTiles $tag",
+              "--notes", $notes
+            )
+            if ($tag -match "-") {
+              $releaseArgs += "--prerelease"
+            }
+            gh @releaseArgs
           }
           else {
-            gh release upload $tag dist\RogueTiles-windows-x64.zip --clobber
+            gh release upload $tag `
+              dist/RogueTiles-windows-x64.zip `
+              dist/RogueTiles-android-debug.apk `
+              --clobber
           }

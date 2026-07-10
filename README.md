@@ -179,14 +179,14 @@ The first Android slice uses the default RogueTiles ruleset, bundled default til
 
 ## GitHub Release Builds
 
-This repo includes a Windows release workflow at `.github/workflows/release-windows.yml`.
+This repo includes a Windows and Android release workflow at `.github/workflows/release-windows.yml`.
 
 It runs on:
 
 - Manual `workflow_dispatch`
 - Version tags matching `v*`
 
-On a tag such as `v0.1.0-alpha`, the workflow builds and uploads `RogueTiles-windows-x64.zip` to the GitHub Release. That zip is the file to upload to itch.io.
+On a tag such as `v0.4.0-alpha`, the workflow builds and uploads both `RogueTiles-windows-x64.zip` and `RogueTiles-android-debug.apk` to the GitHub Release. The zip is the file to upload to itch.io; the APK is the installable Android touch-control build.
 
 Current release highlights:
 
